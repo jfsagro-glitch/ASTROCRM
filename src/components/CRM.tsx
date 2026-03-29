@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, loginWithGoogle, logout } from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp, getDoc, doc, orderBy } from 'firebase/firestore';
-import { LogOut, Users, Calendar as CalendarIcon, Plus, UserPlus, FileText, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp, getDoc, doc, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { LogOut, Users, Calendar as CalendarIcon, Plus, UserPlus, FileText, Clock, CheckCircle, XCircle, Download, Search, Trash2, Edit2, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { downloadPDF } from '../lib/pdfUtils';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Link } from 'react-router-dom';
@@ -69,6 +70,10 @@ interface Client {
   email?: string;
   phone?: string;
   notes?: string;
+  birthDate?: string;
+  birthTime?: string;
+  birthLocation?: string;
+  tags?: string[];
   authorUid: string;
   createdAt: Timestamp;
 }
@@ -79,6 +84,9 @@ interface Consultation {
   date: Timestamp;
   notes?: string;
   status: 'scheduled' | 'completed' | 'cancelled';
+  type?: string;
+  price?: number;
+  paymentStatus?: 'pending' | 'paid' | 'refunded';
   authorUid: string;
   createdAt: Timestamp;
 }
@@ -94,6 +102,7 @@ export default function CRM() {
   const [showAddClient, setShowAddClient] = useState(false);
   const [showAddConsultation, setShowAddConsultation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -147,6 +156,55 @@ export default function CRM() {
       unsubscribeConsultations();
     };
   }, [user, isAuthReady]);
+
+  const handleDeleteClient = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this client? All their consultations will remain but lose the client link.')) {
+      try {
+        await deleteDoc(doc(db, 'clients', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `clients/${id}`);
+      }
+    }
+  };
+
+  const handleDeleteConsultation = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this consultation?')) {
+      try {
+        await deleteDoc(doc(db, 'consultations', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `consultations/${id}`);
+      }
+    }
+  };
+
+  const handleStatusChange = async (id: string, newStatus: 'scheduled' | 'completed' | 'cancelled') => {
+    try {
+      await updateDoc(doc(db, 'consultations', id), { status: newStatus });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `consultations/${id}`);
+    }
+  };
+
+  const handlePaymentStatusChange = async (id: string, newStatus: 'pending' | 'paid' | 'refunded') => {
+    try {
+      await updateDoc(doc(db, 'consultations', id), { paymentStatus: newStatus });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `consultations/${id}`);
+    }
+  };
+
+  const filteredClients = clients.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredConsultations = consultations.filter(c => {
+    const clientName = clients.find(cl => cl.id === c.clientId)?.name || '';
+    return clientName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           c.notes?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const upcomingCount = consultations.filter(c => c.status === 'scheduled').length;
 
   if (!isAuthReady) {
     return (
@@ -234,6 +292,57 @@ export default function CRM() {
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-indigo-100 text-indigo-600">
+                <Users className="w-6 h-6" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Clients</p>
+                <p className="text-2xl font-semibold text-gray-900">{clients.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                <CalendarIcon className="w-6 h-6" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Upcoming Consultations</p>
+                <p className="text-2xl font-semibold text-gray-900">{upcomingCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 text-green-600">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Consultations</p>
+                <p className="text-2xl font-semibold text-gray-900">{consultations.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search clients or consultations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm"
+          />
+        </div>
+
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
             <strong className="font-bold">Error!</strong>
@@ -248,41 +357,65 @@ export default function CRM() {
           <div>
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
-              <button
-                onClick={() => setShowAddClient(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Client
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => downloadPDF('crm-clients-list', 'clients-list.pdf', false)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </button>
+                <button
+                  onClick={() => setShowAddClient(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Client
+                </button>
+              </div>
             </div>
             
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <div id="crm-clients-list" className="bg-white shadow overflow-hidden sm:rounded-md">
               <ul className="divide-y divide-gray-200">
-                {clients.length === 0 ? (
-                  <li className="px-4 py-8 text-center text-gray-500">No clients found. Add one to get started.</li>
+                {filteredClients.length === 0 ? (
+                  <li className="px-4 py-8 text-center text-gray-500">No clients found.</li>
                 ) : (
-                  clients.map((client) => (
+                  filteredClients.map((client) => (
                     <li key={client.id}>
                       <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-indigo-600 truncate">{client.name}</p>
-                          <div className="ml-2 flex-shrink-0 flex">
-                            <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                              Active
-                            </p>
+                          <div className="flex items-center">
+                            <p className="text-sm font-medium text-indigo-600 truncate">{client.name}</p>
+                            {client.tags && client.tags.length > 0 && (
+                              <div className="ml-3 flex gap-1">
+                                {client.tags.map(tag => (
+                                  <span key={tag} className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
+                          <button onClick={() => handleDeleteClient(client.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                         <div className="mt-2 sm:flex sm:justify-between">
-                          <div className="sm:flex">
+                          <div className="sm:flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-6">
                             {client.email && (
-                              <p className="flex items-center text-sm text-gray-500 mr-6">
+                              <p className="flex items-center text-sm text-gray-500">
                                 {client.email}
                               </p>
                             )}
                             {client.phone && (
                               <p className="flex items-center text-sm text-gray-500">
                                 {client.phone}
+                              </p>
+                            )}
+                            {(client.birthDate || client.birthTime || client.birthLocation) && (
+                              <p className="flex items-center text-sm text-gray-500">
+                                <span className="font-medium mr-1">Birth Data:</span>
+                                {client.birthDate} {client.birthTime} {client.birthLocation ? `in ${client.birthLocation}` : ''}
                               </p>
                             )}
                           </div>
@@ -306,46 +439,90 @@ export default function CRM() {
           <div>
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-semibold text-gray-900">Consultations</h1>
-              <button
-                onClick={() => setShowAddConsultation(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Consultation
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => downloadPDF('crm-consultations-list', 'consultations-list.pdf', false)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </button>
+                <button
+                  onClick={() => setShowAddConsultation(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Consultation
+                </button>
+              </div>
             </div>
             
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <div id="crm-consultations-list" className="bg-white shadow overflow-hidden sm:rounded-md">
               <ul className="divide-y divide-gray-200">
-                {consultations.length === 0 ? (
-                  <li className="px-4 py-8 text-center text-gray-500">No consultations found. Schedule one to get started.</li>
+                {filteredConsultations.length === 0 ? (
+                  <li className="px-4 py-8 text-center text-gray-500">No consultations found.</li>
                 ) : (
-                  consultations.map((consultation) => {
+                  filteredConsultations.map((consultation) => {
                     const client = clients.find(c => c.id === consultation.clientId);
                     return (
                       <li key={consultation.id}>
                         <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-indigo-600 truncate">
-                              {client ? client.name : 'Unknown Client'}
-                            </p>
-                            <div className="ml-2 flex-shrink-0 flex">
-                              <p className={cn(
-                                "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                                consultation.status === 'completed' ? "bg-green-100 text-green-800" :
-                                consultation.status === 'scheduled' ? "bg-blue-100 text-blue-800" :
-                                "bg-red-100 text-red-800"
-                              )}>
-                                {consultation.status.charAt(0).toUpperCase() + consultation.status.slice(1)}
+                            <div className="flex items-center">
+                              <p className="text-sm font-medium text-indigo-600 truncate">
+                                {client ? client.name : 'Unknown Client'}
                               </p>
+                              <div className="ml-3 flex items-center space-x-2">
+                                <select 
+                                  value={consultation.status}
+                                  onChange={(e) => handleStatusChange(consultation.id, e.target.value as any)}
+                                  className={cn(
+                                    "text-xs font-semibold rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-0",
+                                    consultation.status === 'completed' ? "bg-green-100 text-green-800" :
+                                    consultation.status === 'scheduled' ? "bg-blue-100 text-blue-800" :
+                                    "bg-red-100 text-red-800"
+                                  )}
+                                >
+                                  <option value="scheduled">Scheduled</option>
+                                  <option value="completed">Completed</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                                <select 
+                                  value={consultation.paymentStatus || 'pending'}
+                                  onChange={(e) => handlePaymentStatusChange(consultation.id, e.target.value as any)}
+                                  className={cn(
+                                    "text-xs font-semibold rounded-full px-2 py-1 border-0 cursor-pointer focus:ring-0",
+                                    consultation.paymentStatus === 'paid' ? "bg-green-100 text-green-800" :
+                                    consultation.paymentStatus === 'refunded' ? "bg-gray-100 text-gray-800" :
+                                    "bg-yellow-100 text-yellow-800"
+                                  )}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="paid">Paid</option>
+                                  <option value="refunded">Refunded</option>
+                                </select>
+                              </div>
                             </div>
+                            <button onClick={() => handleDeleteConsultation(consultation.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                           <div className="mt-2 sm:flex sm:justify-between">
-                            <div className="sm:flex">
+                            <div className="sm:flex gap-6">
                               <p className="flex items-center text-sm text-gray-500">
                                 <Clock className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
                                 {consultation.date ? format(consultation.date.toDate(), 'MMM d, yyyy h:mm a') : 'Unknown Date'}
                               </p>
+                              {consultation.type && (
+                                <p className="flex items-center text-sm text-gray-500 font-medium">
+                                  {consultation.type}
+                                </p>
+                              )}
+                              {consultation.price !== undefined && (
+                                <p className="flex items-center text-sm text-gray-500">
+                                  ${consultation.price}
+                                </p>
+                              )}
                             </div>
                             {consultation.notes && (
                               <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
@@ -379,16 +556,27 @@ export default function CRM() {
                 const email = formData.get('email') as string;
                 const phone = formData.get('phone') as string;
                 const notes = formData.get('notes') as string;
+                const birthDate = formData.get('birthDate') as string;
+                const birthTime = formData.get('birthTime') as string;
+                const birthLocation = formData.get('birthLocation') as string;
+                const tagsString = formData.get('tags') as string;
+                const tags = tagsString ? tagsString.split(',').map(t => t.trim()).filter(t => t) : [];
                 
                 try {
-                  await addDoc(collection(db, 'clients'), {
+                  const newClient: any = {
                     name,
-                    email: email || "",
-                    phone: phone || "",
-                    notes: notes || "",
                     authorUid: user.uid,
                     createdAt: serverTimestamp()
-                  });
+                  };
+                  if (email) newClient.email = email;
+                  if (phone) newClient.phone = phone;
+                  if (notes) newClient.notes = notes;
+                  if (birthDate) newClient.birthDate = birthDate;
+                  if (birthTime) newClient.birthTime = birthTime;
+                  if (birthLocation) newClient.birthLocation = birthLocation;
+                  if (tags.length > 0) newClient.tags = tags;
+
+                  await addDoc(collection(db, 'clients'), newClient);
                   setShowAddClient(false);
                 } catch (err) {
                   handleFirestoreError(err, OperationType.CREATE, 'clients');
@@ -449,17 +637,25 @@ export default function CRM() {
                 const clientId = formData.get('clientId') as string;
                 const dateStr = formData.get('date') as string;
                 const status = formData.get('status') as string;
+                const type = formData.get('type') as string;
+                const priceStr = formData.get('price') as string;
+                const paymentStatus = formData.get('paymentStatus') as string;
                 const notes = formData.get('notes') as string;
                 
                 try {
-                  await addDoc(collection(db, 'consultations'), {
+                  const newConsultation: any = {
                     clientId,
                     date: Timestamp.fromDate(new Date(dateStr)),
                     status,
-                    notes: notes || "",
                     authorUid: user.uid,
                     createdAt: serverTimestamp()
-                  });
+                  };
+                  if (type) newConsultation.type = type;
+                  if (priceStr) newConsultation.price = parseFloat(priceStr);
+                  if (paymentStatus) newConsultation.paymentStatus = paymentStatus;
+                  if (notes) newConsultation.notes = notes;
+
+                  await addDoc(collection(db, 'consultations'), newConsultation);
                   setShowAddConsultation(false);
                 } catch (err) {
                   handleFirestoreError(err, OperationType.CREATE, 'consultations');
@@ -485,6 +681,31 @@ export default function CRM() {
                         <div>
                           <label htmlFor="date" className="block text-sm font-medium text-gray-700">Date & Time *</label>
                           <input type="datetime-local" name="date" id="date" required className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border" />
+                        </div>
+                        <div>
+                          <label htmlFor="type" className="block text-sm font-medium text-gray-700">Consultation Type</label>
+                          <select name="type" id="type" className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border">
+                            <option value="">Select type...</option>
+                            <option value="Natal Chart">Natal Chart</option>
+                            <option value="Synastry">Synastry</option>
+                            <option value="Transit Reading">Transit Reading</option>
+                            <option value="Tarot Reading">Tarot Reading</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="price" className="block text-sm font-medium text-gray-700">Price ($)</label>
+                            <input type="number" step="0.01" name="price" id="price" className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border" />
+                          </div>
+                          <div>
+                            <label htmlFor="paymentStatus" className="block text-sm font-medium text-gray-700">Payment Status</label>
+                            <select name="paymentStatus" id="paymentStatus" defaultValue="pending" className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border">
+                              <option value="pending">Pending</option>
+                              <option value="paid">Paid</option>
+                              <option value="refunded">Refunded</option>
+                            </select>
+                          </div>
                         </div>
                         <div>
                           <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status *</label>

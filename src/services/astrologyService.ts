@@ -80,6 +80,37 @@ export async function getRelocation(name: string, date: string, birthLocation: s
   return JSON.parse(response.text || "{}");
 }
 
+export async function getTarotReading(question: string, spread: '1-card' | '3-card') {
+  const prompt = `Act as an expert Tarot reader. The user asks: "${question}". Draw ${spread === '1-card' ? '1 card' : '3 cards (Past, Present, Future)'}. Provide the card names, their orientation (upright/reversed), and a detailed, insightful reading.`;
+  const response = await ai.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          cards: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                position: { type: Type.STRING },
+                name: { type: Type.STRING },
+                orientation: { type: Type.STRING },
+                meaning: { type: Type.STRING }
+              }
+            }
+          },
+          reading: { type: Type.STRING }
+        },
+        required: ["cards", "reading"]
+      }
+    }
+  });
+  return JSON.parse(response.text || "{}");
+}
+
 export async function getHoroscope(sign: string, timeframe: 'daily' | 'weekly') {
   const prompt = `Act as an expert astrologer. Provide a ${timeframe} horoscope for ${sign}. Include general themes, love, and career.`;
   const response = await ai.models.generateContent({

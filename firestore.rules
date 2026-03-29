@@ -14,6 +14,10 @@ service cloud.firestore {
     //   - email: string (optional, valid email format)
     //   - phone: string (optional, 0-20 chars)
     //   - notes: string (optional, 0-5000 chars)
+    //   - birthDate: string (optional, 0-20 chars)
+    //   - birthTime: string (optional, 0-20 chars)
+    //   - birthLocation: string (optional, 0-100 chars)
+    //   - tags: list of strings (optional)
     //   - authorUid: string (required, immutable, matches auth.uid)
     //   - createdAt: timestamp (required, immutable)
     //
@@ -24,6 +28,9 @@ service cloud.firestore {
     //   - date: timestamp (required)
     //   - notes: string (optional, 0-5000 chars)
     //   - status: string (required, 'scheduled' | 'completed' | 'cancelled')
+    //   - type: string (optional, 0-50 chars)
+    //   - price: number (optional)
+    //   - paymentStatus: string (optional, 'pending' | 'paid' | 'refunded')
     //   - authorUid: string (required, immutable, matches auth.uid)
     //   - createdAt: timestamp (required, immutable)
     //
@@ -90,21 +97,28 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidClient(data) {
-      return hasOnlyAllowedFields(['name', 'email', 'phone', 'notes', 'authorUid', 'createdAt']) &&
+      return hasOnlyAllowedFields(['name', 'email', 'phone', 'notes', 'birthDate', 'birthTime', 'birthLocation', 'tags', 'authorUid', 'createdAt']) &&
              validStringLength('name', 1, 100) &&
              isValidOptionalEmail('email') &&
              isValidOptionalString('phone', 0, 20) &&
              isValidOptionalString('notes', 0, 5000) &&
+             isValidOptionalString('birthDate', 0, 20) &&
+             isValidOptionalString('birthTime', 0, 20) &&
+             isValidOptionalString('birthLocation', 0, 100) &&
+             (!('tags' in data) || data.tags is list) &&
              data.authorUid is string &&
              data.createdAt is timestamp;
     }
 
     function isValidConsultation(data) {
-      return hasOnlyAllowedFields(['clientId', 'date', 'notes', 'status', 'authorUid', 'createdAt']) &&
+      return hasOnlyAllowedFields(['clientId', 'date', 'notes', 'status', 'type', 'price', 'paymentStatus', 'authorUid', 'createdAt']) &&
              validStringLength('clientId', 1, 100) &&
              data.date is timestamp &&
              isValidOptionalString('notes', 0, 5000) &&
              data.status in ['scheduled', 'completed', 'cancelled'] &&
+             isValidOptionalString('type', 0, 50) &&
+             (!('price' in data) || data.price is number) &&
+             (!('paymentStatus' in data) || data.paymentStatus in ['pending', 'paid', 'refunded']) &&
              data.authorUid is string &&
              data.createdAt is timestamp;
     }
