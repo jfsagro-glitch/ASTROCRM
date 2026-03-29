@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: clients
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - email: string (optional, valid email format)
+    //   - phone: string (optional, 0-20 chars)
+    //   - notes: string (optional, 0-5000 chars)
+    //   - authorUid: string (required, immutable, matches auth.uid)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: consultations
+    // Document ID: auto-generated
+    // Fields:
+    //   - clientId: string (required, 1-100 chars)
+    //   - date: timestamp (required)
+    //   - notes: string (optional, 0-5000 chars)
+    //   - status: string (required, 'scheduled' | 'completed' | 'cancelled')
+    //   - authorUid: string (required, immutable, matches auth.uid)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorUid;
+    }
+    
+    function uidUnchanged() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('authorUid' in request.resource.data) || request.resource.data.authorUid == resource.data.authorUid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+    
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+    
+    function isValidOptionalEmail(field) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] == "") ||
+             isValidEmail(request.resource.data[field]);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidClient(data) {
+      return hasOnlyAllowedFields(['name', 'email', 'phone', 'notes', 'authorUid', 'createdAt']) &&
+             validStringLength('name', 1, 100) &&
+             isValidOptionalEmail('email') &&
+             isValidOptionalString('phone', 0, 20) &&
+             isValidOptionalString('notes', 0, 5000) &&
+             data.authorUid is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidConsultation(data) {
+      return hasOnlyAllowedFields(['clientId', 'date', 'notes', 'status', 'authorUid', 'createdAt']) &&
+             validStringLength('clientId', 1, 100) &&
+             data.date is timestamp &&
+             isValidOptionalString('notes', 0, 5000) &&
+             data.status in ['scheduled', 'completed', 'cancelled'] &&
+             data.authorUid is string &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /clients/{clientId} {
+      allow read: if isOwner();
+      allow create: if isAuthenticated() && 
+                       hasRequiredFields(['name', 'authorUid', 'createdAt']) &&
+                       isValidClient(request.resource.data) && 
+                       uidUnchanged();
+      allow update: if isOwner() && 
+                       isValidClient(request.resource.data) && 
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged(['createdAt']);
+      allow delete: if isOwner();
+    }
+
+    match /consultations/{consultationId} {
+      allow read: if isOwner();
+      allow create: if isAuthenticated() && 
+                       hasRequiredFields(['clientId', 'date', 'status', 'authorUid', 'createdAt']) &&
+                       isValidConsultation(request.resource.data) && 
+                       uidUnchanged();
+      allow update: if isOwner() && 
+                       isValidConsultation(request.resource.data) && 
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged(['createdAt', 'clientId']);
+      allow delete: if isOwner();
+    }
+  }
+}
