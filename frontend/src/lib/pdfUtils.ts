@@ -69,8 +69,8 @@ export async function downloadTabsPDF(
   switchSection: (id: string) => Promise<void>,
   filename = 'full-report.pdf',
 ): Promise<void> {
-  const BG = '#07090f';
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const BG = '#ffffff';
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pw  = pdf.internal.pageSize.getWidth();
   const ph  = pdf.internal.pageSize.getHeight();
   let isFirst = true;
@@ -89,6 +89,18 @@ export async function downloadTabsPDF(
         logging: false,
         backgroundColor: BG,
         windowWidth: Math.max(el.scrollWidth, 1200),
+        scrollY: -window.scrollY,
+        onclone: (doc) => {
+          doc.body.classList.add('pdf-export-bw');
+          const target = doc.getElementById(id);
+          if (target) {
+            target.style.maxWidth = 'none';
+            target.style.width = '1600px';
+            target.style.padding = '20px';
+            target.style.margin = '0';
+            target.style.filter = 'grayscale(1) contrast(1.15)';
+          }
+        },
       });
       if (canvas.width === 0 || canvas.height === 0) continue;
 
@@ -98,11 +110,11 @@ export async function downloadTabsPDF(
       // section header
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(214, 168, 93);
-      pdf.text(`HOLO · ${title}`, pw / 2, 8, { align: 'center' });
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(`HOLO AstroCRM | ${title}`, pw / 2, 8, { align: 'center' });
       pdf.setTextColor(0, 0, 0);
 
-      const pageW   = pw - 20;
+      const pageW   = pw - 12;
       const imgH    = (pageW * canvas.height) / canvas.width;
       let remaining = imgH;
       let y         = 14;
@@ -121,7 +133,7 @@ export async function downloadTabsPDF(
         ctx.fillRect(0, 0, slice.width, slice.height);
         ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
 
-        pdf.addImage(slice.toDataURL('image/jpeg', 0.9), 'JPEG', 10, y, pageW, chunk);
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.98), 'JPEG', 6, y, pageW, chunk);
         remaining -= chunk;
         if (remaining > 0) { pdf.addPage(); y = 10; }
       }

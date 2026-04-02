@@ -139,3 +139,34 @@ body {
     animation: none;
   }
 }
+
+.pdf-export-bw,
+.pdf-export-bw body {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.pdf-export-bw * {
+  color: #000000 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  transition: none !important;
+  animation: none !important;
+  backdrop-filter: none !important;
+}
+
+.pdf-export-bw a,
+.pdf-export-bw button,
+.pdf-export-bw input,
+.pdf-export-bw select,
+.pdf-export-bw textarea {
+  color: #000000 !important;
+  background: #ffffff !important;
+  border-color: #666666 !important;
+}
+
+.pdf-export-bw table,
+.pdf-export-bw th,
+.pdf-export-bw td {
+  border-color: #666666 !important;
+}
