@@ -30,7 +30,7 @@ import {
 } from '../services/astrologyService';
 import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
-import { downloadPDF } from '../lib/pdfUtils';
+import { downloadPDF, downloadTabsPDF } from '../lib/pdfUtils';
 import { useLang } from '../i18n/LanguageContext';
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
@@ -1555,6 +1555,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const calcNatal = useCallback(async () => {
     if (!birth.date || !birth.time) { setError(tr.dateTimeRequired); return; }
@@ -1563,6 +1564,32 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [birth, tr]);
+
+  const handleExportAll = useCallback(async () => {
+    setIsExporting(true);
+    const savedTab = activeTab;
+    const titles: Record<string, string> = {
+      natal: tr.natalChart, predictive: tr.predictive, synastry: tr.synastry,
+      relocation: tr.relocation, interpretation: tr.interpretation,
+    };
+    try {
+      await downloadTabsPDF(
+        (['natal', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
+          k => ({ id: `pdf-section-${k}`, title: titles[k] }),
+        ),
+        async (id) => {
+          const key = id.replace('pdf-section-', '') as typeof activeTab;
+          setActiveTab(key);
+          // wait for AnimatePresence exit (260ms) + enter (260ms) + margin
+          await new Promise(r => setTimeout(r, 650));
+        },
+        `${birth.name ? birth.name.replace(/\s+/g, '-') : 'holo'}-report.pdf`,
+      );
+    } finally {
+      setIsExporting(false);
+      setActiveTab(savedTab);
+    }
+  }, [activeTab, birth.name, tr]);
 
   const tabs = [
     { key: 'natal',          icon: Star,      label: tr.natalChart },
@@ -1614,9 +1641,11 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             {loading ? <><Spin />{tr.calculating}</> : <><Star className="h-4 w-4 inline mr-1.5" />{tr.calcNatal}</>}
           </button>
           {natalChart && (
-            <button onClick={() => downloadPDF('chart-export', 'natal-chart.pdf', false)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card}`}>
-              <Download className="h-4 w-4 inline mr-1.5" />{tr.exportPdf}
+            <button onClick={handleExportAll} disabled={isExporting}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
+              {isExporting
+                ? <><Spin />{tr.exportPdf}…</>
+                : <><Download className="h-4 w-4 inline mr-1.5" />{tr.exportPdf}</>}
             </button>
           )}
         </div>
@@ -1640,7 +1669,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             transition={{ duration: 0.26, ease: 'easeOut' }}>
 
             {activeTab === 'natal' && natalChart && (
-              <div id="chart-export" className="space-y-4">
+              <div id="pdf-section-natal" className="space-y-4">
                 <div className={`rounded-xl border ${theme.card} p-3 text-xs ${theme.text}`}>
                   <span className={theme.accent}>{tr.chart}: </span>
                   {natalChart.metadata.date} {natalChart.metadata.time} · Lat {natalChart.metadata.lat} / Lon {natalChart.metadata.lon} · UTC {natalChart.metadata.utc > 0 ? '+' : ''}{natalChart.metadata.utc} · {natalChart.metadata.houses_system}
@@ -1667,47 +1696,59 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             )}
 
             {activeTab === 'predictive' && (
-              natalChart
-                ? <PredictiveExpanded birth={birth} theme={theme} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+              <div id="pdf-section-predictive">
+                {natalChart
+                  ? <PredictiveExpanded birth={birth} theme={theme} />
+                  : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                      <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                      <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                    </div>
+                }
+              </div>
             )}
 
             {activeTab === 'synastry' && (
-              natalChart
-                ? <SynastryPanel birth={birth} theme={theme} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+              <div id="pdf-section-synastry">
+                {natalChart
+                  ? <SynastryPanel birth={birth} theme={theme} />
+                  : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                      <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                      <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                    </div>
+                }
+              </div>
             )}
 
             {activeTab === 'relocation' && (
-              natalChart
-                ? <RelocationPanel birth={birth} theme={theme} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+              <div id="pdf-section-relocation">
+                {natalChart
+                  ? <RelocationPanel birth={birth} theme={theme} />
+                  : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                      <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                      <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                    </div>
+                }
+              </div>
             )}
 
             {activeTab === 'interpretation' && (
-              natalChart
-                ? (
-                  <div className={`rounded-xl border ${theme.card} p-4`}>
-                    <InterpretationPanel
-                      chart={natalChart}
-                      name={birth.name}
-                      theme={theme.wheelTheme}
-                    />
-                  </div>
-                )
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <BookOpen className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+              <div id="pdf-section-interpretation">
+                {natalChart
+                  ? (
+                    <div className={`rounded-xl border ${theme.card} p-4`}>
+                      <InterpretationPanel
+                        chart={natalChart}
+                        name={birth.name}
+                        theme={theme.wheelTheme}
+                      />
+                    </div>
+                  )
+                  : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                      <BookOpen className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                      <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                    </div>
+                }
+              </div>
             )}
 
           </motion.div>
