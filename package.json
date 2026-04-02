@@ -1,14 +1,19 @@
 {
-  "name": "react-example",
+  "name": "holo-astrocrm",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
+  "description": "HOLO Astrology CRM — Frontend + AI Proxy Backend",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "dev": "npm run dev:api & npm run dev:frontend",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:api": "tsx server/aiProxy.ts",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "lint": "cd frontend && npm run build",
+    "start": "npm run start:api",
+    "start:api": "tsx server/aiProxy.ts",
+    "install:all": "npm install && cd frontend && npm install"
   },
   "dependencies": {
     "@google/genai": "^1.47.0",
