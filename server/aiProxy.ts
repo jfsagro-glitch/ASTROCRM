@@ -1,9 +1,16 @@
 import 'dotenv/config';
 import express from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const port = Number(process.env.PORT || process.env.AI_PROXY_PORT || 8787);
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distDir = path.resolve(__dirname, '..', 'frontend', 'dist');
+const hasFrontendBuild = fs.existsSync(path.join(distDir, 'index.html'));
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -49,11 +56,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/', (_req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: 'ai-proxy',
-    health: '/api/health',
-  });
+  if (hasFrontendBuild) {
+    res.sendFile(path.join(distDir, 'index.html'));
+    return;
+  }
+
+  res.status(200).json({ ok: true, service: 'ai-proxy', health: '/api/health' });
 });
 
 app.post('/api/natal', safeHandler(async (req) => {
@@ -183,6 +191,13 @@ app.post('/api/horoscope', safeHandler(async (req) => {
     required: ['general', 'love', 'career', 'luckyColor', 'luckyNumber'],
   });
 }));
+
+if (hasFrontendBuild) {
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api).*/, (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.listen(port, () => {
   console.log(`AI proxy listening on http://localhost:${port}`);
