@@ -8,10 +8,10 @@
     "dev": "npm run dev:api & npm run dev:frontend",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:api": "tsx server/aiProxy.ts",
-    "build": "cd frontend && npm run build",
+    "build": "npm --prefix frontend install --include=dev --no-audit --no-fund && npm --prefix frontend run build",
     "preview": "cd frontend && npm run preview",
-    "lint": "cd frontend && npm run build",
-    "type-check": "cd frontend && tsc --noEmit",
+    "lint": "npm --prefix frontend install --include=dev --no-audit --no-fund && npm --prefix frontend run build",
+    "type-check": "npm --prefix frontend install --include=dev --no-audit --no-fund && npm --prefix frontend exec tsc --noEmit",
     "start": "npm run start:api",
     "start:api": "tsx server/aiProxy.ts",
     "install:all": "npm install && cd frontend && npm install"
