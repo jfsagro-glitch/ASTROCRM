@@ -1,0 +1,1458 @@
+{
+  "analysis": {
+    "sun": {
+      "n": 64989,
+      "mae_all": 6.2,
+      "mae_clean": 0.58,
+      "pct_bad": 0.43,
+      "pct_5min": 98.0,
+      "pct_30min": 99.5,
+      "pct_1deg": 99.6,
+      "p50": 0.3,
+      "p90": 0.6,
+      "p99": 13.6
+    },
+    "moon": {
+      "n": 64989,
+      "mae_all": 35.75,
+      "mae_clean": 1.59,
+      "pct_bad": 2.4,
+      "pct_5min": 93.5,
+      "pct_30min": 95.2,
+      "pct_1deg": 97.6,
+      "p50": 0.3,
+      "p90": 0.9,
+      "p99": 182.8
+    },
+    "asc": {
+      "n": 64989,
+      "mae_all": 65.17,
+      "mae_clean": 0.56,
+      "pct_bad": 7.38,
+      "pct_5min": 91.7,
+      "pct_30min": 92.3,
+      "pct_1deg": 92.6,
+      "p50": 0.3,
+      "p90": 0.8,
+      "p99": 1392.9
+    }
+  },
+  "by_decade": {
+    "1450": {
+      "n": 13,
+      "sun_mae": 42.6,
+      "moon_mae": 499.2,
+      "asc_mae": 86.9,
+      "sun_p90": 0.7,
+      "moon_p90": 2.6
+    },
+    "1460": {
+      "n": 12,
+      "sun_mae": 43.6,
+      "moon_mae": 625.9,
+      "asc_mae": 39.3,
+      "sun_p90": 0.6,
+      "moon_p90": 3.3
+    },
+    "1470": {
+      "n": 21,
+      "sun_mae": 25.6,
+      "moon_mae": 373.9,
+      "asc_mae": 48.0,
+      "sun_p90": 0.7,
+      "moon_p90": 4.3
+    },
+    "1480": {
+      "n": 20,
+      "sun_mae": 26.1,
+      "moon_mae": 387.7,
+      "asc_mae": 19.2,
+      "sun_p90": 0.9,
+      "moon_p90": 2.7
+    },
+    "1490": {
+      "n": 24,
+      "sun_mae": 44.5,
+      "moon_mae": 632.5,
+      "asc_mae": 51.0,
+      "sun_p90": 0.9,
+      "moon_p90": 5.6
+    },
+    "1500": {
+      "n": 13,
+      "sun_mae": 0.4,
+      "moon_mae": 1.2,
+      "asc_mae": 0.3,
+      "sun_p90": 0.6,
+      "moon_p90": 1.8
+    },
+    "1510": {
+      "n": 22,
+      "sun_mae": 10.5,
+      "moon_mae": 122.3,
+      "asc_mae": 178.9,
+      "sun_p90": 0.6,
+      "moon_p90": 1.7
+    },
+    "1520": {
+      "n": 30,
+      "sun_mae": 20.0,
+      "moon_mae": 291.8,
+      "asc_mae": 24.6,
+      "sun_p90": 0.6,
+      "moon_p90": 7.1
+    },
+    "1530": {
+      "n": 24,
+      "sun_mae": 25.7,
+      "moon_mae": 364.6,
+      "asc_mae": 44.4,
+      "sun_p90": 0.7,
+      "moon_p90": 2.2
+    },
+    "1540": {
+      "n": 26,
+      "sun_mae": 0.3,
+      "moon_mae": 1.0,
+      "asc_mae": 21.6,
+      "sun_p90": 0.6,
+      "moon_p90": 1.6
+    },
+    "1550": {
+      "n": 33,
+      "sun_mae": 54.1,
+      "moon_mae": 710.9,
+      "asc_mae": 53.3,
+      "sun_p90": 0.6,
+      "moon_p90": 4.4
+    },
+    "1560": {
+      "n": 37,
+      "sun_mae": 309.9,
+      "moon_mae": 695.3,
+      "asc_mae": 59.2,
+      "sun_p90": 229.0,
+      "moon_p90": 712.0
+    },
+    "1570": {
+      "n": 41,
+      "sun_mae": 0.5,
+      "moon_mae": 3.1,
+      "asc_mae": 81.1,
+      "sun_p90": 0.6,
+      "moon_p90": 2.3
+    },
+    "1580": {
+      "n": 51,
+      "sun_mae": 72.5,
+      "moon_mae": 938.0,
+      "asc_mae": 148.9,
+      "sun_p90": 572.1,
+      "moon_p90": 7222.1
+    },
+    "1590": {
+      "n": 34,
+      "sun_mae": 124.4,
+      "moon_mae": 1669.1,
+      "asc_mae": 168.2,
+      "sun_p90": 607.8,
+      "moon_p90": 8129.4
+    },
+    "1600": {
+      "n": 53,
+      "sun_mae": 44.7,
+      "moon_mae": 575.9,
+      "asc_mae": 63.4,
+      "sun_p90": 0.8,
+      "moon_p90": 1.9
+    },
+    "1610": {
+      "n": 30,
+      "sun_mae": 78.9,
+      "moon_mae": 1102.8,
+      "asc_mae": 100.8,
+      "sun_p90": 575.8,
+      "moon_p90": 7785.6
+    },
+    "1620": {
+      "n": 50,
+      "sun_mae": 96.2,
+      "moon_mae": 1246.9,
+      "asc_mae": 94.6,
+      "sun_p90": 603.3,
+      "moon_p90": 7517.2
+    },
+    "1630": {
+      "n": 33,
+      "sun_mae": 75.7,
+      "moon_mae": 929.0,
+      "asc_mae": 223.2,
+      "sun_p90": 493.7,
+      "moon_p90": 5938.9
+    },
+    "1640": {
+      "n": 31,
+      "sun_mae": 211.1,
+      "moon_mae": 2778.5,
+      "asc_mae": 188.1,
+      "sun_p90": 608.9,
+      "moon_p90": 8042.6
+    },
+    "1650": {
+      "n": 30,
+      "sun_mae": 157.7,
+      "moon_mae": 2154.7,
+      "asc_mae": 185.6,
+      "sun_p90": 596.8,
+      "moon_p90": 8088.6
+    },
+    "1660": {
+      "n": 43,
+      "sun_mae": 132.7,
+      "moon_mae": 1686.7,
+      "asc_mae": 121.9,
+      "sun_p90": 579.2,
+      "moon_p90": 7978.4
+    },
+    "1670": {
+      "n": 40,
+      "sun_mae": 310.2,
+      "moon_mae": 4166.9,
+      "asc_mae": 343.2,
+      "sun_p90": 608.9,
+      "moon_p90": 8429.3
+    },
+    "1680": {
+      "n": 41,
+      "sun_mae": 144.9,
+      "moon_mae": 1910.2,
+      "asc_mae": 119.6,
+      "sun_p90": 598.5,
+      "moon_p90": 8034.7
+    },
+    "1690": {
+      "n": 35,
+      "sun_mae": 169.9,
+      "moon_mae": 2256.8,
+      "asc_mae": 309.9,
+      "sun_p90": 599.7,
+      "moon_p90": 8103.1
+    },
+    "1700": {
+      "n": 32,
+      "sun_mae": 42.1,
+      "moon_mae": 565.3,
+      "asc_mae": 346.7,
+      "sun_p90": 0.7,
+      "moon_p90": 4.9
+    },
+    "1710": {
+      "n": 52,
+      "sun_mae": 75.5,
+      "moon_mae": 1035.4,
+      "asc_mae": 78.0,
+      "sun_p90": 569.7,
+      "moon_p90": 7258.7
+    },
+    "1720": {
+      "n": 69,
+      "sun_mae": 93.2,
+      "moon_mae": 1280.4,
+      "asc_mae": 72.9,
+      "sun_p90": 631.9,
+      "moon_p90": 8216.6
+    },
+    "1730": {
+      "n": 65,
+      "sun_mae": 60.1,
+      "moon_mae": 781.2,
+      "asc_mae": 71.0,
+      "sun_p90": 0.8,
+      "moon_p90": 4.6
+    },
+    "1740": {
+      "n": 81,
+      "sun_mae": 64.6,
+      "moon_mae": 827.1,
+      "asc_mae": 76.1,
+      "sun_p90": 3.7,
+      "moon_p90": 39.0
+    },
+    "1750": {
+      "n": 124,
+      "sun_mae": 26.7,
+      "moon_mae": 341.5,
+      "asc_mae": 100.7,
+      "sun_p90": 0.6,
+      "moon_p90": 1.2
+    },
+    "1760": {
+      "n": 88,
+      "sun_mae": 22.7,
+      "moon_mae": 287.0,
+      "asc_mae": 44.3,
+      "sun_p90": 0.6,
+      "moon_p90": 1.2
+    },
+    "1770": {
+      "n": 148,
+      "sun_mae": 48.1,
+      "moon_mae": 113.1,
+      "asc_mae": 22.2,
+      "sun_p90": 0.5,
+      "moon_p90": 0.8
+    },
+    "1780": {
+      "n": 130,
+      "sun_mae": 34.3,
+      "moon_mae": 160.5,
+      "asc_mae": 169.4,
+      "sun_p90": 0.7,
+      "moon_p90": 0.8
+    },
+    "1790": {
+      "n": 200,
+      "sun_mae": 1.3,
+      "moon_mae": 14.2,
+      "asc_mae": 36.9,
+      "sun_p90": 0.6,
+      "moon_p90": 0.8
+    },
+    "1800": {
+      "n": 411,
+      "sun_mae": 0.3,
+      "moon_mae": 0.9,
+      "asc_mae": 11.0,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1810": {
+      "n": 517,
+      "sun_mae": 16.4,
+      "moon_mae": 57.7,
+      "asc_mae": 45.8,
+      "sun_p90": 0.6,
+      "moon_p90": 0.8
+    },
+    "1820": {
+      "n": 572,
+      "sun_mae": 12.8,
+      "moon_mae": 17.6,
+      "asc_mae": 28.8,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1830": {
+      "n": 599,
+      "sun_mae": 0.9,
+      "moon_mae": 10.3,
+      "asc_mae": 37.2,
+      "sun_p90": 0.7,
+      "moon_p90": 2.5
+    },
+    "1840": {
+      "n": 800,
+      "sun_mae": 1.3,
+      "moon_mae": 14.8,
+      "asc_mae": 31.7,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1850": {
+      "n": 902,
+      "sun_mae": 11.8,
+      "moon_mae": 29.6,
+      "asc_mae": 84.4,
+      "sun_p90": 0.7,
+      "moon_p90": 2.1
+    },
+    "1860": {
+      "n": 1370,
+      "sun_mae": 3.9,
+      "moon_mae": 52.2,
+      "asc_mae": 79.8,
+      "sun_p90": 0.7,
+      "moon_p90": 5.1
+    },
+    "1870": {
+      "n": 1899,
+      "sun_mae": 1.7,
+      "moon_mae": 20.1,
+      "asc_mae": 69.3,
+      "sun_p90": 0.7,
+      "moon_p90": 0.9
+    },
+    "1880": {
+      "n": 2504,
+      "sun_mae": 2.2,
+      "moon_mae": 27.5,
+      "asc_mae": 62.7,
+      "sun_p90": 0.7,
+      "moon_p90": 0.7
+    },
+    "1890": {
+      "n": 2846,
+      "sun_mae": 5.1,
+      "moon_mae": 50.3,
+      "asc_mae": 81.6,
+      "sun_p90": 0.7,
+      "moon_p90": 0.7
+    },
+    "1900": {
+      "n": 3915,
+      "sun_mae": 6.3,
+      "moon_mae": 19.6,
+      "asc_mae": 104.3,
+      "sun_p90": 0.8,
+      "moon_p90": 0.6
+    },
+    "1910": {
+      "n": 4749,
+      "sun_mae": 0.7,
+      "moon_mae": 5.7,
+      "asc_mae": 83.5,
+      "sun_p90": 0.7,
+      "moon_p90": 0.6
+    },
+    "1920": {
+      "n": 6402,
+      "sun_mae": 5.7,
+      "moon_mae": 10.4,
+      "asc_mae": 75.5,
+      "sun_p90": 0.7,
+      "moon_p90": 0.7
+    },
+    "1930": {
+      "n": 5580,
+      "sun_mae": 3.3,
+      "moon_mae": 7.9,
+      "asc_mae": 61.4,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1940": {
+      "n": 6859,
+      "sun_mae": 1.8,
+      "moon_mae": 6.6,
+      "asc_mae": 56.5,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1950": {
+      "n": 6000,
+      "sun_mae": 2.3,
+      "moon_mae": 6.2,
+      "asc_mae": 45.4,
+      "sun_p90": 0.6,
+      "moon_p90": 0.7
+    },
+    "1960": {
+      "n": 5349,
+      "sun_mae": 0.7,
+      "moon_mae": 6.8,
+      "asc_mae": 51.1,
+      "sun_p90": 0.6,
+      "moon_p90": 0.8
+    },
+    "1970": {
+      "n": 4377,
+      "sun_mae": 2.1,
+      "moon_mae": 9.3,
+      "asc_mae": 50.3,
+      "sun_p90": 0.6,
+      "moon_p90": 0.8
+    },
+    "1980": {
+      "n": 3719,
+      "sun_mae": 4.8,
+      "moon_mae": 14.9,
+      "asc_mae": 50.7,
+      "sun_p90": 0.6,
+      "moon_p90": 0.9
+    },
+    "1990": {
+      "n": 2282,
+      "sun_mae": 3.2,
+      "moon_mae": 12.5,
+      "asc_mae": 32.1,
+      "sun_p90": 0.6,
+      "moon_p90": 1.0
+    },
+    "2000": {
+      "n": 868,
+      "sun_mae": 9.5,
+      "moon_mae": 24.0,
+      "asc_mae": 74.8,
+      "sun_p90": 0.6,
+      "moon_p90": 1.0
+    },
+    "2010": {
+      "n": 467,
+      "sun_mae": 67.6,
+      "moon_mae": 131.1,
+      "asc_mae": 166.0,
+      "sun_p90": 0.7,
+      "moon_p90": 1.1
+    },
+    "2020": {
+      "n": 139,
+      "sun_mae": 89.0,
+      "moon_mae": 55.6,
+      "asc_mae": 122.3,
+      "sun_p90": 0.6,
+      "moon_p90": 1.1
+    }
+  },
+  "utc_distribution": {
+    "-6.0": 5898,
+    "-5.0": 6974,
+    "-7.0": 3153,
+    "-4.0": 3768,
+    "2.0": 3777,
+    "1.0": 18960,
+    "5.0": 35,
+    "0.0": 9942,
+    "-5.5": 164,
+    "-10.0": 66,
+    "-6.5": 219,
+    "3.0": 274,
+    "-8.0": 2891,
+    "0.5": 4102,
+    "5.5": 430,
+    "-3.0": 1632,
+    "-4.5": 261,
+    "-2.0": 143,
+    "1.5": 404,
+    "4.0": 62,
+    "-0.5": 356,
+    "6.5": 28,
+    "2.5": 33,
+    "9.0": 203,
+    "11.5": 23,
+    "3.5": 25,
+    "10.0": 321,
+    "8.0": 276,
+    "7.0": 85,
+    "9.5": 53,
+    "-10.5": 87,
+    "11.0": 86,
+    "-9.5": 2,
+    "-2.5": 20,
+    "-1.0": 32,
+    "12.0": 48,
+    "-11.0": 2,
+    "4.5": 11,
+    "6.0": 31,
+    "13.0": 13,
+    "7.5": 38,
+    "-3.5": 27,
+    "-8.5": 2,
+    "10.5": 7,
+    "8.5": 4,
+    "-11.5": 2,
+    "-7.5": 18,
+    "-1.5": 1
+  },
+  "top_outliers": [
+    {
+      "name": "Peary, Marie",
+      "planet": "asc",
+      "err_arcmin": 10799.9,
+      "year": 1893,
+      "utc": -4.573333333333333,
+      "computed": "virgo 26°",
+      "expected": "pisces 26.2°"
+    },
+    {
+      "name": "Plane Crash: Alaska (1935)",
+      "planet": "asc",
+      "err_arcmin": 10798.7,
+      "year": 1935,
+      "utc": -10.0,
+      "computed": "libra 29°",
+      "expected": "aries 29.1°"
+    },
+    {
+      "name": "Hertz, Heinrich",
+      "planet": "asc",
+      "err_arcmin": 10795.3,
+      "year": 1857,
+      "utc": 0.6655555555555555,
+      "computed": "aquarius 0°",
+      "expected": "leo 0.0°"
+    },
+    {
+      "name": "Dmitri Alexandrovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 10785.5,
+      "year": 1901,
+      "utc": 1.0,
+      "computed": "pisces 0°",
+      "expected": "virgo 0.7°"
+    },
+    {
+      "name": "Wilson, Harriette",
+      "planet": "asc",
+      "err_arcmin": 10765.1,
+      "year": 1786,
+      "utc": -0.01111111111111111,
+      "computed": "pisces 29°",
+      "expected": "libra 0.2°"
+    },
+    {
+      "name": "Charest, Jean",
+      "planet": "asc",
+      "err_arcmin": 10737.7,
+      "year": 1958,
+      "utc": -4.0,
+      "computed": "aries 2°",
+      "expected": "libra 1.3°"
+    },
+    {
+      "name": "Lula da Silva, Luiz Inácio",
+      "planet": "asc",
+      "err_arcmin": 10713.6,
+      "year": 1945,
+      "utc": -3.0,
+      "computed": "sagittarius 19°",
+      "expected": "gemini 21.1°"
+    },
+    {
+      "name": "Cities: Berne:Conj. Jup-Sat",
+      "planet": "asc",
+      "err_arcmin": 10582.2,
+      "year": 1186,
+      "utc": 0.4955555555555556,
+      "computed": "sagittarius 8°",
+      "expected": "gemini 4.5°"
+    },
+    {
+      "name": "Space: Apollo 14 (Launch)",
+      "planet": "asc",
+      "err_arcmin": 10455.9,
+      "year": 1971,
+      "utc": -0.0,
+      "computed": "capricorn 22°",
+      "expected": "cancer 17.0°"
+    },
+    {
+      "name": "Inauguration:Hofoper am Ring",
+      "planet": "moon",
+      "err_arcmin": 10448.4,
+      "year": 1869,
+      "utc": 1.091537037037037,
+      "computed": "sagittarius 5°",
+      "expected": "gemini 0.0°"
+    },
+    {
+      "name": "Jensen, Finn",
+      "planet": "moon",
+      "err_arcmin": 10431.9,
+      "year": 1957,
+      "utc": 1.0,
+      "computed": "scorpio 2°",
+      "expected": "aries 25.9°"
+    },
+    {
+      "name": "Marić, Mileva",
+      "planet": "moon",
+      "err_arcmin": 10411.9,
+      "year": 1875,
+      "utc": 1.3533333333333333,
+      "computed": "aries 0°",
+      "expected": "virgo 24.0°"
+    },
+    {
+      "name": "Korolev, Sergei",
+      "planet": "moon",
+      "err_arcmin": 10367.3,
+      "year": 1906,
+      "utc": 1.9166666666666667,
+      "computed": "cancer 8°",
+      "expected": "capricorn 1.4°"
+    },
+    {
+      "name": "Igor Constantinovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 10349.2,
+      "year": 1894,
+      "utc": 4.113333333333333,
+      "computed": "pisces 22°",
+      "expected": "virgo 14.6°"
+    },
+    {
+      "name": "Alexander II, Czar of Russia",
+      "planet": "moon",
+      "err_arcmin": 10311.1,
+      "year": 1818,
+      "utc": 2.0166666666666666,
+      "computed": "virgo 8°",
+      "expected": "aquarius 29.9°"
+    },
+    {
+      "name": "Tolstoy, Sergei Lvovich",
+      "planet": "moon",
+      "err_arcmin": 10281.3,
+      "year": 1863,
+      "utc": 2.5077777777777777,
+      "computed": "scorpio 19°",
+      "expected": "taurus 11.3°"
+    },
+    {
+      "name": "Onizuka, Ellison",
+      "planet": "asc",
+      "err_arcmin": 10278.7,
+      "year": 1946,
+      "utc": -10.5,
+      "computed": "capricorn 2°",
+      "expected": "cancer 11.4°"
+    },
+    {
+      "name": "Mocky, Jean Pierre",
+      "planet": "moon",
+      "err_arcmin": 10270.1,
+      "year": 1929,
+      "utc": 1.0,
+      "computed": "cancer 8°",
+      "expected": "sagittarius 29.2°"
+    },
+    {
+      "name": "Nicholas Nikolayevich, Grand Duke of Russia",
+      "planet": "moon",
+      "err_arcmin": 10246.4,
+      "year": 1856,
+      "utc": 0.0,
+      "computed": "aquarius 19°",
+      "expected": "leo 10.3°"
+    },
+    {
+      "name": "Feodor Alexandrovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 10239.0,
+      "year": 1898,
+      "utc": 2.1333333333333333,
+      "computed": "scorpio 15°",
+      "expected": "taurus 5.9°"
+    },
+    {
+      "name": "Tolstaya, Alexandra",
+      "planet": "moon",
+      "err_arcmin": 10224.6,
+      "year": 1884,
+      "utc": 2.5077777777777777,
+      "computed": "aries 17°",
+      "expected": "libra 7.9°"
+    },
+    {
+      "name": "Asturias, Miguel Ángel",
+      "planet": "asc",
+      "err_arcmin": 10115.3,
+      "year": 1899,
+      "utc": -6.0344444444444445,
+      "computed": "cancer 3°",
+      "expected": "sagittarius 22.2°"
+    },
+    {
+      "name": "Tzara, Tristan",
+      "planet": "moon",
+      "err_arcmin": 10113.0,
+      "year": 1896,
+      "utc": 1.74,
+      "computed": "gemini 9°",
+      "expected": "scorpio 27.6°"
+    },
+    {
+      "name": "Nature:Eruption:Sunset Crater 1064",
+      "planet": "moon",
+      "err_arcmin": 10058.0,
+      "year": 1063,
+      "utc": -0.0,
+      "computed": "scorpio 22°",
+      "expected": "gemini 5.2°"
+    },
+    {
+      "name": "Nature:Earthquake Ecuador 1868",
+      "planet": "asc",
+      "err_arcmin": 10024.9,
+      "year": 1868,
+      "utc": -0.0,
+      "computed": "gemini 15°",
+      "expected": "sagittarius 28.9°"
+    },
+    {
+      "name": "Odam, Norman Carl",
+      "planet": "asc",
+      "err_arcmin": 9987.1,
+      "year": 1947,
+      "utc": -6.0,
+      "computed": "virgo 9°",
+      "expected": "aquarius 25.9°"
+    },
+    {
+      "name": "Cities: House of Zähringen:Foundations",
+      "planet": "moon",
+      "err_arcmin": 9943.8,
+      "year": 1120,
+      "utc": 0.4955555555555556,
+      "computed": "pisces 24°",
+      "expected": "virgo 10.7°"
+    },
+    {
+      "name": "Nature: Earthquake Series:Central Italy 2016",
+      "planet": "moon",
+      "err_arcmin": 9924.1,
+      "year": 2016,
+      "utc": -0.0,
+      "computed": "taurus 16°",
+      "expected": "scorpio 2.3°"
+    },
+    {
+      "name": "Tsvetaeva, Marina",
+      "planet": "moon",
+      "err_arcmin": 9915.3,
+      "year": 1892,
+      "utc": 2.504722222222222,
+      "computed": "sagittarius 7°",
+      "expected": "taurus 23.1°"
+    },
+    {
+      "name": "Phenomena:The Fribourg Water Spook",
+      "planet": "moon",
+      "err_arcmin": 9911.8,
+      "year": 1971,
+      "utc": 1.0,
+      "computed": "libra 26°",
+      "expected": "taurus 11.7°"
+    },
+    {
+      "name": "Law: Don't Ask, Don't Tell Repeal Act (USA)",
+      "planet": "asc",
+      "err_arcmin": 9903.0,
+      "year": 2010,
+      "utc": -4.0,
+      "computed": "capricorn 16°",
+      "expected": "cancer 1.9°"
+    },
+    {
+      "name": "John Constantinovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 9855.7,
+      "year": 1886,
+      "utc": 4.113333333333333,
+      "computed": "pisces 13°",
+      "expected": "leo 28.2°"
+    },
+    {
+      "name": "Olga, Grand Duchess of Russia (1882)",
+      "planet": "moon",
+      "err_arcmin": 9839.0,
+      "year": 1882,
+      "utc": -5.0,
+      "computed": "sagittarius 6°",
+      "expected": "taurus 20.9°"
+    },
+    {
+      "name": "Nature:Etna Eruption 1979",
+      "planet": "asc",
+      "err_arcmin": 9838.9,
+      "year": 1979,
+      "utc": 2.0,
+      "computed": "aquarius 18°",
+      "expected": "virgo 4.0°"
+    },
+    {
+      "name": "Rimsky-Korsakov, Nikolai",
+      "planet": "moon",
+      "err_arcmin": 9834.8,
+      "year": 1844,
+      "utc": 2.5,
+      "computed": "libra 9°",
+      "expected": "pisces 23.6°"
+    },
+    {
+      "name": "Florensky, Pavel",
+      "planet": "moon",
+      "err_arcmin": 9800.4,
+      "year": 1882,
+      "utc": 3.143333333333333,
+      "computed": "virgo 16°",
+      "expected": "aquarius 29.5°"
+    },
+    {
+      "name": "Nature:Talca Earthquake 1928",
+      "planet": "sun",
+      "err_arcmin": 9775.8,
+      "year": 1928,
+      "utc": -0.0,
+      "computed": "sagittarius 8°",
+      "expected": "taurus 21.7°"
+    },
+    {
+      "name": "Cyril Vladimirovich, Grand Duke of Russia",
+      "planet": "moon",
+      "err_arcmin": 9746.4,
+      "year": 1876,
+      "utc": 0.0,
+      "computed": "pisces 0°",
+      "expected": "leo 12.8°"
+    },
+    {
+      "name": "Nature:Earthquake Japan 1707 (alternate date)",
+      "planet": "asc",
+      "err_arcmin": 9733.2,
+      "year": 1707,
+      "utc": -0.0,
+      "computed": "cancer 27°",
+      "expected": "aquarius 15.8°"
+    },
+    {
+      "name": "Shooting Spree: 2023 Lewiston, Maine",
+      "planet": "sun",
+      "err_arcmin": 9722.6,
+      "year": 2023,
+      "utc": -5.0,
+      "computed": "scorpio 2°",
+      "expected": "aries 14.3°"
+    },
+    {
+      "name": "Space: Apollo 16 (Launch)",
+      "planet": "asc",
+      "err_arcmin": 9717.9,
+      "year": 1972,
+      "utc": -0.0,
+      "computed": "aquarius 28°",
+      "expected": "leo 10.3°"
+    },
+    {
+      "name": "Turel, Adrien",
+      "planet": "moon",
+      "err_arcmin": 9714.0,
+      "year": 1890,
+      "utc": 2.0166666666666666,
+      "computed": "capricorn 15°",
+      "expected": "gemini 27.1°"
+    },
+    {
+      "name": "Nature:Elazig earthquakes, Turkey 2010-20",
+      "planet": "asc",
+      "err_arcmin": 9705.6,
+      "year": 2020,
+      "utc": 3.0,
+      "computed": "virgo 5°",
+      "expected": "aquarius 17.6°"
+    },
+    {
+      "name": "Nature:Eruption:Besymjanny (1955)",
+      "planet": "sun",
+      "err_arcmin": 9702.1,
+      "year": 1955,
+      "utc": 12.0,
+      "computed": "libra 27°",
+      "expected": "aries 9.3°"
+    },
+    {
+      "name": "Historic: Egmond beheaded",
+      "planet": "sun",
+      "err_arcmin": 9688.8,
+      "year": 1568,
+      "utc": 0.28888888888888886,
+      "computed": "gemini 24°",
+      "expected": "sagittarius 5.5°"
+    },
+    {
+      "name": "Tolstoy, Lev Lvovich",
+      "planet": "moon",
+      "err_arcmin": 9636.8,
+      "year": 1869,
+      "utc": 2.5077777777777777,
+      "computed": "virgo 25°",
+      "expected": "pisces 6.4°"
+    },
+    {
+      "name": "Jenyns, Soame",
+      "planet": "moon",
+      "err_arcmin": 9602.8,
+      "year": 1703,
+      "utc": -0.01111111111111111,
+      "computed": "libra 16°",
+      "expected": "pisces 26.7°"
+    },
+    {
+      "name": "Nature:Earthquake Chillan 1939",
+      "planet": "sun",
+      "err_arcmin": 9551.8,
+      "year": 1939,
+      "utc": -0.0,
+      "computed": "aquarius 4°",
+      "expected": "cancer 13.5°"
+    },
+    {
+      "name": "Cawthorn, James",
+      "planet": "moon",
+      "err_arcmin": 9538.3,
+      "year": 1719,
+      "utc": -0.1,
+      "computed": "cancer 28°",
+      "expected": "capricorn 7.3°"
+    },
+    {
+      "name": "Nikita Alexandrovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 9538.1,
+      "year": 1900,
+      "utc": 1.0,
+      "computed": "aquarius 26°",
+      "expected": "leo 5.7°"
+    },
+    {
+      "name": "Michael, Grand Duke of Russia",
+      "planet": "moon",
+      "err_arcmin": 9537.3,
+      "year": 1878,
+      "utc": 3.75,
+      "computed": "scorpio 7°",
+      "expected": "aries 16.5°"
+    },
+    {
+      "name": "Space: Apollo 12 (Launch)",
+      "planet": "asc",
+      "err_arcmin": 9531.2,
+      "year": 1969,
+      "utc": -0.0,
+      "computed": "leo 15°",
+      "expected": "capricorn 24.4°"
+    },
+    {
+      "name": "Maria Nikolaievna, Grand Duchess of Russia",
+      "planet": "moon",
+      "err_arcmin": 9526.4,
+      "year": 1819,
+      "utc": 2.02,
+      "computed": "aquarius 14°",
+      "expected": "cancer 22.9°"
+    },
+    {
+      "name": "Adams, Samuel",
+      "planet": "moon",
+      "err_arcmin": 9480.2,
+      "year": 1722,
+      "utc": -4.737777777777778,
+      "computed": "sagittarius 2°",
+      "expected": "taurus 10.3°"
+    },
+    {
+      "name": "Celestial: Ten planets in Water element 219 CE",
+      "planet": "asc",
+      "err_arcmin": 9477.5,
+      "year": 219,
+      "utc": 0.0,
+      "computed": "capricorn 13°",
+      "expected": "leo 5.8°"
+    },
+    {
+      "name": "Elizabeth Percy, Duchess of Northumberland",
+      "planet": "moon",
+      "err_arcmin": 9465.6,
+      "year": 1716,
+      "utc": -0.01111111111111111,
+      "computed": "taurus 0°",
+      "expected": "libra 8.6°"
+    },
+    {
+      "name": "Charles Stuart, Prince",
+      "planet": "moon",
+      "err_arcmin": 9464.0,
+      "year": 1720,
+      "utc": 0.8322222222222222,
+      "computed": "virgo 4°",
+      "expected": "aquarius 12.1°"
+    },
+    {
+      "name": "Reynolds, Frances",
+      "planet": "moon",
+      "err_arcmin": 9406.1,
+      "year": 1729,
+      "utc": -0.26999999999999996,
+      "computed": "libra 12°",
+      "expected": "pisces 18.8°"
+    },
+    {
+      "name": "Reynolds, Joshua",
+      "planet": "moon",
+      "err_arcmin": 9395.0,
+      "year": 1723,
+      "utc": -0.01111111111111111,
+      "computed": "capricorn 1°",
+      "expected": "gemini 8.0°"
+    },
+    {
+      "name": "Hutchinson, Thomas",
+      "planet": "moon",
+      "err_arcmin": 9371.8,
+      "year": 1711,
+      "utc": -4.737777777777778,
+      "computed": "leo 13°",
+      "expected": "capricorn 20.0°"
+    },
+    {
+      "name": "Nature: Lone Pine Earthquake:California 1872",
+      "planet": "asc",
+      "err_arcmin": 9346.8,
+      "year": 1872,
+      "utc": -7.88,
+      "computed": "cancer 0°",
+      "expected": "capricorn 25.1°"
+    },
+    {
+      "name": "Andrei Alexandrovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 9328.1,
+      "year": 1897,
+      "utc": 1.0,
+      "computed": "taurus 3°",
+      "expected": "libra 9.0°"
+    },
+    {
+      "name": "Fisher, M. F. K.",
+      "planet": "asc",
+      "err_arcmin": 9313.5,
+      "year": 1908,
+      "utc": -6.0,
+      "computed": "libra 1°",
+      "expected": "aries 26.0°"
+    },
+    {
+      "name": "Nature: 2019 Durrès Albania earthquakes",
+      "planet": "moon",
+      "err_arcmin": 9292.7,
+      "year": 2019,
+      "utc": 2.0,
+      "computed": "scorpio 25°",
+      "expected": "gemini 20.8°"
+    },
+    {
+      "name": "Nature:Earthquake Alaska 2002",
+      "planet": "moon",
+      "err_arcmin": 9272.0,
+      "year": 2002,
+      "utc": -0.0,
+      "computed": "libra 28°",
+      "expected": "taurus 23.6°"
+    },
+    {
+      "name": "Caroline Matilda, Queen of Denmark and Norway",
+      "planet": "moon",
+      "err_arcmin": 9251.4,
+      "year": 1751,
+      "utc": -0.01111111111111111,
+      "computed": "aquarius 18°",
+      "expected": "cancer 23.2°"
+    },
+    {
+      "name": "Charles X, King of France",
+      "planet": "asc",
+      "err_arcmin": 9246.5,
+      "year": 1757,
+      "utc": 0.14222222222222222,
+      "computed": "libra 24°",
+      "expected": "taurus 19.9°"
+    },
+    {
+      "name": "Nation: Greece 1821:Independence Conjunctions",
+      "planet": "moon",
+      "err_arcmin": 9212.2,
+      "year": 1821,
+      "utc": -0.0,
+      "computed": "virgo 13°",
+      "expected": "aquarius 17.0°"
+    },
+    {
+      "name": "Nature:Earthquake Turkey 1899",
+      "planet": "moon",
+      "err_arcmin": 9211.9,
+      "year": 1899,
+      "utc": -0.0,
+      "computed": "aries 4°",
+      "expected": "virgo 8.4°"
+    },
+    {
+      "name": "Augustus Hervey, 3rd Earl of Bristol",
+      "planet": "moon",
+      "err_arcmin": 9201.3,
+      "year": 1724,
+      "utc": -0.01111111111111111,
+      "computed": "aries 14°",
+      "expected": "virgo 17.5°"
+    },
+    {
+      "name": "Nature:Eruption Etna 1669",
+      "planet": "moon",
+      "err_arcmin": 9185.6,
+      "year": 1669,
+      "utc": 1.0066666666666666,
+      "computed": "gemini 3°",
+      "expected": "capricorn 0.0°"
+    },
+    {
+      "name": "Slonimsky, Nicolas",
+      "planet": "moon",
+      "err_arcmin": 9182.7,
+      "year": 1894,
+      "utc": 2.0166666666666666,
+      "computed": "leo 22°",
+      "expected": "capricorn 25.7°"
+    },
+    {
+      "name": "Nature: August 2018 Lombok earthquake",
+      "planet": "asc",
+      "err_arcmin": 9179.5,
+      "year": 2018,
+      "utc": 8.0,
+      "computed": "pisces 6°",
+      "expected": "leo 9.8°"
+    },
+    {
+      "name": "Wolkonski, Sergei",
+      "planet": "moon",
+      "err_arcmin": 9128.9,
+      "year": 1860,
+      "utc": 1.65,
+      "computed": "scorpio 6°",
+      "expected": "aries 8.3°"
+    },
+    {
+      "name": "Tesla, Nikola",
+      "planet": "moon",
+      "err_arcmin": 9089.1,
+      "year": 1856,
+      "utc": -4.0,
+      "computed": "taurus 12°",
+      "expected": "libra 14.0°"
+    },
+    {
+      "name": "Alexandra, Archduchess of Austria",
+      "planet": "moon",
+      "err_arcmin": 9086.2,
+      "year": 1783,
+      "utc": 1.2722222222222221,
+      "computed": "gemini 7°",
+      "expected": "capricorn 6.2°"
+    },
+    {
+      "name": "Constantine Constantinovich, Prince of Russia",
+      "planet": "moon",
+      "err_arcmin": 9070.0,
+      "year": 1890,
+      "utc": 4.113333333333333,
+      "computed": "aries 18°",
+      "expected": "virgo 19.9°"
+    },
+    {
+      "name": "Rubinstein, Arthur",
+      "planet": "moon",
+      "err_arcmin": 9065.1,
+      "year": 1887,
+      "utc": 1.4,
+      "computed": "libra 29°",
+      "expected": "aries 0.3°"
+    },
+    {
+      "name": "Newdigate, Roger",
+      "planet": "moon",
+      "err_arcmin": 9049.7,
+      "year": 1719,
+      "utc": -0.09777777777777778,
+      "computed": "gemini 6°",
+      "expected": "scorpio 7.3°"
+    },
+    {
+      "name": "Johnson, Elizabeth (1721)",
+      "planet": "moon",
+      "err_arcmin": 9018.3,
+      "year": 1721,
+      "utc": -0.26999999999999996,
+      "computed": "capricorn 0°",
+      "expected": "gemini 0.4°"
+    },
+    {
+      "name": "Augusta, Princess of Great Britain",
+      "planet": "moon",
+      "err_arcmin": 8993.4,
+      "year": 1737,
+      "utc": -0.01111111111111111,
+      "computed": "libra 5°",
+      "expected": "pisces 5.5°"
+    },
+    {
+      "name": "Hahn, Herbert",
+      "planet": "moon",
+      "err_arcmin": 8974.4,
+      "year": 1890,
+      "utc": 1.65,
+      "computed": "gemini 17°",
+      "expected": "scorpio 17.3°"
+    },
+    {
+      "name": "Nation: USSR, foundation",
+      "planet": "moon",
+      "err_arcmin": 8956.1,
+      "year": 1922,
+      "utc": 2.0,
+      "computed": "taurus 27°",
+      "expected": "sagittarius 28.6°"
+    },
+    {
+      "name": "Freberg, Stan",
+      "planet": "asc",
+      "err_arcmin": 8928.5,
+      "year": 1926,
+      "utc": -8.0,
+      "computed": "sagittarius 28°",
+      "expected": "cancer 29.3°"
+    },
+    {
+      "name": "Sports: Olympic torch relay",
+      "planet": "moon",
+      "err_arcmin": 8891.0,
+      "year": 1936,
+      "utc": 1.0,
+      "computed": "capricorn 17°",
+      "expected": "leo 19.0°"
+    },
+    {
+      "name": "Edwards, Jonathan (1745)",
+      "planet": "moon",
+      "err_arcmin": 8889.6,
+      "year": 1745,
+      "utc": -4.843333333333334,
+      "computed": "aries 16°",
+      "expected": "virgo 14.8°"
+    },
+    {
+      "name": "Phenomena:Joller and the Haunted House of Stans",
+      "planet": "moon",
+      "err_arcmin": 8883.2,
+      "year": 1818,
+      "utc": 0.4955555555555556,
+      "computed": "libra 18°",
+      "expected": "pisces 16.6°"
+    },
+    {
+      "name": "Law: FISA of 1978 Amendments Act of 2008 (USA)",
+      "planet": "asc",
+      "err_arcmin": 8882.4,
+      "year": 2008,
+      "utc": -4.0,
+      "computed": "scorpio 4°",
+      "expected": "aries 2.4°"
+    },
+    {
+      "name": "Nature:Earthquake Central Italy 2002",
+      "planet": "asc",
+      "err_arcmin": 8867.0,
+      "year": 2002,
+      "utc": -0.0,
+      "computed": "capricorn 9°",
+      "expected": "leo 11.6°"
+    },
+    {
+      "name": "Nature:Earthquake Kazakhstan 1887",
+      "planet": "moon",
+      "err_arcmin": 8850.0,
+      "year": 1887,
+      "utc": -0.0,
+      "computed": "capricorn 25°",
+      "expected": "gemini 23.5°"
+    },
+    {
+      "name": "Gustav III, King of Sweden",
+      "planet": "moon",
+      "err_arcmin": 8842.3,
+      "year": 1746,
+      "utc": 1.2033333333333334,
+      "computed": "libra 7°",
+      "expected": "pisces 4.5°"
+    },
+    {
+      "name": "Chaney, Robert",
+      "planet": "asc",
+      "err_arcmin": 8815.8,
+      "year": 1913,
+      "utc": -6.0,
+      "computed": "scorpio 6°",
+      "expected": "gemini 9.1°"
+    },
+    {
+      "name": "Jura, sovereignty",
+      "planet": "asc",
+      "err_arcmin": 8811.9,
+      "year": 1979,
+      "utc": 1.0,
+      "computed": "libra 1°",
+      "expected": "aquarius 28.4°"
+    },
+    {
+      "name": "Bernhardi, Sophie",
+      "planet": "moon",
+      "err_arcmin": 8811.1,
+      "year": 1775,
+      "utc": 0.89,
+      "computed": "cancer 11°",
+      "expected": "aquarius 14.9°"
+    },
+    {
+      "name": "Jones, Chipper",
+      "planet": "asc",
+      "err_arcmin": 8809.4,
+      "year": 1972,
+      "utc": -5.0,
+      "computed": "leo 15°",
+      "expected": "capricorn 12.6°"
+    },
+    {
+      "name": "Wilhelm Ernst, Duke of Saxe-Weimar",
+      "planet": "moon",
+      "err_arcmin": 8798.0,
+      "year": 1662,
+      "utc": 0.7544444444444445,
+      "computed": "pisces 9°",
+      "expected": "leo 6.0°"
+    },
+    {
+      "name": "Gorky, Maxim",
+      "planet": "moon",
+      "err_arcmin": 8795.3,
+      "year": 1868,
+      "utc": 2.933333333333333,
+      "computed": "scorpio 28°",
+      "expected": "aries 25.4°"
+    },
+    {
+      "name": "Jura, sovereignty",
+      "planet": "moon",
+      "err_arcmin": 8773.9,
+      "year": 1979,
+      "utc": 1.0,
+      "computed": "aquarius 10°",
+      "expected": "cancer 6.3°"
+    },
+    {
+      "name": "Chekhov, Anton",
+      "planet": "moon",
+      "err_arcmin": 8763.5,
+      "year": 1860,
+      "utc": 2.5955555555555554,
+      "computed": "scorpio 16°",
+      "expected": "aries 12.1°"
+    },
+    {
+      "name": "Pasternak, Boris",
+      "planet": "moon",
+      "err_arcmin": 8741.7,
+      "year": 1890,
+      "utc": 2.504722222222222,
+      "computed": "gemini 3°",
+      "expected": "libra 28.9°"
+    }
+  ]
+}

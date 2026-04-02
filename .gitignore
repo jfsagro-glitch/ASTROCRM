@@ -1,8 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+.vite/
+
+# Editor/system
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local temp artifacts
+.tmp_*.db
+nul
+
+# Large local databases/datasets (not suitable for regular GitHub push)
+astro.db
+astro_people_full.csv
+astro_people_full.jsonl
+astro_analytics_full.csv
+astro_analytics_full.jsonl
+holos_full.csv
+
+# Generic JS/build artifacts
 node_modules/
 build/
 dist/
 coverage/
-.DS_Store
 *.log
+
+# Env files
 .env*
 !.env.example

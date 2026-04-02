@@ -1,0 +1,236 @@
+export type Lang = 'en' | 'ru';
+
+export const translations = {
+  en: {
+    appName: 'HOLO AstroCRM',
+    crmLink: 'CRM Dashboard →',
+    langToggle: 'RU',
+    // Birth form
+    birthData: 'Birth Data',
+    partnerData: 'Partner Data',
+    name: 'Name',
+    date: 'Date (YYYY-MM-DD)',
+    time: 'Time (HH:MM)',
+    utcOffset: 'UTC Offset',
+    latitude: 'Latitude',
+    longitude: 'Longitude',
+    city: 'City',
+    cityPlaceholder: 'Moscow, New York, Paris…',
+    findCity: 'Find',
+    searching: 'Searching…',
+    cityFoundPrefix: '✓ ',
+    cityNotFound: 'City not found',
+    // Buttons
+    calcNatal: 'Calculate Natal Chart',
+    calculating: 'Calculating…',
+    exportPdf: 'Export PDF',
+    calculate: 'Calculate',
+    relocate: 'Relocate',
+    // Main tabs
+    natalChart: 'Natal Chart',
+    predictive: 'Predictive',
+    synastry: 'Synastry',
+    relocation: 'Relocation',
+    interpretation: 'Interpretation',
+    // Planet table headers
+    planet: 'Planet',
+    sign: 'Sign',
+    pos: 'Pos',
+    house: 'House',
+    speed: 'Speed',
+    decan: 'Decan',
+    term: 'Term',
+    dignity: 'Dignity',
+    // Sections
+    majorAspects: 'Major Aspects',
+    houseCusps: 'House Cusps',
+    sect: 'Sect',
+    moon: 'Moon',
+    phase: 'Phase',
+    mansion: 'Mansion',
+    arabicParts: 'Arabic Parts',
+    patterns: 'Patterns',
+    fixedStars: 'Fixed Star Conjunctions',
+    dispositors: 'Dispositors',
+    final: 'Final',
+    mutual: 'Mutual',
+    // Predictive subtabs
+    transits: 'Transits',
+    secondary: 'Secondary Prog.',
+    solarArc: 'Solar Arc',
+    solarReturn: 'Solar Return',
+    lunarReturn: 'Lunar Return',
+    profections: 'Profections',
+    tertiary: 'Tertiary',
+    converse: 'Converse',
+    returnYear: 'Return Year',
+    targetDate: 'Target Date',
+    // Synastry
+    synastryAspects: 'Synastry Aspects',
+    composite: 'Composite',
+    davison: 'Davison',
+    compatibilityScore: 'Compatibility Score',
+    // Relocation
+    newCity: 'Relocation City',
+    newLatitude: 'New Latitude',
+    newLongitude: 'New Longitude',
+    // Empty states
+    enterBirthData: 'Enter birth data and press "Calculate Natal Chart" to begin.',
+    calcNatalFirst: 'Calculate the natal chart first.',
+    // Misc
+    dateTimeRequired: 'Date and time required',
+    chart: 'Chart',
+    // Planet names
+    planets: {
+      sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus',
+      mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus',
+      neptune: 'Neptune', pluto: 'Pluto', node: 'N.Node', chiron: 'Chiron', lilith: 'Lilith',
+    } as Record<string, string>,
+    // Sign names
+    signs: {
+      aries: 'Aries', taurus: 'Taurus', gemini: 'Gemini', cancer: 'Cancer',
+      leo: 'Leo', virgo: 'Virgo', libra: 'Libra', scorpio: 'Scorpio',
+      sagittarius: 'Sagittarius', capricorn: 'Capricorn', aquarius: 'Aquarius', pisces: 'Pisces',
+    } as Record<string, string>,
+    // Speed status
+    speedStatus: {
+      retrograde: 'retro', stationary: 'stat.', fast: 'fast', slow: 'slow', average: 'avg',
+    } as Record<string, string>,
+    // Aspect names
+    aspects: {
+      conjunction: 'Conjunction', opposition: 'Opposition', trine: 'Trine',
+      square: 'Square', sextile: 'Sextile', quincunx: 'Quincunx',
+      semisextile: 'Semisextile', semisquare: 'Semisquare',
+      sesquisquare: 'Sesquisquare', parallel: 'Parallel', contra_parallel: 'Contra-Parallel',
+    } as Record<string, string>,
+    // CRM
+    crmTitle: 'HOLO CRM',
+    crmSubtitle: 'Manage clients & consultations securely.',
+    firebaseNotConfigured: 'Firebase not configured',
+    firebaseSetupHint: 'Copy frontend/.env.example to frontend/.env and fill in your Firebase credentials to enable authentication.',
+    signInGoogle: 'Sign in with Google',
+    backToPortal: '← Client Portal',
+    portal: 'Portal',
+    clients: 'Clients',
+    consultations: 'Consultations',
+    upcoming: 'Upcoming',
+    revenue: 'Revenue',
+  },
+  ru: {
+    appName: 'HOLO AstroCRM',
+    crmLink: 'CRM Дашборд →',
+    langToggle: 'EN',
+    // Birth form
+    birthData: 'Данные рождения',
+    partnerData: 'Данные партнёра',
+    name: 'Имя',
+    date: 'Дата (ГГГГ-ММ-ДД)',
+    time: 'Время (ЧЧ:ММ)',
+    utcOffset: 'UTC (часовой пояс)',
+    latitude: 'Широта',
+    longitude: 'Долгота',
+    city: 'Город',
+    cityPlaceholder: 'Москва, Берлин, Нью-Йорк…',
+    findCity: 'Найти',
+    searching: 'Поиск…',
+    cityFoundPrefix: '✓ ',
+    cityNotFound: 'Город не найден',
+    // Buttons
+    calcNatal: 'Рассчитать натальную карту',
+    calculating: 'Вычисляем…',
+    exportPdf: 'Экспорт PDF',
+    calculate: 'Рассчитать',
+    relocate: 'Релокация',
+    // Main tabs
+    natalChart: 'Натальная карта',
+    predictive: 'Предсказательные',
+    synastry: 'Синастрия',
+    relocation: 'Релокация',
+    interpretation: 'Интерпретация',
+    // Planet table headers
+    planet: 'Планета',
+    sign: 'Знак',
+    pos: 'Позиция',
+    house: 'Дом',
+    speed: 'Скорость',
+    decan: 'Декан',
+    term: 'Терм',
+    dignity: 'Достоинство',
+    // Sections
+    majorAspects: 'Мажорные аспекты',
+    houseCusps: 'Куспиды домов',
+    sect: 'Секта',
+    moon: 'Луна',
+    phase: 'Фаза',
+    mansion: 'Мансия',
+    arabicParts: 'Арабские части',
+    patterns: 'Паттерны',
+    fixedStars: 'Соединения с фикс. звёздами',
+    dispositors: 'Диспозиторы',
+    final: 'Финальные',
+    mutual: 'Взаимный приём',
+    // Predictive subtabs
+    transits: 'Транзиты',
+    secondary: 'Вторичные прогр.',
+    solarArc: 'Солярная дуга',
+    solarReturn: 'Соляр',
+    lunarReturn: 'Лунар',
+    profections: 'Профекции',
+    tertiary: 'Третичные',
+    converse: 'Конверсионные',
+    returnYear: 'Год возврата',
+    targetDate: 'Целевая дата',
+    // Synastry
+    synastryAspects: 'Аспекты синастрии',
+    composite: 'Композит',
+    davison: 'Дэвисон',
+    compatibilityScore: 'Совместимость',
+    // Relocation
+    newCity: 'Город для релокации',
+    newLatitude: 'Новая широта',
+    newLongitude: 'Новая долгота',
+    // Empty states
+    enterBirthData: 'Введите данные рождения и нажмите «Рассчитать натальную карту».',
+    calcNatalFirst: 'Сначала рассчитайте натальную карту.',
+    // Misc
+    dateTimeRequired: 'Необходимо указать дату и время',
+    chart: 'Карта',
+    // Planet names
+    planets: {
+      sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
+      mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
+      neptune: 'Нептун', pluto: 'Плутон', node: 'С.Узел', chiron: 'Хирон', lilith: 'Лилит',
+    } as Record<string, string>,
+    // Sign names
+    signs: {
+      aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак',
+      leo: 'Лев', virgo: 'Дева', libra: 'Весы', scorpio: 'Скорпион',
+      sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
+    } as Record<string, string>,
+    // Speed status
+    speedStatus: {
+      retrograde: 'ретро', stationary: 'стац.', fast: 'быстрая', slow: 'медл.', average: 'норм.',
+    } as Record<string, string>,
+    // Aspect names
+    aspects: {
+      conjunction: 'Соединение', opposition: 'Оппозиция', trine: 'Трин',
+      square: 'Квадрат', sextile: 'Секстиль', quincunx: 'Квинкункс',
+      semisextile: 'П/Секст.', semisquare: 'П/Квадр.',
+      sesquisquare: 'Сескв.', parallel: 'Параллель', contra_parallel: 'Контрпарал.',
+    } as Record<string, string>,
+    // CRM
+    crmTitle: 'HOLO CRM',
+    crmSubtitle: 'Управляйте клиентами и консультациями.',
+    firebaseNotConfigured: 'Firebase не настроен',
+    firebaseSetupHint: 'Скопируйте frontend/.env.example в frontend/.env и заполните Firebase-credentials для включения аутентификации.',
+    signInGoogle: 'Войти через Google',
+    backToPortal: '← Клиентский портал',
+    portal: 'Портал',
+    clients: 'Клиенты',
+    consultations: 'Консультации',
+    upcoming: 'Предстоящие',
+    revenue: 'Доход',
+  },
+};
+
+export type Translations = typeof translations['en'];

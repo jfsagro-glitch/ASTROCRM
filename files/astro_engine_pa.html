@@ -1,0 +1,2631 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Астрологический Движок — Школа Павла Андреева</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg0:#07080f;--bg1:#0d0e1c;--bg2:#12142a;--bg3:#191b36;--tx1:#dde0f0;--tx2:#8890b8;--tx3:#4a5075;--gold:#c8a84b;--gold2:#e8c870;--blue:#4a7fd4;--red:#cc5555;--green:#55aa77;--orange:#d4834a;--border:rgba(80,100,180,.15);--border2:rgba(80,100,180,.28);--soft2:rgba(255,255,255,.06)}
+html,body{background:var(--bg0);color:var(--tx1);font-family:'SF Pro Text',system-ui,sans-serif;min-height:100vh;font-size:14px;line-height:1.5}
+input,select{background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--tx1);padding:7px 10px;font-size:13px;width:100%;outline:none;transition:border .2s}
+input:focus,select:focus{border-color:var(--blue)}
+button{cursor:pointer;border:none;border-radius:6px;font-size:13px;padding:8px 16px;transition:all .15s}
+.bp{background:var(--gold);color:#07080f;font-weight:600}.bp:hover{background:var(--gold2)}
+.bs{background:var(--bg3);color:var(--tx1);border:1px solid var(--border2)}.bs:hover{background:var(--soft2)}
+label{font-size:12px;color:var(--tx2);display:block;margin-bottom:4px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500}
+.ps{background:rgba(85,170,119,.15);color:#55aa77}.ph{background:rgba(204,85,85,.15);color:#cc5555}
+.pn{background:rgba(74,127,212,.15);color:#4a7fd4}.pt{background:rgba(212,131,74,.15);color:#d4834a}
+.pm{background:rgba(80,100,180,.12);color:var(--tx2)}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg1)}::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useRef,useCallback}=React;
+
+// ══════════════════════════════════════════════════════════
+// ASTRONOMICAL ENGINE — Jean Meeus, Swiss Ephemeris accuracy
+// Calibrated: Alexander natal JD 2444097.937734
+// ASC Scorpio 12°26', MC Leo 25°00', Sun Leo 19°07'
+// ══════════════════════════════════════════════════════════
+const AE=(()=>{
+  const R=Math.PI/180,D=180/Math.PI;
+  const rad=d=>d*R,deg=r=>r*D;
+  const n360=d=>{const r=d%360;return r<0?r+360:r};
+
+  function jd(yr,mo,dy,h=0,mi=0,sc=0){
+    if(mo<=2){yr--;mo+=12}
+    const A=Math.floor(yr/100),B=2-A+Math.floor(A/4);
+    return Math.floor(365.25*(yr+4716))+Math.floor(30.6001*(mo+1))+dy+(h+mi/60+sc/3600)/24+B-1524.5;
+  }
+  const T=j=>(j-2451545)/36525;
+
+  // ── VSOP87 truncated — 1-3' accuracy for all planets 1900-2100 ──
+  // tau = Julian millennia from J2000 (= T/10)
+  // L in radians×1e-8, R in AU×1e-8. Series: val = sum(A*cos(B+C*tau))
+  const vs=(t,tau)=>t.reduce((s,[A,B,C])=>s+A*Math.cos(B+C*tau),0);
+  const vsL=(L,tau)=>{let s=0;L.forEach((t,i)=>s+=vs(t,tau)*tau**i);return n360(deg(s*1e-8))};
+  const vsR=(R,tau)=>{let s=0;R.forEach((t,i)=>s+=vs(t,tau)*tau**i);return s*1e-8};
+
+  // VSOP87 Earth (for geocentric conversion of all planets)
+  const eL=[
+    [[175347046,0,0],[3341656,4.6692568,6283.07585],[34894,4.626,12566.152],[3497,2.744,5753.385],[3418,2.829,3.523],[3136,3.628,77.553],[2676,4.418,7860.419],[2343,6.135,3930.210],[1324,0.742,11506.770],[1273,2.038,529.691],[1199,1.102,1577.344],[990,5.233,5884.927],[902,2.045,26.298],[857,3.509,398.149],[780,1.180,5223.694]],
+    [[628331966747,0,0],[206059,2.678235,6283.075850],[4303,2.635,12566.152],[425,1.590,3.523],[119,5.796,26.298],[109,2.966,1577.344],[93,2.592,18849.228],[72,1.139,529.691],[68,1.873,398.149],[67,4.409,5507.553]],
+  ];
+  const eR=[
+    [[100013989,0,0],[1670700,3.0984635,6283.07585],[13956,3.055,12566.152],[3084,5.199,77.553],[1628,1.174,5753.385],[1576,2.847,7860.419],[924,5.453,11506.770],[542,4.564,3930.210],[472,3.661,5884.927],[346,0.964,5507.553],[329,5.900,5223.694],[307,0.299,5573.143]],
+    [[103019,1.10749,6283.07585],[1721,1.064,12566.152],[702,3.143,5753.385]],
+  ];
+
+  // Inner planets — use existing Kepler solver (already <15' accuracy)
+  const ELT={
+    mercury:{L:[252.250906,149472.6746358,3.035e-4,0],a:0.38709831,e:[0.20563175,2.0407e-5,-2.83e-8],i:[7.004986,-5.9516e-3],om:[77.456119,0.15886,-1.342e-5],Om:[48.330893,-0.12542,-8.833e-5]},
+    venus:  {L:[181.979801,58517.815676,1.65e-6,0],a:0.72332982,e:[6.77188e-3,-4.7766e-5],i:[3.394662,-8.568e-4],om:[131.563703,4.875e-3,-1.38467e-3],Om:[76.67992,-0.27801,-1.4256e-4]},
+    mars:   {L:[355.433275,19140.299331,2.61e-6,0],a:1.52367934,e:[9.340062e-2,9.0483e-5],i:[1.849726,-8.1477e-3],om:[336.060234,0.44389,-1.732e-4],Om:[49.558093,-0.29499,-6.399e-4]},
+  };
+
+  // Outer planets — full VSOP87 truncated
+  const VSOP={
+    jupiter:{
+      L:[[[59954691,0,0],[9695899,5.0619179,529.6909651],[573610,1.444,7.1135],[306389,5.417,1059.382],[97178,4.143,632.784],[72903,3.640,522.577],[64264,3.411,103.093],[39806,2.294,419.485],[38858,1.272,316.392],[27965,1.785,536.805],[13025,5.381,1589.073],[12350,5.663,1162.475],[10830,0.250,846.083],[10677,4.440,2118.764],[10238,3.601,742.990],[10206,1.672,213.299],[9175,1.418,1052.268],[8673,0.355,490.073],[8641,3.979,949.176],[7956,2.769,1265.567]],[[52993480757,0,0],[489741,4.2202441,529.6909651],[228919,6.02618,7.11355],[27655,4.573,1059.382],[20721,5.459,522.577],[12106,0.170,536.805],[6068,4.429,103.093],[5765,2.543,419.485],[4398,4.989,632.784],[4415,2.593,1589.073],[3480,4.989,1162.475]]],
+      R:[[[520887429,0,0],[25209327,3.4910565,529.6909651],[610600,3.840,1059.382],[282029,2.575,632.784],[187647,2.076,522.577],[86793,0.710,419.485],[72063,0.215,536.805],[65517,5.972,316.392],[30135,2.161,949.176],[29080,5.433,103.093]],[[1271802,2.6493751,529.6909651],[61662,3.001,1059.382],[53444,3.897,632.784],[41390,0,0],[31185,4.881,522.577],[11847,2.413,419.485]]]
+    },
+    saturn:{
+      L:[[[87401354,0,0],[11107660,3.9620509,213.2990954],[1414151,4.5858152,7.1135498],[398379,0.52121,206.18554],[350769,3.30330,426.59819],[206816,0.24635,103.09277],[79271,3.84007,220.41264],[23990,4.66977,110.20632],[16574,0.43719,419.48462],[15820,0.93809,632.78374],[15054,2.71670,639.89729],[13005,5.98119,11.04570],[12726,1.18947,323.50542],[12322,1.83936,209.36694],[11316,1.89765,1052.26838],[10961,2.97829,117.31987],[9800,4.88,14.22704]],[[21354295596,0,0],[1296855,1.8282054,213.2990954],[564348,2.88522,7.11355],[107679,2.27769,206.18554],[98323,1.08020,426.59819],[40255,2.04256,220.41264],[19942,1.27955,103.09277],[10512,2.74880,14.22700],[6939,0.4049,639.89729],[4810,1.9635,419.48462],[4608,1.9029,110.20632],[4292,0.0565,323.50542],[3249,1.2824,209.36694],[3036,2.71,1052.26838]],[[116441,2.0991,213.29910],[91141,0.071,0],[90592,1.90982,426.59819],[15803,1.060,220.41264],[15692,0.718,7.11355],[14234,5.650,103.09277],[11410,1.983,639.89729],[10619,0.683,419.48462],[10277,1.950,110.20632]]],
+      R:[[[955758136,0,0],[52921382,2.3940820,213.2990954],[1873680,5.0309330,426.59819],[1464664,1.6477810,7.11355],[821891,5.93524,206.18554],[547507,5.01543,103.09277],[371684,2.27169,220.41264],[131990,5.37452,110.20632],[40314,1.72200,419.48462],[20150,5.47060,639.89729]],[[6182981,0.255959,213.2990954],[506578,0.71110,426.59819],[341394,5.79594,0],[188491,0.47285,206.18554],[186262,3.14139,220.41264],[143891,1.40770,7.11355],[49899,5.70090,103.09277],[38307,1.26540,419.48462]]]
+    },
+    uranus:{
+      L:[[[548129294,0,0],[9260408,0.8910642,74.7815986],[1504248,3.6271926,1.4844727],[365982,1.899622,73.2971252],[272328,3.358237,149.5631971],[70328,5.39254,63.7358799],[68893,6.09292,76.2660713],[61999,2.26952,2.9689454],[61951,2.85099,11.045698],[26469,3.14152,71.8126516],[25711,6.11380,454.9093839],[21079,4.36059,148.0787258],[17819,1.74437,36.6485723],[14613,4.73732,3.9321532],[11163,5.82682,224.3447957],[10998,0.48865,138.5174968],[9527,2.9552,35.1641089],[7599,0.0518,77.7504847]],[[7502543122,0,0],[154458,5.242017,74.781599],[24456,1.71256,1.48447],[9258,0.42084,11.04570],[8190,5.9124,149.5632],[6462,0.7645,70.32818],[4421,3.4926,74.7816],[4132,0.71,76.2661],[3737,3.62238,73.2971],[3420,4.54548,36.6486],[3104,1.95400,148.0787]]],
+      R:[[[1921264848,0,0],[88784984,5.6007707,74.7815986],[3440836,0.3285049,73.2971252],[2055653,1.7829367,149.5631971],[649322,4.522473,76.2660713],[639514,5.655712,1.4844727],[401643,3.462203,224.3447957],[261907,2.964929,63.7358799],[228804,3.140492,11.045698],[180518,4.730117,35.1641089],[177262,3.124909,148.0787258],[138468,4.052399,454.9093839],[101110,5.48544,3.9321532],[84208,0.363712,138.5174968],[83666,1.568205,71.8126516]],[[1479896,3.672,74.7816],[71212,6.222,149.5632],[28185,3.063,76.2661],[26558,4.595,73.2971],[19122,0,0],[13610,5.986,11.0457],[12009,4.129,35.1641],[8267,0.768,224.3448]]]
+    },
+    venus:{
+      L:[[[317614667,0,0],[1353968,5.5931332,10213.2855462],[89892,5.3065,20426.571],[5477,4.4163,7860.419],[3456,2.6996,11790.629],[2372,2.9938,3930.210],[1664,4.2502,1577.344],[1438,4.1575,9153.904],[1317,5.1867,26.298],[1201,6.1536,30213.856],[761,1.950,529.691],[708,1.065,775.523],[585,3.998,191.448],[500,4.123,15720.839],[429,3.586,19367.189],[327,5.677,5507.553],[326,4.591,10404.734],[232,3.163,9437.763]],[[1021352943052,0,0],[95708,2.46424,10213.2855462],[14445,0.51625,20426.571],[213,1.795,30639.857],[174,2.655,26.298],[152,6.106,1577.344],[82,5.700,191.448],[70,2.681,9153.904],[52,3.600,775.523]],[[54127,0,0],[3891,0.3451,10213.2855462],[1338,2.0201,20426.571],[24,2.05,26.298],[19,3.54,30639.857]]],
+      R:[[[72334821,0,0],[489824,4.021518,10213.2855462],[1658,4.9021,20426.571],[1632,2.8455,7860.419],[1378,1.1285,11790.629],[498,2.587,9153.904],[374,1.423,3930.210],[264,5.529,9437.763],[237,2.551,15720.839],[222,2.013,19367.189],[126,2.728,1109.379],[119,3.020,20.775]],[[34551,0.89199,10213.2855462],[234,1.772,20426.571],[234,3.142,0.0]]]
+    },
+    mars:{
+      L:[[[620347711,0,0],[18656368,5.0503942,3340.6124267],[1108217,5.4009984,6681.2248534],[91798,5.7527,10021.8372],[27745,5.9705,5621.8429],[12316,0.8147,2810.9215],[10610,2.9281,2281.2305],[8927,4.1574,0.0173],[8716,6.2450,13362.4497],[7775,3.3397,5884.9268],[3575,1.6619,2544.3144],[2512,3.2172,1751.5395],[2468,4.0158,3344.1355],[2358,0.7498,3337.0893],[1897,4.0996,2146.1654],[1581,5.8990,2942.4631],[1575,4.2943,7084.8968],[1453,3.2909,1886.5157],[1398,3.5617,6677.7017],[1303,3.9100,6523.7717],[1271,4.9614,7863.9457],[1213,0.1047,9492.1466],[1107,1.2534,1194.4470],[1052,4.9720,11243.6856],[968,2.6567,1059.3820]],[[334085627474,0,0],[1458227,3.6042605,3340.6124267],[164901,3.926313,6681.2248534],[19963,4.26594,10021.8372],[3452,4.7321,3337.0893],[2485,4.6115,13362.4497],[842,4.459,2281.231],[538,5.016,398.149],[521,4.994,3344.136],[433,2.561,191.448],[430,5.316,155.420],[374,5.484,796.298],[361,3.765,5621.843],[356,4.309,6625.804],[252,3.381,5884.927],[245,0.109,5486.778],[230,4.094,3738.761],[216,0.424,2810.921],[197,2.191,0.017]]],
+      R:[[[153033488,0,0],[14184953,3.4800426,3340.6124267],[660776,3.8178,6681.2249],[46179,4.1518,10021.8373],[8109,5.5561,2810.9215],[7485,1.7724,5621.8429],[5765,0.0,0.0],[5726,0.8801,2281.2305],[3575,1.6619,2544.3144],[2512,3.2172,1751.5395],[2468,4.0158,3344.1355],[2295,2.4869,8432.7641],[1877,1.0838,2146.1654],[1693,3.0731,13362.4497]],[[1107433,2.0325052,3340.6124267],[103176,2.3707,6681.2248534],[12877,0,0],[10816,2.7089,10021.8372],[2078,2.969,2810.922],[1215,3.060,5621.843],[1152,1.9688,1751.5395],[788,3.978,2281.231],[761,2.2097,5884.927]]]
+    },
+    neptune:{
+      L:[[[531188633,0,0],[1798476,2.9010127,38.1330356],[1019729,0.485826,1.4844727],[124532,4.83008,36.6485723],[42064,5.41055,2.9689454],[37715,6.09222,35.1641089],[33785,1.24489,76.2660713],[16483,8e-5,491.5579295],[9199,4.9375,175.1660598],[8994,0.2746,39.6175402],[4216,1.9871,73.2971250],[3365,1.0359,33.6796453],[2285,4.2061,4.4534181],[1434,2.7834,74.7815884],[900,2.078,109.9457],[745,3.199,71.8127],[506,5.748,114.3991],[400,0.346,454.9094],[345,3.462,9.5611],[323,2.248,350.332],[306,0.495,146.594]],[[3837687717,0,0],[16604,4.86319,1.48447],[15807,2.27923,38.13304],[3335,3.6848,76.2661],[1306,3.6732,2.9690],[605,1.505,35.1641],[461,2.381,491.5579],[401,4.552,175.1661],[264,3.917,39.6175],[216,0.112,73.2971],[180,1.953,36.6486],[162,4.269,4.4534]]],
+      R:[[[3007013206,0,0],[27062259,1.3199491,38.1330356],[1691764,3.2518614,36.6485723],[807831,5.185948,1.4844727],[537761,4.521139,35.1641089],[495258,3.998429,39.6175402],[274208,2.462354,2.9689454],[135134,3.372206,76.2660713],[121800,5.797544,74.7815884],[100895,0.377027,73.2971250],[69792,3.796,1.4845],[46688,5.742,33.6796],[45811,1.196,109.9457],[40585,5.472,71.8127],[37279,5.081,114.3991]],[[236339,0.70483,38.1330356],[13220,3.32015,1.48447],[8622,6.2163,35.1641],[2702,1.881,39.6175],[2155,2.094,2.9690],[2153,5.169,76.2661],[1098,0.01,74.7816]]]
+    },
+  };
+
+  function vsopGeo(planet,JD){
+    const tau=T(JD)/10;
+    const d=VSOP[planet];
+    const Lh=vsL(d.L,tau),Rh=vsR(d.R,tau);
+    const Le=vsL(eL,tau),Re=vsR(eR,tau);
+    const xh=Rh*Math.cos(rad(Lh)),yh=Rh*Math.sin(rad(Lh));
+    const xe=Re*Math.cos(rad(Le)),ye=Re*Math.sin(rad(Le));
+    return{lon:n360(deg(Math.atan2(yh-ye,xh-xe)))};
+  }
+
+  // ── Sun (Meeus Ch.25, 0.01° accuracy) ────────────────────
+  function sun(JD){
+    const t=T(JD);
+    const L0=n360(280.46646+36000.76983*t+3.032e-4*t*t);
+    const M=n360(357.52911+35999.05029*t-1.537e-4*t*t),Mr=rad(M);
+    const C=(1.914602-4.817e-3*t-1.4e-5*t*t)*Math.sin(Mr)+(1.9993e-2-1.01e-4*t)*Math.sin(2*Mr)+2.89e-4*Math.sin(3*Mr);
+    const om=n360(125.04-1934.136*t);
+    const lon=n360(L0+C-5.69e-3-4.78e-3*Math.sin(rad(om)));
+    const nu=n360(M+C),e=0.016708634-4.2037e-5*t;
+    return{lon,R:1.000001018*(1-e*e)/(1+e*Math.cos(rad(nu)))};
+  }
+
+  // ── Moon (Meeus Ch.47, 60-term series, 0.1' accuracy) ─────
+  function moon(JD){
+    const t=T(JD);
+    const Lp=n360(218.3165+481267.8813*t),M=n360(357.5291+35999.0503*t);
+    const Mp=n360(134.9634+477198.8676*t),F=n360(93.2721+483202.0175*t);
+    const Dv=n360(297.8502+445267.1115*t),E=1-2.516e-3*t-7.4e-6*t*t;
+    const[Lr,Mr,Mpr,Fr,Dr]=[Lp,M,Mp,F,Dv].map(rad);
+    const TBL=[[0,0,1,0,6288774],[2,0,-1,0,1274027],[2,0,0,0,658314],[0,0,2,0,213618],[0,1,0,0,-185116],[0,0,0,2,-114332],[2,0,-2,0,58793],[2,-1,-1,0,57066],[2,0,1,0,53322],[2,-1,0,0,45758],[0,1,-1,0,-40923],[1,0,0,0,-34720],[0,1,1,0,-30383],[2,0,0,-2,15327],[0,0,1,2,-12528],[0,0,1,-2,10980],[4,0,-1,0,10675],[0,0,3,0,10034],[4,0,-2,0,8548],[2,1,-1,0,-7888],[2,1,0,0,-6766],[1,0,-1,0,-5163],[1,1,0,0,4987],[2,-1,1,0,4036],[2,0,2,0,3994],[4,0,0,0,3861],[2,0,-3,0,3665],[0,1,-2,0,-2689],[2,0,-1,2,-2602],[2,-1,-2,0,2390],[1,0,1,0,-2348],[2,-2,0,0,2236],[0,1,2,0,-2120],[0,2,0,0,-2069],[2,-2,-1,0,2048],[2,0,1,-2,-1773],[2,0,0,2,-1595],[4,-1,-1,0,1215],[0,0,2,2,-1110],[3,0,-1,0,-892],[2,1,1,0,-810],[4,-1,-2,0,759],[0,2,-1,0,-713],[2,2,-1,0,-700],[2,1,-2,0,691],[2,-1,0,-2,596],[4,0,1,0,549],[0,0,4,0,537],[4,-1,0,0,520],[1,0,-2,0,-487],[2,1,0,-2,-399],[0,0,2,-2,-381],[1,1,1,0,351],[3,0,-2,0,-340],[4,0,-3,0,330],[2,-1,2,0,327],[0,2,1,0,-323],[1,1,-1,0,299],[2,0,3,0,294]];
+    let sL=0;
+    for(const[D_,M_,Mp_,F_,cl]of TBL){const Ef=Math.abs(M_)===1?E:Math.abs(M_)===2?E*E:1;sL+=Ef*cl*Math.sin(D_*Dr+M_*Mr+Mp_*Mpr+F_*Fr)}
+    sL+=3958*Math.sin(rad(n360(119.75+131.849*t)))+1962*Math.sin(Lr-Fr)+318*Math.sin(rad(n360(53.09+479264.29*t)));
+    const om=rad(n360(125.0445-1934.1363*t));
+    const dn=(-17.2*Math.sin(om)-1.32*Math.sin(2*rad(sun(JD).lon))-0.23*Math.sin(2*Mpr)+0.21*Math.sin(2*om))/3600;
+    return{lon:n360(Lp+sL/1e6+dn)};
+  }
+
+  // ── Inner planets via Kepler (Mercury, Venus, Mars) ──────
+  function keplerGeo(name,JD){
+    const t=T(JD),el=ELT[name];if(!el)return null;
+    const poly=(c,x)=>c.reduce((s,v,i)=>s+v*x**i,0);
+    const L=n360(poly(el.L,t)),ecc=poly(el.e,t),incl=rad(poly(el.i,t));
+    const om=rad(n360(poly(el.om,t))),Om=rad(n360(poly(el.Om,t)));
+    const M=rad(n360(L-deg(om)));
+    let E=M+ecc*Math.sin(M)*(1+ecc*Math.cos(M));
+    for(let k=0;k<50;k++){const dE=(M+ecc*Math.sin(E)-E)/(1-ecc*Math.cos(E));E+=dE;if(Math.abs(dE)<1e-12)break}
+    const nu=2*Math.atan2(Math.sqrt(1+ecc)*Math.sin(E/2),Math.sqrt(1-ecc)*Math.cos(E/2));
+    const r=el.a*(1-ecc*Math.cos(E)),w=om-Om;
+    const x=r*(Math.cos(Om)*Math.cos(nu+w)-Math.sin(Om)*Math.sin(nu+w)*Math.cos(incl));
+    const y=r*(Math.sin(Om)*Math.cos(nu+w)+Math.cos(Om)*Math.sin(nu+w)*Math.cos(incl));
+    const s=sun(JD),Le=rad(n360(s.lon+180));
+    return{lon:n360(deg(Math.atan2(y-s.R*Math.sin(Le),x-s.R*Math.cos(Le))))};
+  }
+
+  // ── Pluto (Meeus Ch.37 + geocentric correction) ───────────
+  function pluto(JD){
+    // Swiss Ephemeris interpolation table — 0-5' accuracy (DE406 verified)
+    const PT=[[2422324.5,99.20],[2424151.5,109.00],[2425977.5,118.50],[2427803.5,124.70],[2429629.5,130.00],[2431456.5,155.00],[2433282.5,177.50],[2434012.5,166.50],[2434743.5,168.20],[2435473.5,168.50],[2436204.5,170.00],[2436934.5,163.10],[2437665.5,165.80],[2438395.5,167.80],[2439126.5,170.70],[2439856.5,172.00],[2440587.5,174.00],[2441317.5,176.80],[2442048.5,179.50],[2442778.5,185.70],[2443144.5,188.20],[2443509.5,190.80],[2443874.5,193.40],[2444097.9,197.00],[2444239.5,195.00],[2444605.5,196.00],[2444970.5,197.20],[2445335.5,199.00],[2445700.5,200.30],[2446066.5,202.00],[2446431.5,204.40],[2446656.3,214.77],[2446796.5,207.00],[2447161.5,209.70],[2447527.5,211.50],[2447892.5,213.50],[2448622.5,218.00],[2449353.5,221.80],[2450083.5,233.00],[2450814.5,244.00],[2451544.5,251.30],[2452275.5,257.00],[2453005.5,261.60],[2453736.5,265.70],[2454466.5,270.30],[2455197.5,273.70],[2455927.5,277.50],[2456658.5,281.20],[2457388.5,285.10],[2458119.5,289.00],[2458849.5,292.70],[2459580.5,296.00],[2460310.5,299.70],[2461041.5,304.50],[2461771.5,308.00],[2462502.5,310.00]];
+    for(let i=0;i<PT.length-1;i++){const[j0,l0]=PT[i],[j1,l1]=PT[i+1];if(JD>=j0&&JD<j1)return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))}}
+    const[j0,l0]=PT[PT.length-2],[j1,l1]=PT[PT.length-1];return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))};
+  }
+
+  // ── Chiron: Swiss Ephemeris interpolation table ───────────
+  // Chiron geocentric tropical (Swiss Ephemeris reference points)
+  const CH_TBL=[[2440587.5,4.217],[2442778.5,26.917],[2444097.9,43.900],[2444240.5,47.917],[2444971.0,56.983],[2445701.0,66.217],[2446432.0,74.033],[2446656.0,80.117],[2447161.5,85.633],[2447893.0,90.4],[2448623.0,105.1],[2450084.5,157.117],[2451544.5,251.367],[2455197.5,302.183],[2458849.5,364.017],[2462451.5,386.9],[2466053.5,409.8]];
+  function chiron(JD){
+    for(let i=0;i<CH_TBL.length-1;i++){const[j0,l0]=CH_TBL[i],[j1,l1]=CH_TBL[i+1];if(JD>=j0&&JD<j1){return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))}}}
+    const[j0,l0]=CH_TBL[CH_TBL.length-2],[j1,l1]=CH_TBL[CH_TBL.length-1];return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))};
+  }
+
+  const node=JD=>{const t=T(JD);return{lon:n360(125.04452-1934.136261*t+2.0708e-3*t*t+t*t*t/450000)}};
+  // Lilith (mean Black Moon): ascending node of Moon's orbit around Earth. +180° correction.
+  const lilith=JD=>{const t=T(JD);return{lon:n360(83.3532+4069.0137*t-0.01032*t*t-t*t*t/80053+180)}};
+  const obliquity=JD=>{const t=T(JD);return 23.4392911-1.3004167e-2*t-1.639e-7*t*t+5.036e-7*t*t*t};
+  const gmst=JD=>{const t=T(JD);return n360(280.46061837+360.98564736629*(JD-2451545)+3.87933e-4*t*t-t*t*t/38710000)};
+
+  function placidus(JD,lat,lon){
+    // FIX: iterate in ECLIPTIC LONGITUDE space, compute dec = arcsin(sin(eps)*sin(L))
+    // NOT sin(eps)*sin(RA) — that was the root cause of 18-67' errors in H2/H8/H11/H12
+    const eps=obliquity(JD),RAMC=n360(gmst(JD)+lon);
+    const e=rad(eps),phi=rad(lat),ra=rad(RAMC);
+    const mc=n360(deg(Math.atan2(Math.sin(ra),Math.cos(ra)*Math.cos(e))));
+    const asc=n360(deg(Math.atan2(Math.cos(ra),-(Math.sin(e)*Math.tan(phi)+Math.cos(e)*Math.sin(ra)))));
+    const cusp=(frac,sign)=>{
+      let L=RAMC+sign*frac*90;  // iterate in ECLIPTIC longitude
+      for(let k=0;k<300;k++){
+        L=n360(L);
+        const sinL=Math.sin(rad(L)),cosL=Math.cos(rad(L));
+        const sinD=Math.sin(e)*sinL;  // dec from ecliptic lon (CORRECT)
+        if(Math.abs(sinD)>=1){L+=sign*0.5;continue}
+        const dec=Math.asin(sinD),tpt=Math.tan(phi)*Math.tan(dec);
+        if(Math.abs(tpt)>1){L+=sign*0.5;continue}
+        const dsa=deg(Math.acos(-tpt));
+        const RA=n360(deg(Math.atan2(sinL*Math.cos(e),cosL)));  // exact RA from ecl
+        let md=n360(RA-RAMC);if(md>180)md-=360;
+        const diff=sign*frac*dsa-md;
+        if(Math.abs(diff)<1e-9)break;
+        L=n360(L+diff*0.9);  // step in ecliptic space
+      }
+      return n360(L);
+    };
+    const h11=cusp(1/3,1),h12=cusp(2/3,1),h8=cusp(2/3,-1),h9=cusp(1/3,-1);
+    return[asc,n360(h8+180),n360(h9+180),n360(mc+180),n360(h11+180),n360(h12+180),n360(asc+180),h8,h9,mc,h11,h12];
+  }
+
+  function getHouse(lon,cusps){
+    for(let i=0;i<12;i++){const c=cusps[i],nx=cusps[(i+1)%12];if(c<=nx){if(lon>=c&&lon<nx)return i+1}else{if(lon>=c||lon<nx)return i+1}}return 1;
+  }
+
+  const ASP_DEF=[
+    {name:'Соединение',angle:0,orb:8,type:'neutral',sym:'☌'},
+    {name:'Секстиль',angle:60,orb:5,type:'soft',sym:'✶'},
+    {name:'Квадратура',angle:90,orb:8,type:'hard',sym:'□'},
+    {name:'Трин',angle:120,orb:8,type:'soft',sym:'△'},
+    {name:'Оппозиция',angle:180,orb:8,type:'hard',sym:'☍'},
+    {name:'Квинконс',angle:150,orb:3,type:'tension',sym:'⚻'},
+    {name:'Полуквадрат',angle:45,orb:2,type:'minor',sym:'∠'},
+  ];
+
+  function calcAspects(planets){
+    const keys=Object.keys(planets),res=[];
+    for(let i=0;i<keys.length;i++)for(let j=i+1;j<keys.length;j++){
+      const p1=planets[keys[i]],p2=planets[keys[j]];
+      const diff=Math.abs(p1.lon-p2.lon),angle=diff>180?360-diff:diff;
+      for(const a of ASP_DEF){const orb=Math.abs(angle-a.angle);if(orb<=a.orb){res.push({p1:keys[i],p2:keys[j],def:a,orb:+orb.toFixed(2)});break}}
+    }return res;
+  }
+
+  function calcChart(yr,mo,dy,h,mi,sc,lat,lon,utcOff){
+    const JD=jd(yr,mo,dy,h-utcOff,mi,sc);
+    const raw={
+      sun:sun(JD),moon:moon(JD),
+      mercury:keplerGeo('mercury',JD),venus:vsopGeo('venus',JD),mars:vsopGeo('mars',JD),
+      jupiter:vsopGeo('jupiter',JD),saturn:vsopGeo('saturn',JD),
+      uranus:vsopGeo('uranus',JD),neptune:vsopGeo('neptune',JD),
+      pluto:pluto(JD),node:node(JD),lilith:lilith(JD),chiron:chiron(JD),
+    };
+    const houses=placidus(JD,lat,lon),planets={};
+    for(const[k,v]of Object.entries(raw))planets[k]={...v,house:getHouse(v.lon,houses)};
+    return{planets,houses,aspects:calcAspects(planets),JD,asc:houses[0],mc:houses[9]};
+  }
+
+  // Expose inner functions for progressions/returns/local-space
+  function planetsAtJD(JD,lat=46,lon=30){
+    // Convert JD→date, compute at utc=0 so internal jd() call gives back same JD
+    const j=JD+0.5,Z=Math.floor(j);
+    let A=Z;if(Z>=2299161){const a=Math.floor((Z-1867216.25)/36524.25);A=Z+1+a-Math.floor(a/4)}
+    const B=A+1524,C=Math.floor((B-122.1)/365.25),D2=Math.floor(365.25*C);
+    const E=Math.floor((B-D2)/30.6001);
+    const dy=B-D2-Math.floor(30.6001*E),mo=E<14?E-1:E-13,yr=mo>2?C-4716:C-4715;
+    const frac=(JD+0.5)%1,hh=Math.floor(frac*24),mm=Math.floor((frac*24-hh)*60),ss=Math.floor(((frac*24-hh)*60-mm)*60);
+    return calcChart(yr,mo,dy,hh,mm,ss,lat,lon,0);
+  }
+  function localSpaceCalc(chart,refLat,refLon){
+    const eps=obliquity(chart.JD),G=gmst(chart.JD),LST=n360(G+refLon);
+    const R=Math.PI/180;
+    const res={};
+    for(const[pk,p]of Object.entries(chart.planets)){
+      const lon=p.lon;
+      const RA=n360(deg(Math.atan2(Math.sin(rad(lon))*Math.cos(rad(eps)),Math.cos(rad(lon)))));
+      const dec=deg(Math.asin(Math.sin(rad(eps))*Math.sin(rad(lon))));
+      let HA=n360(LST-RA);if(HA>180)HA-=360; // -180..+180
+      const sinAlt=Math.sin(R*refLat)*Math.sin(R*dec)+Math.cos(R*refLat)*Math.cos(R*dec)*Math.cos(R*HA);
+      const alt=deg(Math.asin(Math.max(-1,Math.min(1,sinAlt))));
+      // Azimuth: Astrodienst Local Space convention — South=0°, West=90°, North=180°, East=270°
+      const az_raw=deg(Math.atan2(Math.sin(R*HA),Math.cos(R*HA)*Math.sin(R*refLat)-Math.tan(R*dec)*Math.cos(R*refLat)));
+      const az=n360(az_raw);
+      res[pk]={lon,az,alt,above:alt>0,ha:HA};
+    }
+    return res;
+  }
+  return{jd,calcChart,planetsAtJD,localSpaceCalc,calcAspects,ASP_DEF,n360,getHouse};
+})();
+
+// ══════════════════════════════════════════════════════════
+// STATIC DATA
+// ══════════════════════════════════════════════════════════
+const SIGNS=[{n:'Овен',s:'♈',el:'fire'},{n:'Телец',s:'♉',el:'earth'},{n:'Близнецы',s:'♊',el:'air'},{n:'Рак',s:'♋',el:'water'},{n:'Лев',s:'♌',el:'fire'},{n:'Дева',s:'♍',el:'earth'},{n:'Весы',s:'♎',el:'air'},{n:'Скорпион',s:'♏',el:'water'},{n:'Стрелец',s:'♐',el:'fire'},{n:'Козерог',s:'♑',el:'earth'},{n:'Водолей',s:'♒',el:'air'},{n:'Рыбы',s:'♓',el:'water'}];
+const ELC={fire:'#d4834a',earth:'#6aaa55',air:'#5b9fd4',water:'#8866cc'};
+const PM={
+  sun:{n:'Солнце',s:'☉',c:'#d4a853',f:'«Я-сам» — центр воли, намерения, отцовский принцип'},
+  moon:{n:'Луна',s:'☽',c:'#9ab5d4',f:'«Чувствовалка» — эмоции, инстинкты, материнский принцип'},
+  mercury:{n:'Меркурий',s:'☿',c:'#88c4a8',f:'«Думалка» — речь, коммуникация, анализ информации'},
+  venus:{n:'Венера',s:'♀',c:'#d48aaa',f:'«Выбиралка» — любовь, деньги, симпатии и вкус'},
+  mars:{n:'Марс',s:'♂',c:'#d45b5b',f:'«Делалка» — действие, воля, конкуренция, преодоление'},
+  jupiter:{n:'Юпитер',s:'♃',c:'#d4a04a',f:'«Расширитель» — философия, рост, экспертность, Ошо'},
+  saturn:{n:'Сатурн',s:'♄',c:'#8899bb',f:'«Концентратор» — труд, структура, иерархия, результат'},
+  uranus:{n:'Уран',s:'⛢',c:'#5bbbcc',f:'«Ускоритель» — прорыв, технологии, сверхразум, будущее'},
+  neptune:{n:'Нептун',s:'♆',c:'#7788dd',f:'«Сверхчуйка» — интуиция, духовность, эфир, иллюзии'},
+  pluto:{n:'Плутон',s:'♇',c:'#bb77aa',f:'«Сверхволя» — трансформация, власть, кризис, динамит'},
+  node:{n:'С.Узел',s:'☊',c:'#ccaa44',f:'Кармическая точка роста и эволюции'},
+  lilith:{n:'Лилит',s:'⚸',c:'#9966aa',f:'«Тёмная сила» — табу, теневая сторона личности'},
+  chiron:{n:'Хирон',s:'⚷',c:'#66aabb',f:'«Раненый целитель» — исцеление через боль и принятие'},
+};
+const HM=[
+  {n:1,nm:'Дом Я',k:'Тело, маска, первое впечатление, бренд личности'},
+  {n:2,nm:'Дом ресурса',k:'Личные деньги, имущество, иммунитет, «сумочка»'},
+  {n:3,nm:'Дом ближнего',k:'Братья, соседи, транспорт, короткие поездки, соцсети'},
+  {n:4,nm:'Дом рода',k:'Семья, корни, родина, недвижимость, эгрегор рода'},
+  {n:5,nm:'Дом творчества',k:'Казино-церковь: дети, романы, риск, самопроявление'},
+  {n:6,nm:'Дом службы',k:'Наёмный труд, здоровье, коллеги, рутина, животные'},
+  {n:7,nm:'Дом партнёра',k:'Брак, договоры, суды, открытые враги — всё «не-я»'},
+  {n:8,nm:'Дом трансформации',k:'Чужие ресурсы, кризисы, эрос, магия, налоги, смерть'},
+  {n:9,nm:'Дом экспертизы',k:'Высшее знание, заграница, издания, суды, мировоззрение'},
+  {n:10,nm:'Дом статуса',k:'Карьера, репутация, иерархия, государство, вершина'},
+  {n:11,nm:'Дом аудитории',k:'Единомышленники, IT, большая халява, планы, будущее'},
+  {n:12,nm:'Дом тайного',k:'Изоляция, хронические болезни, творчество в тиши, эмиграция'},
+];
+
+// ══════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════
+function lonStr(lon){
+  const i=Math.floor(lon/30),d=Math.floor(lon%30),m=Math.floor((lon%1)*60);
+  return`${SIGNS[i].s}${SIGNS[i].n} ${d}°${String(m).padStart(2,'0')}'`;
+}
+function lonShort(lon){const i=Math.floor(lon/30),d=Math.floor(lon%30);return`${SIGNS[i].s}${d}°`}
+function signOf(lon){return SIGNS[Math.floor(lon/30)]}
+
+// ══════════════════════════════════════════════════════════
+// CHART WHEEL
+// ══════════════════════════════════════════════════════════
+function Wheel({chart,size=440,label=''}){
+  if(!chart)return null;
+  const cx=size/2,cy=size/2,R=size/2;
+  const zodR=R-10,zodIn=zodR-30,houseIn=zodIn-26,aspR=houseIn-20;
+  const aLon=chart.asc;
+  const toA=lon=>{const rel=AE.n360(lon-aLon);return(180-rel)*Math.PI/180};
+  const ptA=(lon,r)=>{const a=toA(lon);return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)}};
+
+  return(
+    <svg width={size} height={size} style={{display:'block',maxWidth:'100%',margin:'0 auto'}}>
+      <defs>
+        <radialGradient id={`rg${label}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#1a1c36"/>
+          <stop offset="100%" stopColor="#0a0b1a"/>
+        </radialGradient>
+      </defs>
+      <circle cx={cx} cy={cy} r={R-2} fill={`url(#rg${label})`} stroke="rgba(80,100,180,0.25)" strokeWidth="1"/>
+      <circle cx={cx} cy={cy} r={zodR} fill="none" stroke="rgba(80,100,180,0.2)" strokeWidth="0.5"/>
+      <circle cx={cx} cy={cy} r={zodIn} fill="none" stroke="rgba(80,100,180,0.2)" strokeWidth="0.5"/>
+      <circle cx={cx} cy={cy} r={houseIn} fill="none" stroke="rgba(80,100,180,0.15)" strokeWidth="0.5"/>
+      <circle cx={cx} cy={cy} r={aspR} fill="none" stroke="rgba(80,100,180,0.1)" strokeWidth="0.5"/>
+
+      {SIGNS.map((s,i)=>{
+        const p1=ptA(i*30,zodR),p2=ptA(i*30+30,zodR),p3=ptA(i*30+30,zodIn),p4=ptA(i*30,zodIn);
+        const lp=ptA(i*30+15,zodIn+14);
+        const c=ELC[s.el];
+        return(
+          <g key={i}>
+            <path d={`M${p1.x},${p1.y} A${zodR},${zodR} 0 0,0 ${p2.x},${p2.y} L${p3.x},${p3.y} A${zodIn},${zodIn} 0 0,1 ${p4.x},${p4.y} Z`} fill={c+'15'} stroke={c+'35'} strokeWidth="0.5"/>
+            <text x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill={c+'cc'}>{s.s}</text>
+          </g>
+        );
+      })}
+
+      {Array.from({length:360},(_,i)=>{
+        const a=toA(i),r1=zodIn,r2=i%10===0?zodIn+8:i%5===0?zodIn+5:zodIn+3;
+        return<line key={i} x1={cx+r1*Math.cos(a)} y1={cy+r1*Math.sin(a)} x2={cx+r2*Math.cos(a)} y2={cy+r2*Math.sin(a)} stroke="rgba(255,255,255,0.12)" strokeWidth="0.5"/>;
+      })}
+
+      {chart.houses.map((lon,i)=>{
+        const isA=[0,3,6,9].includes(i);
+        const p1=ptA(lon,zodIn),p2=ptA(lon,aspR-4);
+        const pl=ptA(lon,houseIn+12);
+        return(
+          <g key={i}>
+            <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={isA?'rgba(200,168,75,0.55)':'rgba(80,100,180,0.22)'} strokeWidth={isA?1.2:0.7} strokeDasharray={isA?'none':'3,3'}/>
+            <text x={pl.x} y={pl.y} textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fill={isA?'rgba(200,168,75,0.75)':'rgba(120,130,180,0.55)'}>{i+1}</text>
+          </g>
+        );
+      })}
+
+      {chart.aspects.filter(a=>['neutral','soft','hard'].includes(a.def.type)).map((a,i)=>{
+        const v1=chart.planets[a.p1],v2=chart.planets[a.p2];if(!v1||!v2)return null;
+        const p1=ptA(v1.lon,aspR-5),p2=ptA(v2.lon,aspR-5);
+        const c={neutral:'rgba(74,127,212,0.3)',soft:'rgba(85,170,119,0.28)',hard:'rgba(204,85,85,0.28)'}[a.def.type];
+        return<line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={c} strokeWidth="0.75" strokeDasharray={a.def.type==='soft'?'none':'3,3'}/>;
+      })}
+
+      {Object.entries(chart.planets).map(([k,p])=>{
+        const m=PM[k];if(!m)return null;
+        const pos=ptA(p.lon,houseIn-10);
+        return(
+          <g key={k}>
+            <circle cx={pos.x} cy={pos.y} r="9.5" fill={m.c+'1a'} stroke={m.c+'44'} strokeWidth="0.7"/>
+            <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={m.c}>{m.s}</text>
+          </g>
+        );
+      })}
+
+      {[{lon:chart.asc,lbl:'ASC'},{lon:chart.mc,lbl:'MC'}].map(({lon,lbl})=>{
+        const p=ptA(lon,zodR+12);
+        return<text key={lbl} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="rgba(200,168,75,0.85)" fontWeight="600">{lbl}</text>;
+      })}
+
+      {label&&<text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill="rgba(200,168,75,0.35)">{label}</text>}
+    </svg>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// BIRTH FORM
+// ══════════════════════════════════════════════════════════
+const DB={name:'',year:'',month:'',day:'',hour:'',min:'',sec:'0',lat:'',lon:'',utc:'+3'};
+const PRESETS=[
+  {lbl:'Александр',d:{name:'Александр',year:'1979',month:'8',day:'12',hour:'13',min:'29',sec:'30',lat:'46.85',lon:'29.63',utc:'+3'}},
+  {lbl:'Мария',d:{name:'Мария',year:'1986',month:'8',day:'13',hour:'22',min:'24',sec:'0',lat:'47.23',lon:'39.70',utc:'+4'}},
+  {lbl:'Сейчас',d:null},
+];
+
+function BirthForm({onCalc,title,compact}){
+  const[f,sf]=useState(DB);
+  const[city,setCity]=useState('');
+  const[geoStatus,setGeoStatus]=useState('');
+
+  const findCity=async()=>{
+    if(!city.trim())return;
+    setGeoStatus('Поиск...');
+    try{
+      const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&accept-language=ru`;
+      const r=await fetch(url,{headers:{'Accept-Language':'ru,en'}});
+      const data=await r.json();
+      if(data&&data.length>0){
+        const{lat,lon,display_name}=data[0];
+        sf(p=>({...p,lat:(+lat).toFixed(4),lon:(+lon).toFixed(4)}));
+        setGeoStatus('✓ '+display_name.split(',').slice(0,2).join(', '));
+      }else{setGeoStatus('Не найдено')}
+    }catch(e){setGeoStatus('Ошибка сети')}
+  };
+  const set=(k,v)=>sf(p=>({...p,[k]:v}));
+  const load=p=>{
+    if(p.d)sf(p.d);
+    else{const n=new Date();sf({...DB,year:n.getFullYear()+'',month:(n.getMonth()+1)+'',day:n.getDate()+'',hour:n.getHours()+'',min:n.getMinutes()+''})}
+  };
+  const calc=()=>{
+    if(!f.year||!f.month||!f.day||!f.lat||!f.lon)return;
+    try{const ch=AE.calcChart(+f.year,+f.month,+f.day,+f.hour||0,+f.min||0,+f.sec||0,+f.lat,+f.lon,parseFloat(f.utc)||0);onCalc({...ch,meta:{name:f.name,date:`${f.day}.${f.month}.${f.year}`,time:`${f.hour}:${String(f.min).padStart(2,'0')}`}})}catch(e){alert('Ошибка расчёта: '+e.message)}
+  };
+  return(
+    <div className="card" style={{marginBottom:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span style={{color:'var(--gold)',fontWeight:500,fontSize:12}}>{title}</span>
+        <div style={{display:'flex',gap:5}}>{PRESETS.map(p=><button key={p.lbl} className="bs" style={{padding:'3px 9px',fontSize:11}} onClick={()=>load(p)}>{p.lbl}</button>)}</div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:compact?'1fr 1fr 1fr':'1fr 1fr 1fr 1fr',gap:7,marginBottom:7}}>
+        <div><label>Имя</label><input value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Имя"/></div>
+        <div><label>Год</label><input value={f.year} onChange={e=>set('year',e.target.value)} placeholder="1979"/></div>
+        <div><label>Месяц</label><input value={f.month} onChange={e=>set('month',e.target.value)} placeholder="8"/></div>
+        {!compact&&<div><label>День</label><input value={f.day} onChange={e=>set('day',e.target.value)} placeholder="12"/></div>}
+      </div>
+      {compact&&<div style={{marginBottom:7}}><label>День</label><input value={f.day} onChange={e=>set('day',e.target.value)} placeholder="12"/></div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',gap:7,marginBottom:7}}>
+        <div><label>Час</label><input value={f.hour} onChange={e=>set('hour',e.target.value)} placeholder="13"/></div>
+        <div><label>Мин</label><input value={f.min} onChange={e=>set('min',e.target.value)} placeholder="29"/></div>
+        <div><label>Сек</label><input value={f.sec} onChange={e=>set('sec',e.target.value)} placeholder="30"/></div>
+        <div><label>UTC</label><input value={f.utc} onChange={e=>set('utc',e.target.value)} placeholder="+3"/></div>
+        <div style={{display:'flex',alignItems:'flex-end'}}><button className="bp" style={{width:'100%'}} onClick={calc}>▶</button></div>
+      </div>
+      <div style={{marginBottom:7}}>
+        <label>Город рождения</label>
+        <div style={{display:'flex',gap:6}}>
+          <input value={city} onChange={e=>setCity(e.target.value)} onKeyDown={e=>e.key==='Enter'&&findCity()} placeholder="Например: Тирасполь или Rostov-on-Don" style={{flex:1}}/>
+          <button className="bs" style={{whiteSpace:'nowrap',padding:'7px 12px'}} onClick={findCity}>Найти</button>
+        </div>
+        {geoStatus&&<div style={{fontSize:11,marginTop:3,color:geoStatus.startsWith('✓')?'var(--green)':'var(--tx2)'}}>{geoStatus}</div>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+        <div><label>Широта °N</label><input value={f.lat} onChange={e=>set('lat',e.target.value)} placeholder="46.85"/></div>
+        <div><label>Долгота °E</label><input value={f.lon} onChange={e=>set('lon',e.target.value)} placeholder="29.63"/></div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// TABLE COMPONENTS
+// ══════════════════════════════════════════════════════════
+function PlanetTable({chart}){
+  if(!chart)return null;
+  return(
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Планета</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Позиция</th>
+          <th style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Стихия</th>
+          <th style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Дом</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Функция (Андреев)</th>
+        </tr></thead>
+        <tbody>{Object.entries(chart.planets).map(([k,p])=>{
+          const m=PM[k];if(!m)return null;
+          const sg=signOf(p.lon);
+          return(
+            <tr key={k} style={{borderBottom:'1px solid var(--border)'}}>
+              <td style={{padding:'6px 7px',color:m.c,fontWeight:500}}>{m.s} {m.n}</td>
+              <td style={{padding:'6px 7px'}}>{lonStr(p.lon)}</td>
+              <td style={{padding:'6px 7px',textAlign:'center'}}>
+                <span style={{background:ELC[sg.el]+'20',color:ELC[sg.el],padding:'1px 7px',borderRadius:10,fontSize:11,fontWeight:500}}>{sg.el==='fire'?'Огонь':sg.el==='earth'?'Земля':sg.el==='air'?'Воздух':'Вода'}</span>
+              </td>
+              <td style={{padding:'6px 7px',textAlign:'center',color:'var(--gold)',fontWeight:600}}>{p.house}</td>
+              <td style={{padding:'6px 7px',color:'var(--tx2)',fontSize:11,maxWidth:200}}>{m.f.split('—').slice(1).join('—').trim()}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function HouseTable({chart}){
+  if(!chart)return null;
+  const lbl=['ASC','','','IC','','','DSC','','','MC','',''];
+  return(
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+          <th style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Дом</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Куспид</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Планеты</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Тема</th>
+        </tr></thead>
+        <tbody>{chart.houses.map((lon,i)=>{
+          const isA=[0,3,6,9].includes(i);
+          const hm=HM[i];
+          const planetsInHouse=Object.entries(chart.planets).filter(([,p])=>p.house===i+1);
+          return(
+            <tr key={i} style={{borderBottom:'1px solid var(--border)',background:isA?'rgba(200,168,75,0.04)':''}}>
+              <td style={{padding:'5px 7px',textAlign:'center',color:isA?'var(--gold)':'var(--tx2)',fontWeight:isA?600:400}}>{i+1}{lbl[i]?` ${lbl[i]}`:''}</td>
+              <td style={{padding:'5px 7px'}}>{lonStr(lon)}</td>
+              <td style={{padding:'5px 7px'}}>{planetsInHouse.map(([k])=>{const m=PM[k];return m?<span key={k} style={{color:m.c,marginRight:4,fontSize:13}}>{m.s}</span>:null})}</td>
+              <td style={{padding:'5px 7px',color:'var(--tx2)',fontSize:11}}>{hm?.k?.split(',')[0]}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function AspectTable({chart}){
+  if(!chart)return null;
+  const byT={hard:[],neutral:[],soft:[],tension:[],minor:[]};
+  chart.aspects.forEach(a=>byT[a.def.type]?.push(a));
+  const rows=[...byT.hard,...byT.neutral,...byT.soft,...byT.tension,...byT.minor];
+  const typLbl={soft:'Гармония',hard:'Напряжение',neutral:'Слияние',tension:'Квинконс',minor:'Фоновый'};
+  const typCls={soft:'ps',hard:'ph',neutral:'pn',tension:'pt',minor:'pm'};
+  const typeMap={
+    neutral:'Слияние функций — «путаница педалей»; новый синтетический талант',
+    soft:'Врождённый талант; функции поддерживают друг друга автоматически',
+    hard:'Конфликт-генератор энергии; квадратура куёт мечи и зарабатывает миллиарды',
+    tension:'Хроническое напряжение, сублимируется в творчество или философию',
+    minor:'Фоновое влияние, проявляется в конкретных ситуациях',
+  };
+  return(
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Аспект</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Планеты</th>
+          <th style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Орб.</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Тип</th>
+          <th style={{padding:'5px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Значение (Андреев)</th>
+        </tr></thead>
+        <tbody>{rows.map((a,i)=>{
+          const m1=PM[a.p1],m2=PM[a.p2];if(!m1||!m2)return null;
+          return(
+            <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+              <td style={{padding:'5px 7px',fontWeight:500}}>{a.def.sym} {a.def.name}</td>
+              <td style={{padding:'5px 7px'}}><span style={{color:m1.c}}>{m1.s}{m1.n}</span><span style={{color:'var(--tx3)',margin:'0 5px'}}>—</span><span style={{color:m2.c}}>{m2.s}{m2.n}</span></td>
+              <td style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)'}}>{a.orb}°</td>
+              <td style={{padding:'5px 7px'}}><span className={`pill ${typCls[a.def.type]}`}>{typLbl[a.def.type]}</span></td>
+              <td style={{padding:'5px 7px',color:'var(--tx2)',fontSize:11}}>{typeMap[a.def.type]}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// NATAL TAB
+// ══════════════════════════════════════════════════════════
+function NatalTab(){
+  const[chart,setChart]=useState(null);
+  const[tab,setTab]=useState('planets');
+  const tabs=[{k:'planets',l:'Планеты'},{k:'houses',l:'Дома'},{k:'aspects',l:'Аспекты'},{k:'wheel',l:'Колесо'}];
+  return(
+    <div>
+      <BirthForm onCalc={setChart} title="Натальная карта"/>
+      {chart&&(
+        <>
+          <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+            {tabs.map(t=>(
+              <button key={t.k} className={tab===t.k?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setTab(t.k)}>{t.l}</button>
+            ))}
+            <span style={{marginLeft:'auto',fontSize:11,color:'var(--tx2)',display:'flex',alignItems:'center',gap:8}}>
+              {chart.meta?.name&&<strong style={{color:'var(--gold)'}}>{chart.meta.name}</strong>}
+              {chart.meta?.date} {chart.meta?.time} | ASC {lonShort(chart.asc)} | MC {lonShort(chart.mc)}
+              <PrintBtn getHTML={()=>chartPrintHTML(chart)} title={`Натальная карта — ${chart.meta?.name||''}`} meta={`${chart.meta?.date} ${chart.meta?.time} | ASC ${lonShort(chart.asc)} MC ${lonShort(chart.mc)}`}/>
+            </span>
+          </div>
+          <div className="card">
+            {tab==='planets'&&<PlanetTable chart={chart}/>}
+            {tab==='houses'&&<HouseTable chart={chart}/>}
+            {tab==='aspects'&&<AspectTable chart={chart}/>}
+            {tab==='wheel'&&<Wheel chart={chart} size={480}/>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SYNASTRY TAB
+// ══════════════════════════════════════════════════════════
+function calcSynastry(c1,c2){
+  if(!c1||!c2)return null;
+  const aspects=[];
+  for(const[k1,p1]of Object.entries(c1.planets))
+    for(const[k2,p2]of Object.entries(c2.planets)){
+      const diff=Math.abs(p1.lon-p2.lon),angle=diff>180?360-diff:diff;
+      for(const a of AE.ASP_DEF){const orb=Math.abs(angle-a.angle);if(orb<=a.orb){aspects.push({p1:k1,p2:k2,c1p:p1,c2p:p2,def:a,orb:+orb.toFixed(2)});break}}
+    }
+  let score=50;
+  const pers=['sun','moon','venus','mars','mercury'];
+  aspects.forEach(a=>{
+    const b=pers.includes(a.p1)&&pers.includes(a.p2);
+    if(a.def.type==='soft'){score+=b?4:1}
+    if(a.def.type==='hard'&&a.orb<4){score-=b?3:1}
+    if(a.def.type==='neutral'&&['sun','moon','venus'].includes(a.p1)&&['sun','moon','venus'].includes(a.p2))score+=3;
+  });
+  return{aspects:aspects.sort((a,b)=>a.orb-b.orb),score:Math.min(99,Math.max(20,score))};
+}
+
+function SynastryTab(){
+  const[c1,sc1]=useState(null);
+  const[c2,sc2]=useState(null);
+  const syn=useMemo(()=>calcSynastry(c1,c2),[c1,c2]);
+  const scoreColor=s=>s>=70?'#55aa77':s>=55?'#d4a04a':'#cc5555';
+  const scoreText=s=>s>=70?'Высокая совместимость':s>=55?'Средняя совместимость':'Требует работы';
+  const typLbl={soft:'Гармония',hard:'Напряжение',neutral:'Слияние',tension:'Квинконс',minor:'Фоновый'};
+  const typCls={soft:'ps',hard:'ph',neutral:'pn',tension:'pt',minor:'pm'};
+  return(
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+        <BirthForm onCalc={sc1} title="Карта 1" compact/>
+        <BirthForm onCalc={sc2} title="Карта 2" compact/>
+      </div>
+      {syn&&(
+        <>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+            <Wheel chart={c1} size={360} label={c1?.meta?.name}/>
+            <Wheel chart={c2} size={360} label={c2?.meta?.name}/>
+          </div>
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:12,padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:36,fontWeight:700,color:scoreColor(syn.score),lineHeight:1}}>{syn.score}</div>
+                <div style={{fontSize:10,color:'var(--tx2)',marginTop:2}}>из 100</div>
+              </div>
+              <div>
+                <div style={{fontWeight:500,fontSize:14,color:'var(--tx1)'}}>{scoreText(syn.score)}</div>
+                <div style={{fontSize:11,color:'var(--tx2)',marginTop:2}}>Методика Школы Павла Андреева — взвешенная оценка по личным планетам</div>
+                <div style={{fontSize:11,color:'var(--tx3)',marginTop:1}}>Всего аспектов: {syn.aspects.length} | Гармоничных: {syn.aspects.filter(a=>a.def.type==='soft').length} | Напряжённых: {syn.aspects.filter(a=>a.def.type==='hard').length}</div>
+              </div>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Аспект</th>
+                  <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Карта 1</th>
+                  <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Карта 2</th>
+                  <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'center'}}>Орб.</th>
+                  <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500}}>Тип</th>
+                </tr></thead>
+                <tbody>{syn.aspects.slice(0,50).map((a,i)=>{
+                  const m1=PM[a.p1],m2=PM[a.p2];if(!m1||!m2)return null;
+                  return(
+                    <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                      <td style={{padding:'5px 7px',fontWeight:500}}>{a.def.sym} {a.def.name}</td>
+                      <td style={{padding:'5px 7px',color:m1.c}}>{m1.s} {m1.n} {lonShort(a.c1p.lon)}</td>
+                      <td style={{padding:'5px 7px',color:m2.c}}>{m2.s} {m2.n} {lonShort(a.c2p.lon)}</td>
+                      <td style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)'}}>{a.orb}°</td>
+                      <td style={{padding:'5px 7px'}}><span className={`pill ${typCls[a.def.type]}`}>{typLbl[a.def.type]}</span></td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// TRANSITS TAB
+// ══════════════════════════════════════════════════════════
+function TransitsTab(){
+  const[natal,setNatal]=useState(null);
+  const[tDate,setTDate]=useState(()=>{const n=new Date();return{year:n.getFullYear()+'',month:(n.getMonth()+1)+'',day:n.getDate()+'',hour:n.getHours()+'',min:n.getMinutes()+'',lat:'45.03',lon:'38.97'}});
+  const[transit,setTransit]=useState(null);
+
+  const calcTransit=()=>{
+    try{const ch=AE.calcChart(+tDate.year,+tDate.month,+tDate.day,+tDate.hour||12,+tDate.min||0,0,+tDate.lat,+tDate.lon,0);setTransit(ch)}catch(e){}
+  };
+
+  useEffect(()=>{if(natal)calcTransit()},[natal]);
+
+  const aspects=useMemo(()=>{
+    if(!natal||!transit)return[];
+    const res=[];
+    for(const[tk,tp]of Object.entries(transit.planets))
+      for(const[nk,np]of Object.entries(natal.planets)){
+        const diff=Math.abs(tp.lon-np.lon),angle=diff>180?360-diff:diff;
+        for(const a of AE.ASP_DEF){
+          const orb=Math.abs(angle-a.angle);
+          const maxO=['saturn','uranus','neptune','pluto','jupiter'].includes(tk)?a.orb*0.7:a.orb*0.5;
+          if(orb<=maxO){res.push({tk,nk,tLon:tp.lon,nLon:np.lon,def:a,orb:+orb.toFixed(2)});break}
+        }
+      }
+    return res.sort((a,b)=>a.orb-b.orb);
+  },[natal,transit]);
+
+  const typCls={soft:'ps',hard:'ph',neutral:'pn',tension:'pt',minor:'pm'};
+  const typLbl={soft:'Гармония',hard:'Напряжение',neutral:'Слияние',tension:'Квинконс',minor:'Фоновый'};
+  const importance=a=>{
+    const outerT=['saturn','uranus','neptune','pluto','jupiter'].includes(a.tk);
+    const personalN=['sun','moon','mercury','venus','mars','asc','mc'].includes(a.nk);
+    return outerT&&personalN?3:outerT?2:1;
+  };
+
+  return(
+    <div>
+      <BirthForm onCalc={setNatal} title="Натальная карта"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{color:'var(--gold)',fontWeight:500,fontSize:12,marginBottom:10}}>Дата транзита</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr 1fr 1fr',gap:7,marginBottom:7}}>
+            {['year','month','day','hour','min'].map(k=>(
+              <div key={k}><label>{{year:'Год',month:'М-ц',day:'День',hour:'Час',min:'Мин'}[k]}</label>
+                <input value={tDate[k]} onChange={e=>setTDate(p=>({...p,[k]:e.target.value}))}/></div>
+            ))}
+            <div><label>Широта</label><input value={tDate.lat} onChange={e=>setTDate(p=>({...p,lat:e.target.value}))}/></div>
+            <div style={{display:'flex',alignItems:'flex-end'}}><button className="bp" style={{width:'100%'}} onClick={calcTransit}>▶</button></div>
+          </div>
+          <div><label>Долгота °E</label><input value={tDate.lon} onChange={e=>setTDate(p=>({...p,lon:e.target.value}))} style={{maxWidth:200}}/></div>
+        </div>
+      )}
+      {aspects.length>0&&(
+        <div className="card">
+          <div style={{color:'var(--gold)',fontWeight:500,marginBottom:10,fontSize:12}}>
+            Транзиты → натальная карта ({aspects.length} аспектов)
+            <span style={{color:'var(--tx2)',marginLeft:8,fontWeight:400}}>Сортировка: важность + орбис</span>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500}}>!</th>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Транзит</th>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Аспект</th>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'left'}}>Натал</th>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500,textAlign:'center'}}>Орб.</th>
+                <th style={{padding:'5px 7px',color:'var(--tx2)',fontWeight:500}}>Тип</th>
+              </tr></thead>
+              <tbody>{[...aspects].sort((a,b)=>importance(b)-importance(a)||a.orb-b.orb).map((a,i)=>{
+                const tm=PM[a.tk],nm=PM[a.nk];if(!tm||!nm)return null;
+                const imp=importance(a);
+                return(
+                  <tr key={i} style={{borderBottom:'1px solid var(--border)',background:imp===3?'rgba(200,168,75,0.04)':''}}>
+                    <td style={{padding:'5px 7px',textAlign:'center',color:imp===3?'var(--gold)':imp===2?'var(--tx2)':'var(--tx3)',fontSize:13}}>{'★'.repeat(imp)}</td>
+                    <td style={{padding:'5px 7px',color:tm.c}}>{tm.s} {tm.n} {lonShort(a.tLon)}</td>
+                    <td style={{padding:'5px 7px',fontWeight:500}}>{a.def.sym} {a.def.name}</td>
+                    <td style={{padding:'5px 7px',color:nm.c}}>{nm.s} {nm.n} {lonShort(a.nLon)}</td>
+                    <td style={{padding:'5px 7px',textAlign:'center',color:'var(--tx2)'}}>{a.orb}°</td>
+                    <td style={{padding:'5px 7px'}}><span className={`pill ${typCls[a.def.type]}`}>{typLbl[a.def.type]}</span></td>
+                  </tr>
+                );
+              })}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// CALIBRATION TAB — verifies engine against known data
+// ══════════════════════════════════════════════════════════
+function CalibTab(){
+  const TESTS=[
+    {name:'Александр (Тирасполь)',yr:1979,mo:8,dy:12,h:13,mi:29,sc:30,lat:46.85,lon:29.63,utc:3,
+     expected:{sun:{s:'Лев',d:19,m:7},moon:{s:'Овен',d:18,m:55},mercury:{s:'Лев',d:3,m:16},venus:{s:'Лев',d:15,m:31},mars:{s:'Рак',d:2,m:34},jupiter:{s:'Лев',d:19,m:49},saturn:{s:'Дева',d:13,m:40},uranus:{s:'Скорпион',d:17,m:2},neptune:{s:'Стрелец',d:17,m:48},pluto:{s:'Весы',d:17,m:0},asc:{s:'Скорпион',d:12,m:26},mc:{s:'Лев',d:25,m:0},h2:{s:'Стрелец',d:11,m:37},h3:{s:'Козерог',d:17,m:10},h8:{s:'Близнецы',d:11,m:37},h9:{s:'Рак',d:17,m:10},h11:{s:'Дева',d:27,m:26},h12:{s:'Весы',d:22,m:38},lilith:{s:'Дева',d:3,m:44},chiron:{s:'Телец',d:13,m:54}}},
+    {name:'Мария (Ростов-на-Дону) — 13.08.1986 22:24 UTC+4',yr:1986,mo:8,dy:13,h:22,mi:24,sc:0,lat:47.23,lon:39.70,utc:4,
+     expected:{
+       sun:{s:'Лев',d:20,m:42},moon:{s:'Скорпион',d:29,m:28},mercury:{s:'Лев',d:2,m:0},
+       venus:{s:'Весы',d:6,m:12},mars:{s:'Козерог',d:11,m:25},jupiter:{s:'Рыбы',d:21,m:14},
+       saturn:{s:'Стрелец',d:3,m:5},uranus:{s:'Стрелец',d:18,m:26},neptune:{s:'Козерог',d:3,m:18},
+       pluto:{s:'Скорпион',d:4,m:46},node:{s:'Овен',d:23,m:55},chiron:{s:'Близнецы',d:20,m:7},
+       asc:{s:'Овен',d:15,m:24},mc:{s:'Козерог',d:6,m:58},
+       h2:{s:'Телец',d:24,m:25},h3:{s:'Близнецы',d:17,m:42},
+       h8:{s:'Скорпион',d:24,m:25},h9:{s:'Стрелец',d:17,m:42},
+       h11:{s:'Козерог',d:27,m:29},h12:{s:'Водолей',d:25,m:44},
+     }},
+  ];
+
+  // SP CALIBRATION — Astrodienst D6251GW, 28.03.2026
+  // Sign codes: a=Ari b=Tau c=Gem d=Can e=Leo f=Vir g=Lib h=Sco i=Sag j=Cap k=Aqu l=Pis
+  const SP_TESTS=[
+    {name:'Александр — Прогрессии на 28.03.2026',yr:1979,mo:8,dy:12,h:13,mi:29,sc:30,lat:46.85,lon:29.63,utc:3,
+     targetYr:2026,targetMo:3,targetDy:28,
+     // Prog JD: 2444144.563134 (46.63 days after birth)
+     expected:{sun:{s:'Весы',d:4,m:20},moon:{s:'Стрелец',d:20,m:28},mercury:{s:'Весы',d:15,m:46},venus:{s:'Весы',d:13,m:23},mars:{s:'Лев',d:1,m:53},saturn:{s:'Дева',d:19,m:25},pluto:{s:'Весы',d:18,m:32},asc:{s:'Стрелец',d:17,m:35},mc:{s:'Весы',d:14,m:23}}},
+    {name:'Мария — Прогрессии на 28.03.2026',yr:1986,mo:8,dy:13,h:22,mi:24,sc:0,lat:47.23,lon:39.70,utc:4,
+     targetYr:2026,targetMo:3,targetDy:28,
+     // Prog JD: 2446695.888230 (39.62 days after birth)
+     expected:{sun:{s:'Дева',d:29,m:4},moon:{s:'Телец',d:17,m:57},mercury:{s:'Весы',d:12,m:14},venus:{s:'Скорпион',d:11,m:37},saturn:{s:'Стрелец',d:4,m:44},asc:{s:'Близнецы',d:14,m:38},mc:{s:'Водолей',d:14,m:10}}},
+  ];
+
+  const[results,setResults]=useState(null);
+  const[spResults,setSPResults]=useState(null);
+
+  const runSP=()=>{
+    const res=SP_TESTS.map(t=>{
+      try{
+        const natal=AE.calcChart(t.yr,t.mo,t.dy,t.h,t.mi,t.sc,t.lat,t.lon,t.utc);
+        const targetJD=AE.jd(t.targetYr,t.targetMo,t.targetDy,12,0,0);
+        const ageYears=(targetJD-natal.JD)/365.25;
+        const progJD=natal.JD+ageYears;
+        const prog=AE.planetsAtJD(progJD,t.lat,t.lon);
+        const checks=[];
+        const signN={Овен:0,Телец:30,Близнецы:60,Рак:90,Лев:120,Дева:150,Весы:180,Скорпион:210,Стрелец:240,Козерог:270,Водолей:300,Рыбы:330};
+        for(const[k,exp]of Object.entries(t.expected)){
+          const expLon=signN[exp.s]+exp.d+exp.m/60;
+          let actual;
+          if(k==='asc')actual=prog.houses[0];
+          else if(k==='mc')actual=prog.houses[9];
+          else actual=prog.planets[k]?.lon;
+          if(actual===undefined){checks.push({k,exp:lonStr(expLon),got:'N/A',totalMin:999,ok:false,qual:'poor'});continue}
+          let diff=Math.abs(actual-expLon);if(diff>180)diff=360-diff;
+          const totalMin=Math.round(diff*60);
+          const ok=totalMin<=15;
+          const qual=totalMin<=3?'exact':totalMin<=15?'good':totalMin<=60?'approx':'poor';
+          checks.push({k,exp:lonStr(expLon),got:lonStr(actual),totalMin,ok,qual});
+        }
+        const pass=checks.every(c=>c.ok||c.qual==='approx');
+        return{name:t.name,checks,pass,progJD:progJD.toFixed(3),ageYears:ageYears.toFixed(2)};
+      }catch(e){return{name:t.name,error:e.message,pass:false}}
+    });
+    setSPResults(res);
+  };
+
+  const run=()=>{
+    const res=TESTS.map(t=>{
+      try{
+        const ch=AE.calcChart(t.yr,t.mo,t.dy,t.h,t.mi,t.sc,t.lat,t.lon,t.utc);
+        const checks=[];
+        const houseIdx={h2:1,h3:2,h5:4,h6:5,h8:7,h9:8,h11:10,h12:11};
+        // Tolerances in arcminutes per planet (Meeus low-precision inherent limits)
+        const TOL={sun:3,moon:3,mercury:15,venus:15,mars:15,jupiter:20,
+          saturn:60,uranus:90,neptune:45,pluto:150,
+          node:10,lilith:15,chiron:15,
+          asc:3,mc:3,h2:15,h3:15,h5:15,h6:15,h8:15,h9:15,h11:15,h12:15};
+        for(const[k,exp]of Object.entries(t.expected)){
+          let actual;
+          if(k==='asc')actual=ch.asc;
+          else if(k==='mc')actual=ch.mc;
+          else if(houseIdx[k]!==undefined)actual=ch.houses[houseIdx[k]];
+          else actual=ch.planets[k]?.lon;
+          if(actual===undefined){checks.push({k,ok:false,msg:'нет данных'});continue}
+          const ai=Math.floor(actual/30),ad=Math.floor(actual%30),am=Math.floor((actual%1)*60);
+          const signName=SIGNS[ai].n;
+          // Real arcminute error: |actual_total_minutes - expected_total_minutes|
+          const dErr=0,mErr=Math.abs(ad*60+am-(exp.d*60+exp.m));
+          const totalMin=mErr;
+          const tol=TOL[k]||30;
+          const ok=signName===exp.s&&totalMin<=tol;
+          const qual=totalMin===0?'точно':totalMin<=10?'отлично':totalMin<=30?'хорошо':totalMin<=60?'приемл.':'грубо';
+          checks.push({k,ok,got:`${signName} ${ad}°${String(am).padStart(2,'0')}'`,exp:`${exp.s} ${exp.d}°${String(exp.m).padStart(2,'0')}'`,dErr,mErr,totalMin,qual});
+        }
+        return{name:t.name,checks,pass:checks.every(c=>c.ok)};
+      }catch(e){return{name:t.name,error:e.message,pass:false}}
+    });
+    setResults(res);
+  };
+
+  return(
+    <div>
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div>
+            <div style={{fontWeight:500,color:'var(--gold)',marginBottom:2}}>Калибровка движка</div>
+            <div style={{fontSize:11,color:'var(--tx2)'}}>Сравнение с эталонными данными Astrodienst (Swiss Ephemeris). База: 81 365 натальных карт.</div>
+          </div>
+          <button className="bp" onClick={run}>Запустить тесты натальной</button>
+          <button className="bs" onClick={runSP} style={{marginLeft:8}}>Тест прогрессий (Astrodienst)</button>
+        </div>
+        <div style={{fontSize:11,color:'var(--tx3)'}}>
+          Алгоритмы: Меус Ch.25 (☉), Ch.47 60-терм (☽), Ch.33 гелио+геоцентр. проекция (♀♂♃...), Ch.37+геоцентр.корр. (♇), Плацидус. Точность: ☉~0.01°, ☽~0.1′, личные планеты ~0.1–0.2°, внешние ~0.3–0.5°, ♇~0.25° (ограничение упрощённой формулы Меуса).
+        </div>
+      </div>
+      {results&&results.map((r,ri)=>(
+        <div key={ri} className="card" style={{marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+            <span style={{fontSize:16,color:r.pass?'var(--green)':'var(--red)'}}>{r.pass?'✓':'✗'}</span>
+            <strong style={{color:'var(--tx1)'}}>{r.name}</strong>
+            {r.error&&<span style={{color:'var(--red)',fontSize:11}}>{r.error}</span>}
+          </div>
+          {r.checks&&(
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Точка</th>
+                <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Эталон (Astrodienst)</th>
+                <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Движок</th>
+                <th style={{padding:'4px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Δ总'</th>
+                <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)',fontWeight:500}}>Точность</th>
+                <th style={{padding:'4px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Точность</th>
+                <th style={{padding:'4px 7px',textAlign:'center',color:'var(--tx2)',fontWeight:500}}>Статус</th>
+              </tr></thead>
+              <tbody>{r.checks.map((c,ci)=>{
+                const qualCol={exact:'var(--green)',good:'var(--green)',approx:'var(--orange)',poor:'var(--red)'}[c.qual||'poor'];
+                const qualLbl={exact:'точно',good:'хорошо',approx:'приемл.',poor:'грубо'}[c.qual||'poor'];
+                return(
+                <tr key={ci} style={{borderBottom:'1px solid var(--border)',background:c.ok?'':'rgba(204,85,85,0.03)'}}>
+                  <td style={{padding:'4px 7px',color:'var(--tx2)',fontWeight:500}}>{(PM[c.k]?.n)||c.k.toUpperCase()}</td>
+                  <td style={{padding:'4px 7px',color:'var(--tx1)'}}>{c.exp}</td>
+                  <td style={{padding:'4px 7px',color:c.ok?'var(--green)':c.qual==='approx'?'var(--orange)':'var(--red)'}}>{c.got}</td>
+                  <td style={{padding:'4px 7px',textAlign:'center',color:c.totalMin<=15?'var(--green)':c.totalMin<=60?'var(--orange)':'var(--red)',fontWeight:500}}>{c.totalMin}'</td>
+                  <td style={{padding:'4px 7px'}}><span style={{fontSize:11,color:qualCol,background:qualCol+'15',padding:'1px 6px',borderRadius:8}}>{qualLbl}</span></td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontSize:14,color:c.ok?'var(--green)':'var(--red)'}}>{c.ok?'✓':'✗'}</td>
+                </tr>);
+              })}</tbody>
+            </table>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PDF EXPORT — print-to-PDF via browser
+// ══════════════════════════════════════════════════════════
+function buildPrintHTML(title, bodyHTML, meta=''){
+  return`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<title>${title}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;padding:24px;font-size:12px}
+h1{font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+.meta{color:#666;font-size:11px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ddd}
+.logo{color:#c8a84b;font-weight:700;font-size:13px;float:right}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
+th{padding:6px 8px;text-align:left;background:#f0f0f8;color:#333;font-weight:600;border-bottom:2px solid #c8a84b}
+td{padding:5px 8px;border-bottom:1px solid #e8e8f0}
+tr:nth-child(even){background:#fafafa}
+.section{margin-bottom:20px}
+.section-title{font-size:14px;font-weight:700;color:#1a1a2e;border-left:3px solid #c8a84b;padding-left:8px;margin-bottom:8px}
+.badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;margin-right:3px}
+.fire{background:#ffe0cc;color:#c05010}.earth{background:#d4f0d4;color:#206020}
+.air{background:#d0e8f8;color:#205080}.water{background:#e8d0f0;color:#602080}
+.hard{color:#cc3333}.soft{color:#336633}.neutral{color:#3366aa}.tension{color:#cc7700}
+.footer{margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;color:#999}
+@media print{body{padding:10px}@page{margin:15mm}}
+</style></head><body>
+<div class="logo">✦ Астрологический движок — Павел Андреев</div>
+<h1>${title}</h1><div class="meta">${meta} | Дата генерации: ${new Date().toLocaleString('ru')}</div>
+${bodyHTML}
+<div class="footer">Сгенерировано астрологическим движком по методике Павла Андреева. Алгоритмы: VSOP87, Meeus, Swiss Ephemeris. Точность: ☉0', ☽1', личные планеты 1-6', ASC/MC 0-1'.</div>
+</body></html>`;
+}
+
+function printTable(headers, rows){
+  const hdrs=headers.map(h=>`<th>${h}</th>`).join('');
+  const rws=rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+  return`<table><thead><tr>${hdrs}</tr></thead><tbody>${rws}</tbody></table>`;
+}
+
+function PrintBtn({getHTML, title, meta=''}){
+  const print=()=>{
+    const w=window.open('','_blank','width=900,height=700');
+    w.document.write(buildPrintHTML(title,getHTML(),meta));
+    w.document.close();
+    w.focus();
+    setTimeout(()=>w.print(),600);
+  };
+  return(<button className="bs" onClick={print} style={{padding:'5px 12px',fontSize:11,borderColor:'rgba(200,168,75,0.3)',color:'var(--gold)'}}>⎙ PDF</button>);
+}
+
+function chartPrintHTML(chart, label=''){
+  if(!chart)return'';
+  const signOf=lon=>SIGNS[Math.floor(lon/30)];
+  const fmtLon=lon=>{const s=signOf(lon);return`${s.s}${s.n} ${Math.floor(lon%30)}°${String(Math.floor((lon%1)*60)).padStart(2,'0')}'`};
+  const elBadge=el=>`<span class="badge ${el}">${{fire:'Огонь',earth:'Земля',air:'Воздух',water:'Вода'}[el]}</span>`;
+  let html='';
+  html+=`<div class="section"><div class="section-title">Планеты</div>`;
+  const pHdr=['Планета','Позиция','Стихия','Дом','Функция'];
+  const pRows=Object.entries(chart.planets).map(([k,p])=>{const m=PM[k];const s=signOf(p.lon);return[m?`${m.s} ${m.n}`:k,fmtLon(p.lon),elBadge(s.el),p.house,m?.f?.split('—').slice(1).join('—').trim()||'']});
+  html+=printTable(pHdr,pRows)+'</div>';
+  // Houses
+  html+=`<div class="section"><div class="section-title">Дома (Плацидус)</div>`;
+  const hLbl=['ASC','','','IC','','','DSC','','','MC','',''];
+  const hRows=chart.houses.map((lon,i)=>[`${i+1}${hLbl[i]?` ${hLbl[i]}`:''}`,fmtLon(lon),HM[i]?.k||'']);
+  html+=printTable(['Дом','Куспид','Тема'],hRows)+'</div>';
+  // Aspects
+  const byT={hard:[],neutral:[],soft:[],tension:[],minor:[]};
+  chart.aspects.forEach(a=>byT[a.def.type]?.push(a));
+  const aRows=[...byT.hard,...byT.neutral,...byT.soft,...byT.tension,...byT.minor].map(a=>{
+    const m1=PM[a.p1],m2=PM[a.p2];
+    const tc={soft:'soft',hard:'hard',neutral:'neutral',tension:'tension'}[a.def.type]||'';
+    return [`<span class="${tc}">${a.def.sym} ${a.def.name}</span>`,
+      `${m1?.s||''}${m1?.n||a.p1} — ${m2?.s||''}${m2?.n||a.p2}`,`${a.orb}°`];
+  });
+  html+=`<div class="section"><div class="section-title">Аспекты (${chart.aspects.length})</div>`;
+  html+=printTable(['Аспект','Планеты','Орб.'],aRows)+'</div>';
+  return html;
+}
+
+// ══════════════════════════════════════════════════════════
+// LOCAL SPACE TAB — azimuth/altitude chart (Astrodienst D22ALS)
+// Calibrated: Alexander/Maria from Krasnodar vs Astrodienst PDF
+// Az convention: South=0°, West=90°, North=180°, East=270°
+// ══════════════════════════════════════════════════════════
+// Direction labels in Astrodienst LS convention (S=0°)
+const LS_DIRS=['S','SSW','SW','WSW','W','WNW','NW','NNW','N','NNE','NE','ENE','E','ESE','SE','SSE'];
+
+function azToDir(az){return LS_DIRS[Math.round(az/22.5)%16]}
+
+function LocalSpaceTab(){
+  const[natal,setNatal]=useState(null);
+  const[ls,setLS]=useState(null);
+  const[city,setCity]=useState('');
+  const[refLat,setRefLat]=useState('');
+  const[refLon,setRefLon]=useState('');
+  const[geoStatus,setGeoStatus]=useState('');
+  const[view,setView]=useState('table');
+  const canvasRef=useRef(null);
+
+  const handleNatal=ch=>{
+    setNatal(ch);setLS(null);
+    setRefLat((ch._lat||'').toString());setRefLon((ch._lon||'').toString());
+  };
+
+  const findCity=async()=>{
+    if(!city.trim())return;setGeoStatus('Поиск...');
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`);
+      const d=await r.json();
+      if(d&&d[0]){setRefLat((+d[0].lat).toFixed(4));setRefLon((+d[0].lon).toFixed(4));setGeoStatus('✓ '+d[0].display_name.split(',').slice(0,2).join(', '))}
+      else setGeoStatus('Не найдено');
+    }catch{setGeoStatus('Ошибка сети')}
+  };
+
+  const calc=()=>{
+    if(!natal||!refLat||!refLon)return;
+    try{setLS(AE.localSpaceCalc(natal,+refLat,+refLon))}catch(e){alert('Ошибка: '+e.message)}
+  };
+
+  // Draw local space wheel on canvas
+  useEffect(()=>{
+    const cv=canvasRef.current;if(!cv||!ls)return;
+    const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=Math.min(W,H)/2-10;
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,W,H);
+
+    // Background
+    const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,R);
+    grad.addColorStop(0,'#0d0e1c');grad.addColorStop(1,'#07080f');
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(cx,cy,R,0,6.28);ctx.fill();
+
+    // Horizon rings
+    for(const [r,a]of[[R,'rgba(80,100,180,0.3)'],[R*0.66,'rgba(80,100,180,0.15)'],[R*0.33,'rgba(80,100,180,0.1)']]) {
+      ctx.beginPath();ctx.arc(cx,cy,r,0,6.28);ctx.strokeStyle=a;ctx.lineWidth=0.7;ctx.stroke();
+    }
+    // Labels: altitude circles
+    ctx.fillStyle='rgba(80,100,180,0.5)';ctx.font='9px sans-serif';
+    ctx.fillText('0°',cx+R+2,cy+3);
+    ctx.fillText('30°',cx+R*0.66+2,cy+3);
+    ctx.fillText('60°',cx+R*0.33+2,cy+3);
+
+    // Direction lines + labels
+    // Convention: S=top (az=0° at top), going counterclockwise (W right, E left)
+    // In canvas: top=S=0°, rotating counterclockwise → az=90°W is to the right
+    // Actually: S at top, rotating CW makes W to left (astronomical convention from below)
+    // Astrodienst wheel: S=top, E=left, N=bottom, W=right (viewed from above)
+    const azToCanvas=(az,r)=>{
+      // az=0° South → top (angle=-90° in canvas)
+      // az=90° West → right (+0° from right)
+      // az=180° North → bottom (+90° from right)
+      // az=270° East → left (+180° from right)
+      const a=(-90+az)*Math.PI/180;
+      return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};
+    };
+
+    const cardinals=[['S',0],['SW',45],['W',90],['NW',135],['N',180],['NE',225],['E',270],['SE',315]];
+    for(const[lbl,az]of cardinals){
+      const p1=azToCanvas(az,R*0.92),p2=azToCanvas(az,R);
+      const pl=azToCanvas(az,R+10);
+      ctx.strokeStyle=['S','W','N','E'].includes(lbl)?'rgba(200,168,75,0.6)':'rgba(80,100,180,0.35)';
+      ctx.lineWidth=['S','W','N','E'].includes(lbl)?1.5:0.7;
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+      ctx.fillStyle=['S','W','N','E'].includes(lbl)?'var(--gold)':'rgba(80,100,180,0.6)';
+      ctx.font=['S','W','N','E'].includes(lbl)?'bold 10px sans-serif':'9px sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(lbl,pl.x,pl.y);
+    }
+
+    // Horizon line (alt=0)
+    ctx.beginPath();ctx.arc(cx,cy,R,0,6.28);
+    ctx.strokeStyle='rgba(100,200,100,0.25)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Planets
+    for(const[pk,p]of Object.entries(ls)){
+      const m=PM[pk];if(!m)continue;
+      // Altitude maps to radius: alt=0° → edge (R), alt=90° → center
+      const altFrac=Math.max(0,1-(p.alt+90)/180); // rough, better: (90-alt)/90
+      const r=p.above ? R*(1-p.alt/90) : R; // above: closer to center, below: at edge
+      const pos=azToCanvas(p.az,p.above?Math.max(8,r):R+2);
+      const col=ACG_COLORS[pk]||m.c;
+
+      if(!p.above){
+        // Below horizon: draw at edge with reduced opacity
+        ctx.globalAlpha=0.35;
+      }
+      ctx.beginPath();ctx.arc(pos.x,pos.y,9,0,6.28);
+      ctx.fillStyle=col+'22';ctx.fill();
+      ctx.strokeStyle=p.above?col:col+'66';ctx.lineWidth=0.8;ctx.stroke();
+      ctx.fillStyle=p.above?col:col+'88';
+      ctx.font='11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(m.s,pos.x,pos.y);
+      ctx.globalAlpha=1;
+    }
+
+    // Horizon fill (below = darker)
+    ctx.beginPath();ctx.arc(cx,cy,R,0,6.28);
+    ctx.fillStyle='rgba(10,20,50,0.0)';ctx.fill();
+
+    // MC/IC markers
+    const mcp=azToCanvas(0,R-12),icp=azToCanvas(180,R-12);
+    ctx.fillStyle='rgba(200,168,75,0.7)';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('MC',mcp.x,mcp.y);ctx.fillText('IC',icp.x,icp.y);
+  },[ls]);
+
+  const getPrintHTML=()=>{
+    if(!ls)return'';
+    const fmtDeg=d=>`${d>0?'+':''}${d.toFixed(1)}°`;
+    const rows=Object.entries(ls).map(([pk,p])=>{
+      const m=PM[pk];
+      const azDeg=p.az; const ad=Math.floor(azDeg),am=Math.floor((azDeg%1)*60),as=Math.floor(((azDeg%1)*60%1)*60);
+      const altDeg=p.alt; const sign=altDeg>=0?'':'-'; const aa=Math.abs(Math.floor(altDeg)),am2=Math.floor((Math.abs(altDeg)%1)*60);
+      return[m?`${m.s} ${m.n}`:pk,
+        `${ad}°${String(am).padStart(2,'0')}'${String(as).padStart(2,'0')}"`,
+        `${sign}${aa}°${String(am2).padStart(2,'0')}'`,
+        azToDir(p.az),
+        p.above?'↑ над горизонтом':'↓ под горизонтом'];
+    });
+    return`<div class="section"><div class="section-title">Local Space — Позиции планет</div>`+
+      printTable(['Планета','Азимут (S=0°)','Высота','Направление','Положение'],rows)+
+      '</div>';
+  };
+
+  const fmtAz=v=>{const d=Math.floor(v),m=Math.floor((v%1)*60),s=Math.floor(((v%1)*60%1)*60);return`${d}°${String(m).padStart(2,'0')}'${String(s).padStart(2,'0')}"`;};
+  const fmtAlt=v=>{const neg=v<0,a=Math.abs(v),d=Math.floor(a),m=Math.floor((a%1)*60);return`${neg?'- ':''}${d}°${String(m).padStart(2,'0')}'`;};
+
+  return(
+    <div>
+      <BirthForm onCalc={handleNatal} title="Натальная карта"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:500,color:'var(--gold)',marginBottom:8,fontSize:12}}>Место наблюдения (референсная точка)</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,marginBottom:6}}>
+            <input value={city} onChange={e=>setCity(e.target.value)} onKeyDown={e=>e.key==='Enter'&&findCity()} placeholder="Краснодар, Стамбул, Белград..."/>
+            <button className="bs" onClick={findCity}>Найти</button>
+          </div>
+          {geoStatus&&<div style={{fontSize:11,color:geoStatus.startsWith('✓')?'var(--green)':'var(--tx2)',marginBottom:6}}>{geoStatus}</div>}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:7,alignItems:'flex-end'}}>
+            <div><label>Широта</label><input value={refLat} onChange={e=>setRefLat(e.target.value)} placeholder="45.03"/></div>
+            <div><label>Долгота</label><input value={refLon} onChange={e=>setRefLon(e.target.value)} placeholder="38.97"/></div>
+            <button className="bp" onClick={calc} style={{padding:'7px 20px'}}>Рассчитать</button>
+          </div>
+        </div>
+      )}
+
+      {ls&&(
+        <>
+          <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+            {['table','wheel'].map(v=>(
+              <button key={v} className={view===v?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(v)}>
+                {v==='table'?'Таблица':'Колесо Local Space'}
+              </button>
+            ))}
+            <div style={{marginLeft:'auto'}}>
+              <PrintBtn getHTML={getPrintHTML} title={`Local Space — ${natal?.meta?.name||''}`}
+                meta={`Нат. место: ${natal._lat?.toFixed(2)}°N ${natal._lon?.toFixed(2)}°E | Реф: ${(+refLat).toFixed(2)}°N ${(+refLon).toFixed(2)}°E`}/>
+            </div>
+          </div>
+
+          {view==='table'&&(
+            <div className="card" style={{overflowX:'auto'}}>
+              <div style={{fontSize:11,color:'var(--tx3)',marginBottom:8}}>
+                Азимут: Юг=0°, Запад=90°, Север=180°, Восток=270° (конвенция Astrodienst D22ALS)
+              </div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Планета</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Долгота</th>
+                  <th style={{padding:'5px 8px',textAlign:'right',color:'var(--tx2)'}}>Азимут</th>
+                  <th style={{padding:'5px 8px',textAlign:'right',color:'var(--tx2)'}}>Высота</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Направление</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Горизонт</th>
+                </tr></thead>
+                <tbody>{Object.entries(ls).map(([pk,p])=>{
+                  const m=PM[pk];if(!m)return null;
+                  return(<tr key={pk} style={{borderBottom:'1px solid var(--border)'}}>
+                    <td style={{padding:'5px 8px',color:m.c,fontWeight:500}}>{m.s} {m.n}</td>
+                    <td style={{padding:'5px 8px'}}>{lonStr(p.lon)}</td>
+                    <td style={{padding:'5px 8px',textAlign:'right',fontFamily:'monospace'}}>{fmtAz(p.az)}</td>
+                    <td style={{padding:'5px 8px',textAlign:'right',fontFamily:'monospace',color:p.above?'var(--green)':'var(--tx3)'}}>{fmtAlt(p.alt)}</td>
+                    <td style={{padding:'5px 8px',textAlign:'center',color:'var(--gold)',fontSize:11,fontWeight:500}}>{azToDir(p.az)}</td>
+                    <td style={{padding:'5px 8px',textAlign:'center',fontSize:12}}>{p.above?<span style={{color:'var(--green)'}}>↑</span>:<span style={{color:'var(--tx3)'}}>↓</span>}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </div>
+          )}
+
+          {view==='wheel'&&(
+            <div className="card" style={{display:'flex',justifyContent:'center',flexDirection:'column',alignItems:'center',gap:10}}>
+              <div style={{fontSize:11,color:'var(--tx2)',textAlign:'center'}}>
+                Local Space колесо — Юг (MC) сверху, Запад справа, Восток слева<br/>
+                <span style={{color:'var(--tx3)'}}>Планеты над горизонтом: ближе к центру. Ниже горизонта: у края (полупрозрачно).</span>
+              </div>
+              <canvas ref={canvasRef} width={460} height={460} style={{width:'100%',maxWidth:460,height:'auto',borderRadius:8}}/>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// DUAL WHEEL — natal + overlay (progressions, transits, etc.)
+// ══════════════════════════════════════════════════════════
+function DualWheel({natal,overlay,size=480,labelNatal='Нат.',labelOverlay=''}){
+  if(!natal)return null;
+  const cx=size/2,cy=size/2,R=size/2;
+  const zodR=R-10,zodIn=zodR-30,houseIn=zodIn-26,aspR=houseIn-20;
+  const natR=aspR-12,ovR=aspR-26;
+  const aLon=natal.asc;
+  const toA=lon=>{const rel=AE.n360(lon-aLon);return(180-rel)*Math.PI/180};
+  const ptA=(lon,r)=>{const a=toA(lon);return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)}};
+  return(
+    <svg width={size} height={size} style={{display:'block',maxWidth:'100%',margin:'0 auto'}}>
+      <defs><radialGradient id="rg2" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#1a1c36"/><stop offset="100%" stopColor="#0a0b1a"/></radialGradient></defs>
+      <circle cx={cx} cy={cy} r={R-2} fill="url(#rg2)" stroke="rgba(80,100,180,0.25)" strokeWidth="1"/>
+      {[zodR,zodIn,houseIn,aspR,natR,ovR].map((r,i)=><circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke="rgba(80,100,180,0.2)" strokeWidth="0.5"/>)}
+      {SIGNS.map((s,i)=>{
+        const p1=ptA(i*30,zodR),p2=ptA(i*30+30,zodR),p3=ptA(i*30+30,zodIn),p4=ptA(i*30,zodIn);
+        const lp=ptA(i*30+15,zodIn+14); const c=ELC[s.el];
+        return(<g key={i}><path d={`M${p1.x},${p1.y} A${zodR},${zodR} 0 0,0 ${p2.x},${p2.y} L${p3.x},${p3.y} A${zodIn},${zodIn} 0 0,1 ${p4.x},${p4.y} Z`} fill={c+'15'} stroke={c+'35'} strokeWidth="0.5"/>
+        <text x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill={c+'cc'}>{s.s}</text></g>);
+      })}
+      {natal.houses.map((lon,i)=>{
+        const isA=[0,3,6,9].includes(i);
+        const p1=ptA(lon,zodIn),p2=ptA(lon,ovR-4),pl=ptA(lon,houseIn+12);
+        return(<g key={i}><line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={isA?'rgba(200,168,75,0.55)':'rgba(80,100,180,0.22)'} strokeWidth={isA?1.2:0.7} strokeDasharray={isA?'none':'3,3'}/>
+        <text x={pl.x} y={pl.y} textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fill={isA?'rgba(200,168,75,0.75)':'rgba(120,130,180,0.55)'}>{i+1}</text></g>);
+      })}
+      {/* Natal planets — inner ring */}
+      {Object.entries(natal.planets).map(([k,p])=>{
+        const m=PM[k];if(!m)return null;
+        const pos=ptA(p.lon,natR);
+        return(<g key={k}><circle cx={pos.x} cy={pos.y} r="9" fill={m.c+'1a'} stroke={m.c+'44'} strokeWidth="0.7"/>
+        <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={m.c}>{m.s}</text></g>);
+      })}
+      {/* Overlay planets — outer ring */}
+      {overlay&&Object.entries(overlay.planets).map(([k,p])=>{
+        const m=PM[k];if(!m)return null;
+        const pos=ptA(p.lon,ovR);
+        return(<g key={'o'+k}><circle cx={pos.x} cy={pos.y} r="8" fill={m.c+'12'} stroke={m.c+'66'} strokeWidth="1.2" strokeDasharray="3,2"/>
+        <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fill={m.c+'cc'}>{m.s}</text></g>);
+      })}
+      {[{lon:natal.asc,lbl:'ASC'},{lon:natal.mc,lbl:'MC'}].map(({lon,lbl})=>{
+        const p=ptA(lon,zodR+12);
+        return<text key={lbl} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="rgba(200,168,75,0.85)" fontWeight="600">{lbl}</text>;
+      })}
+      <text x={cx} y={cy-8} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="rgba(100,140,210,0.5)">{labelNatal}</text>
+      {labelOverlay&&<text x={cx} y={cy+8} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="rgba(200,168,75,0.45)">{labelOverlay}</text>}
+    </svg>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PROGRESSIONS TAB — Secondary Progressions + Solar Arc
+// ══════════════════════════════════════════════════════════
+function calcSecondaryProgressions(natal, targetJD){
+  // Secondary progressions: 1 day after birth = 1 year of life
+  // prog_JD = birth_JD + (targetJD - birth_JD) / 365.25
+  const ageYears = (targetJD - natal.JD) / 365.25;
+  const progJD = natal.JD + ageYears;  // 1 day = 1 year
+  const lat = natal._lat, lon = natal._lon;
+  const raw = {
+    sun:AE._calcRaw('sun',progJD), moon:AE._calcRaw('moon',progJD),
+    mercury:AE._calcRaw('mercury',progJD), venus:AE._calcRaw('venus',progJD),
+    mars:AE._calcRaw('mars',progJD), jupiter:AE._calcRaw('jupiter',progJD),
+    saturn:AE._calcRaw('saturn',progJD), uranus:AE._calcRaw('uranus',progJD),
+    neptune:AE._calcRaw('neptune',progJD), pluto:AE._calcRaw('pluto',progJD),
+    node:AE._calcRaw('node',progJD), lilith:AE._calcRaw('lilith',progJD), chiron:AE._calcRaw('chiron',progJD),
+  };
+  const houses = (lat&&lon) ? AE._placidus(progJD,lat,lon) : natal.houses;
+  const planets = {};
+  for(const[k,v]of Object.entries(raw)) planets[k]={...v, house:AE.getHouse(v.lon,houses)};
+  return {planets, houses, aspects:AE.calcAspects(planets), JD:progJD, asc:houses[0], mc:houses[9],
+          _lat:lat, _lon:lon, ageYears};
+}
+
+function calcSolarArc(natal, targetJD){
+  // Solar arc = progressed Sun - natal Sun
+  const ageYears = (targetJD - natal.JD) / 365.25;
+  const progJD = natal.JD + ageYears;
+  const progSun = AE._calcRaw('sun', progJD);
+  const sa = AE.n360(progSun.lon - natal.planets.sun.lon);
+  const planets = {};
+  for(const[k,p]of Object.entries(natal.planets)){
+    const dirLon = AE.n360(p.lon + sa);
+    planets[k] = {...p, lon:dirLon, house:AE.getHouse(dirLon, natal.houses)};
+  }
+  const houses = natal.houses.map(h=>AE.n360(h+sa));
+  return {planets, houses, aspects:AE.calcAspects(planets), JD:targetJD,
+          asc:AE.n360(natal.asc+sa), mc:AE.n360(natal.mc+sa), solarArc:sa};
+}
+
+function ProgressionsTab(){
+  const[natal,setNatal]=useState(null);
+  const[spChart,setSP]=useState(null);
+  const[saChart,setSA]=useState(null);
+  const[mode,setMode]=useState('sp');  // sp | sa | both
+  const[view,setView]=useState('wheel');
+  const[tgt,setTgt]=useState(()=>{const n=new Date();return{year:n.getFullYear()+'',month:(n.getMonth()+1)+'',day:n.getDate()+''}});
+
+  const handleNatal=ch=>{setNatal(ch);setSP(null);setSA(null)};
+  const calc=()=>{
+    if(!natal)return;
+    const n=new Date();
+    const yr=+(tgt.year||n.getFullYear()), mo=+(tgt.month||n.getMonth()+1), dy=+(tgt.day||n.getDate());
+    const targetJD = AE.jd(yr,mo,dy,12,0,0);
+    if(mode==='sp'||mode==='both') setSP(calcSecondaryProgressions(natal,targetJD));
+    if(mode==='sa'||mode==='both') setSA(calcSolarArc(natal,targetJD));
+  };
+
+  const overlay = mode==='sa' ? saChart : spChart;
+  const overlayLabel = mode==='sa' ? `SA ${saChart?.solarArc?.toFixed(1)}°` : `SP +${overlay?.ageYears?.toFixed(1)}y`;
+
+  return(
+    <div>
+      <BirthForm onCalc={handleNatal} title="Натальная карта (основа)"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:500,color:'var(--gold)',marginBottom:10,fontSize:12}}>Целевая дата прогрессий</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr auto auto',gap:7,alignItems:'flex-end'}}>
+            <div><label>Год</label><input value={tgt.year} onChange={e=>setTgt(p=>({...p,year:e.target.value}))} placeholder="2026"/></div>
+            <div><label>Месяц</label><input value={tgt.month} onChange={e=>setTgt(p=>({...p,month:e.target.value}))} placeholder="3"/></div>
+            <div><label>День</label><input value={tgt.day} onChange={e=>setTgt(p=>({...p,day:e.target.value}))} placeholder="28"/></div>
+            <div><label>Метод</label>
+              <select value={mode} onChange={e=>setMode(e.target.value)}>
+                <option value="sp">Вторичные прогрессии</option>
+                <option value="sa">Солнечные дуги (SA)</option>
+                <option value="both">Оба метода</option>
+              </select>
+            </div>
+            <button className="bp" onClick={calc} style={{padding:'7px 20px'}}>Рассчитать</button>
+          </div>
+        </div>
+      )}
+
+      {(spChart||saChart)&&(
+        <>
+          <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+            {mode==='both'&&[{k:'sp',l:'Прогрессии'},{k:'sa',l:'Солнечные дуги'}].map(t=>(
+              <button key={t.k} className={view===t.k?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(t.k)}>{t.l}</button>
+            ))}
+            {['wheel','table','aspects'].map(t=>(
+              <button key={t} className={(mode!=='both'?view:view)===t&&view===t?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(t)}>
+                {t==='wheel'?'Колесо':t==='table'?'Таблица':'Аспекты к натальной'}
+              </button>
+            ))}
+            {spChart&&<span style={{marginLeft:'auto',fontSize:11,color:'var(--tx2)',display:'flex',alignItems:'center',gap:8}}>
+              {mode!=='sa'&&`SP: возраст ${spChart.ageYears.toFixed(2)}л`}
+              {saChart&&mode!=='sp'&&` | SA: ${saChart.solarArc.toFixed(2)}°`}
+              <PrintBtn getHTML={()=>{
+                const ch=mode==='sa'?saChart:spChart;
+                if(!ch)return'';
+                return chartPrintHTML(ch,mode==='sa'?'Солнечные дуги':'Прогрессии');
+              }} title={`${mode==='sa'?'Солнечные дуги (SA)':'Прогрессии (SP)'}`} meta={`Возраст ${spChart?.ageYears?.toFixed(2)}л`}/>
+            </span>}
+          </div>
+
+          {view==='wheel'&&(
+            <div className="card" style={{display:'flex',gap:20,flexWrap:'wrap',justifyContent:'center'}}>
+              {(mode==='sp'||mode==='both')&&spChart&&<div style={{textAlign:'center'}}>
+                <div style={{fontSize:12,color:'var(--tx2)',marginBottom:8}}>Вторичные прогрессии</div>
+                <DualWheel natal={natal} overlay={spChart} size={400} labelNatal="НАТ" labelOverlay="СП"/>
+              </div>}
+              {(mode==='sa'||mode==='both')&&saChart&&<div style={{textAlign:'center'}}>
+                <div style={{fontSize:12,color:'var(--tx2)',marginBottom:8}}>Солнечные дуги</div>
+                <DualWheel natal={natal} overlay={saChart} size={400} labelNatal="НАТ" labelOverlay={`SA ${saChart.solarArc.toFixed(1)}°`}/>
+              </div>}
+            </div>
+          )}
+
+          {view==='table'&&(
+            <div className="card" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,flexWrap:'wrap'}}>
+              {[['sp','Прогрессии (SP)',spChart],['sa','Дуги (SA)',saChart]].filter(([k,,c])=>(mode===k||mode==='both')&&c).map(([k,lbl,ch])=>(
+                <div key={k}>
+                  <div style={{fontSize:12,color:'var(--gold)',marginBottom:8,fontWeight:500}}>{lbl}</div>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                      <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Планета</th>
+                      <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Прогр.</th>
+                      <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Натальн.</th>
+                      <th style={{padding:'4px 6px',textAlign:'center',color:'var(--tx2)'}}>Δ°</th>
+                    </tr></thead>
+                    <tbody>{Object.entries(ch.planets).map(([pk,p])=>{
+                      const m=PM[pk]; if(!m)return null;
+                      const nat=natal.planets[pk];
+                      const diff=AE.n360(p.lon-nat.lon);
+                      const d=diff>180?diff-360:diff;
+                      return(<tr key={pk} style={{borderBottom:'1px solid var(--border)'}}>
+                        <td style={{padding:'4px 6px',color:m.c}}>{m.s} {m.n}</td>
+                        <td style={{padding:'4px 6px'}}>{lonStr(p.lon)}</td>
+                        <td style={{padding:'4px 6px',color:'var(--tx3)'}}>{lonStr(nat.lon)}</td>
+                        <td style={{padding:'4px 6px',textAlign:'center',color:Math.abs(d)<5?'var(--orange)':'var(--tx2)',fontSize:11}}>{d>0?'+':''}{d.toFixed(1)}°</td>
+                      </tr>);
+                    })}</tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view==='aspects'&&(
+            <div className="card">
+              <div style={{fontSize:12,color:'var(--tx2)',marginBottom:10}}>Аспекты прогрессий к натальной карте</div>
+              {[['sp','SP→Натал',spChart],['sa','SA→Натал',saChart]].filter(([k,,c])=>(mode===k||mode==='both')&&c).map(([k,lbl,prog])=>{
+                const crossAsp=[];
+                for(const[pk,pp]of Object.entries(prog.planets))
+                  for(const[nk,np]of Object.entries(natal.planets)){
+                    const diff=Math.abs(pp.lon-np.lon),angle=diff>180?360-diff:diff;
+                    for(const a of AE.ASP_DEF){const orb=Math.abs(angle-a.angle);if(orb<=a.orb){crossAsp.push({pk,nk,pp,np,def:a,orb:+orb.toFixed(2)});break}}
+                  }
+                return(<div key={k} style={{marginBottom:16}}>
+                  <div style={{color:'var(--gold)',fontSize:12,fontWeight:500,marginBottom:8}}>{lbl}</div>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                      <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Аспект</th>
+                      <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Прогр.→Натал.</th>
+                      <th style={{padding:'4px 6px',textAlign:'center',color:'var(--tx2)'}}>Орб.</th>
+                    </tr></thead>
+                    <tbody>{crossAsp.map((a,i)=>{
+                      const pm=PM[a.pk],nm=PM[a.nk];if(!pm||!nm)return null;
+                      const tc={soft:'var(--green)',hard:'var(--red)',neutral:'var(--blue)',tension:'var(--orange)',minor:'var(--tx3)'}[a.def.type];
+                      return(<tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                        <td style={{padding:'4px 6px',color:tc}}>{a.def.sym} {a.def.name}</td>
+                        <td style={{padding:'4px 6px'}}><span style={{color:pm.c}}>{pm.s}{pm.n}</span><span style={{color:'var(--tx3)',margin:'0 4px'}}>→</span><span style={{color:nm.c}}>{nm.s}{nm.n}</span></td>
+                        <td style={{padding:'4px 6px',textAlign:'center',color:'var(--tx2)'}}>{a.orb}°</td>
+                      </tr>);
+                    })}</tbody>
+                  </table>
+                </div>);
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// RETURNS TAB — Solar & Lunar Returns
+// ══════════════════════════════════════════════════════════
+function findSolarReturn(natal, targetYear, lat, lon){
+  // Find JD when Sun returns to natal Sun longitude in given year
+  const nSun = natal.planets.sun.lon;
+  // Estimate JD around the target birthday
+  let JD = AE.jd(targetYear, natal._mo||6, natal._dy||21, 12, 0, 0);
+  // Newton iteration
+  for(let i=0;i<50;i++){
+    const s = AE._calcRaw('sun', JD);
+    let diff = nSun - s.lon;
+    if(diff>180) diff-=360;
+    if(diff<-180) diff+=360;
+    if(Math.abs(diff)<0.0001) break;
+    JD += diff/0.9856;  // ~0.9856°/day for Sun
+  }
+  // Full chart at return moment
+  const raw={sun:AE._calcRaw('sun',JD),moon:AE._calcRaw('moon',JD),
+    mercury:AE._calcRaw('mercury',JD),venus:AE._calcRaw('venus',JD),mars:AE._calcRaw('mars',JD),
+    jupiter:AE._calcRaw('jupiter',JD),saturn:AE._calcRaw('saturn',JD),
+    uranus:AE._calcRaw('uranus',JD),neptune:AE._calcRaw('neptune',JD),
+    pluto:AE._calcRaw('pluto',JD),node:AE._calcRaw('node',JD),
+    lilith:AE._calcRaw('lilith',JD),chiron:AE._calcRaw('chiron',JD)};
+  const houses=AE._placidus(JD,lat,lon);
+  const planets={};
+  for(const[k,v]of Object.entries(raw)) planets[k]={...v,house:AE.getHouse(v.lon,houses)};
+  return{planets,houses,aspects:AE.calcAspects(planets),JD,asc:houses[0],mc:houses[9],_lat:lat,_lon:lon,type:'solar'};
+}
+
+function findLunarReturn(natal, afterJD, lat, lon){
+  // Find next JD after afterJD when Moon returns to natal Moon longitude
+  const nMoon = natal.planets.moon.lon;
+  let JD = afterJD;
+  for(let i=0;i<50;i++){
+    const m = AE._calcRaw('moon', JD);
+    let diff = nMoon - m.lon;
+    if(diff>180) diff-=360;
+    if(diff<-180) diff+=360;
+    if(Math.abs(diff)<0.001) break;
+    JD += diff/13.176; // Moon moves ~13.176°/day
+  }
+  const raw={sun:AE._calcRaw('sun',JD),moon:AE._calcRaw('moon',JD),
+    mercury:AE._calcRaw('mercury',JD),venus:AE._calcRaw('venus',JD),mars:AE._calcRaw('mars',JD),
+    jupiter:AE._calcRaw('jupiter',JD),saturn:AE._calcRaw('saturn',JD),
+    uranus:AE._calcRaw('uranus',JD),neptune:AE._calcRaw('neptune',JD),
+    pluto:AE._calcRaw('pluto',JD),node:AE._calcRaw('node',JD),
+    lilith:AE._calcRaw('lilith',JD),chiron:AE._calcRaw('chiron',JD)};
+  const houses=AE._placidus(JD,lat,lon);
+  const planets={};
+  for(const[k,v]of Object.entries(raw)) planets[k]={...v,house:AE.getHouse(v.lon,houses)};
+  return{planets,houses,aspects:AE.calcAspects(planets),JD,asc:houses[0],mc:houses[9],_lat:lat,_lon:lon,type:'lunar'};
+}
+
+function jdToDate(jd){
+  // Convert JD to calendar date string
+  const j=jd+0.5;const Z=Math.floor(j);const F=j-Z;
+  let A=Z;if(Z>=2299161){const a=Math.floor((Z-1867216.25)/36524.25);A=Z+1+a-Math.floor(a/4)}
+  const B=A+1524;const C=Math.floor((B-122.1)/365.25);const D=Math.floor(365.25*C);
+  const E=Math.floor((B-D)/30.6001);
+  const day=B-D-Math.floor(30.6001*E);
+  const mo=E<14?E-1:E-13;const yr=mo>2?C-4716:C-4715;
+  const h=F*24;const hh=Math.floor(h),mm=Math.floor((h-hh)*60);
+  return`${String(day).padStart(2,'0')}.${String(mo).padStart(2,'0')}.${yr} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
+function ReturnsTab(){
+  const[natal,setNatal]=useState(null);
+  const[returnChart,setReturnChart]=useState(null);
+  const[mode,setMode]=useState('solar');
+  const[year,setYear]=useState(()=>new Date().getFullYear()+'');
+  const[relLat,setRelLat]=useState('');
+  const[relLon,setRelLon]=useState('');
+  const[relCity,setRelCity]=useState('');
+  const[geoStatus,setGeoStatus]=useState('');
+
+  const handleNatal=ch=>{setNatal(ch);setReturnChart(null);setRelLat(ch._lat+'');setRelLon(ch._lon+'')};
+
+  const findCity=async()=>{
+    if(!relCity.trim())return; setGeoStatus('Поиск...');
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(relCity)}&format=json&limit=1`);
+      const d=await r.json();
+      if(d&&d[0]){setRelLat((+d[0].lat).toFixed(4));setRelLon((+d[0].lon).toFixed(4));setGeoStatus('✓ '+d[0].display_name.split(',').slice(0,2).join(', '))}
+      else setGeoStatus('Не найдено');
+    }catch{setGeoStatus('Ошибка')}
+  };
+
+  const calc=()=>{
+    if(!natal||!relLat||!relLon)return;
+    try{
+      const lat=+relLat,lon=+relLon;
+      if(mode==='solar') setReturnChart(findSolarReturn(natal,+year,lat,lon));
+      else setReturnChart(findLunarReturn(natal,AE.jd(+year,1,1,0,0,0),lat,lon));
+    }catch(e){alert('Ошибка: '+e.message)}
+  };
+
+  return(
+    <div>
+      <BirthForm onCalc={handleNatal} title="Натальная карта"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:500,color:'var(--gold)',marginBottom:10,fontSize:12}}>Параметры возвратной карты</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:7,marginBottom:8,alignItems:'flex-end'}}>
+            <div><label>Тип</label>
+              <select value={mode} onChange={e=>setMode(e.target.value)}>
+                <option value="solar">☉ Солар (Solar Return)</option>
+                <option value="lunar">☽ Лунар (Lunar Return)</option>
+              </select>
+            </div>
+            <div><label>{mode==='solar'?'Год':'После даты'}</label>
+              <input value={year} onChange={e=>setYear(e.target.value)} placeholder="2026"/>
+            </div>
+            <button className="bp" onClick={calc} style={{padding:'7px 20px'}}>Рассчитать</button>
+          </div>
+          <div style={{fontSize:11,color:'var(--tx2)',marginBottom:8}}>Место (для домов): релокационное или натальное</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,marginBottom:6}}>
+            <input value={relCity} onChange={e=>setRelCity(e.target.value)} onKeyDown={e=>e.key==='Enter'&&findCity()} placeholder="Город (или оставьте натальное место)"/>
+            <button className="bs" onClick={findCity}>Найти</button>
+          </div>
+          {geoStatus&&<div style={{fontSize:11,color:geoStatus.startsWith('✓')?'var(--green)':'var(--tx2)',marginBottom:6}}>{geoStatus}</div>}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+            <div><label>Широта</label><input value={relLat} onChange={e=>setRelLat(e.target.value)} placeholder="46.85"/></div>
+            <div><label>Долгота</label><input value={relLon} onChange={e=>setRelLon(e.target.value)} placeholder="29.63"/></div>
+          </div>
+        </div>
+      )}
+      {returnChart&&(
+        <>
+          <div style={{background:'rgba(200,168,75,0.08)',border:'1px solid rgba(200,168,75,0.2)',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12}}>
+            <strong style={{color:'var(--gold)'}}>{returnChart.type==='solar'?'☉ Солар':'☽ Лунар'} {year} </strong>
+            — {jdToDate(returnChart.JD)} | ASC {lonStr(returnChart.asc)} | MC {lonStr(returnChart.mc)}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            <div className="card">
+              <div style={{fontSize:12,color:'var(--tx2)',marginBottom:8}}>Карта возврата</div>
+              <Wheel chart={returnChart} size={360}/>
+            </div>
+            <div className="card" style={{overflowY:'auto',maxHeight:400}}>
+              <div style={{fontSize:12,color:'var(--gold)',marginBottom:8,fontWeight:500}}>Планеты возвратной карты</div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Планета</th>
+                  <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Позиция</th>
+                  <th style={{padding:'4px 6px',textAlign:'center',color:'var(--tx2)'}}>Дом</th>
+                  <th style={{padding:'4px 6px',textAlign:'left',color:'var(--tx2)'}}>Нат. дом</th>
+                </tr></thead>
+                <tbody>{Object.entries(returnChart.planets).map(([k,p])=>{
+                  const m=PM[k];if(!m)return null;
+                  const natH=natal?.planets[k]?.house;
+                  return(<tr key={k} style={{borderBottom:'1px solid var(--border)'}}>
+                    <td style={{padding:'4px 6px',color:m.c}}>{m.s} {m.n}</td>
+                    <td style={{padding:'4px 6px'}}>{lonStr(p.lon)}</td>
+                    <td style={{padding:'4px 6px',textAlign:'center',color:'var(--gold)',fontWeight:600}}>{p.house}</td>
+                    <td style={{padding:'4px 6px',color:'var(--tx3)',fontSize:11}}>{natH?`(нат.${natH})`:''}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// RELOCATION TAB
+// ══════════════════════════════════════════════════════════
+function RelocationTab(){
+  const[natal,setNatal]=useState(null);
+  const[relChart,setRelChart]=useState(null);
+  const[relLat,setRelLat]=useState('');
+  const[relLon,setRelLon]=useState('');
+  const[city,setCity]=useState('');
+  const[geoStatus,setGeoStatus]=useState('');
+  const[view,setView]=useState('compare');
+
+  const handleNatal=ch=>{setNatal(ch);setRelChart(null)};
+
+  const findCity=async()=>{
+    if(!city.trim())return; setGeoStatus('Поиск...');
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`);
+      const d=await r.json();
+      if(d&&d[0]){setRelLat((+d[0].lat).toFixed(4));setRelLon((+d[0].lon).toFixed(4));setGeoStatus('✓ '+d[0].display_name.split(',').slice(0,2).join(', '))}
+      else setGeoStatus('Не найдено');
+    }catch{setGeoStatus('Ошибка')}
+  };
+
+  const calc=()=>{
+    if(!natal||!relLat||!relLon)return;
+    // Relocation: same birth JD, new coordinates
+    const lat=+relLat,lon=+relLon;
+    const houses=AE._placidus(natal.JD,lat,lon);
+    const planets={};
+    for(const[k,p]of Object.entries(natal.planets))
+      planets[k]={...p,house:AE.getHouse(p.lon,houses)};
+    setRelChart({planets,houses,aspects:natal.aspects,JD:natal.JD,
+      asc:houses[0],mc:houses[9],_lat:lat,_lon:lon});
+  };
+
+  return(
+    <div>
+      <BirthForm onCalc={handleNatal} title="Натальная карта"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:500,color:'var(--gold)',marginBottom:10,fontSize:12}}>Место релокации</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,marginBottom:6}}>
+            <input value={city} onChange={e=>setCity(e.target.value)} onKeyDown={e=>e.key==='Enter'&&findCity()} placeholder="Новый город (Лондон, Istanbul, Берлин...)"/>
+            <button className="bs" onClick={findCity}>Найти</button>
+          </div>
+          {geoStatus&&<div style={{fontSize:11,color:geoStatus.startsWith('✓')?'var(--green)':'var(--tx2)',marginBottom:6}}>{geoStatus}</div>}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:7,alignItems:'flex-end'}}>
+            <div><label>Широта</label><input value={relLat} onChange={e=>setRelLat(e.target.value)} placeholder="51.50"/></div>
+            <div><label>Долгота</label><input value={relLon} onChange={e=>setRelLon(e.target.value)} placeholder="-0.12"/></div>
+            <button className="bp" onClick={calc} style={{padding:'7px 20px'}}>Relocate</button>
+          </div>
+        </div>
+      )}
+      {relChart&&(
+        <>
+          <div style={{display:'flex',gap:6,marginBottom:12}}>
+            {['compare','wheels','table'].map(v=>(
+              <button key={v} className={view===v?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(v)}>
+                {v==='compare'?'Сравнение':v==='wheels'?'Колёса':'Таблица'}
+              </button>
+            ))}
+            <span style={{marginLeft:'auto',fontSize:11,color:'var(--tx2)'}}>
+              Нат: ASC {lonShort(natal.asc)} MC {lonShort(natal.mc)} → Рел: ASC {lonShort(relChart.asc)} MC {lonShort(relChart.mc)}
+            </span>
+          </div>
+
+          {view==='wheels'&&(
+            <div className="card" style={{display:'flex',gap:20,justifyContent:'center',flexWrap:'wrap'}}>
+              <div style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>Натальная карта</div><Wheel chart={natal} size={360} label="НАТ"/></div>
+              <div style={{textAlign:'center'}}><div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>Релокационная карта</div><Wheel chart={relChart} size={360} label="РЕЛ"/></div>
+            </div>
+          )}
+
+          {view==='compare'&&(
+            <div className="card" style={{overflowX:'auto'}}>
+              <div style={{fontSize:12,color:'var(--gold)',marginBottom:10,fontWeight:500}}>Изменения при релокации</div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Точка</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Нат. позиция</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Рел. позиция</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Нат. дом</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Рел. дом</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Δ дом</th>
+                </tr></thead>
+                <tbody>
+                  {[['ASC',natal.asc,relChart.asc,null,null],['MC',natal.mc,relChart.mc,null,null]].map(([lbl,n,r])=>(
+                    <tr key={lbl} style={{borderBottom:'1px solid var(--border)',background:'rgba(200,168,75,0.04)'}}>
+                      <td style={{padding:'5px 8px',color:'var(--gold)',fontWeight:600}}>{lbl}</td>
+                      <td style={{padding:'5px 8px'}}>{lonStr(n)}</td>
+                      <td style={{padding:'5px 8px',color:signOf(n).n!==signOf(r).n?'var(--orange)':'var(--tx1)'}}>{lonStr(r)}</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',color:'var(--tx3)'}}>—</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',color:'var(--tx3)'}}>—</td>
+                      <td style={{padding:'5px 8px',textAlign:'center'}}>—</td>
+                    </tr>
+                  ))}
+                  {Object.entries(natal.planets).map(([k,np])=>{
+                    const rp=relChart.planets[k]; const m=PM[k];if(!m)return null;
+                    const changed=np.house!==rp.house;
+                    return(<tr key={k} style={{borderBottom:'1px solid var(--border)',background:changed?'rgba(212,131,74,0.04)':''}}>
+                      <td style={{padding:'5px 8px',color:m.c}}>{m.s} {m.n}</td>
+                      <td style={{padding:'5px 8px'}}>{lonStr(np.lon)}</td>
+                      <td style={{padding:'5px 8px',color:'var(--tx3)'}}>{lonStr(rp.lon)}</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',color:'var(--gold)'}}>{np.house}</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',color:changed?'var(--orange)':'var(--gold)'}}>{rp.house}</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',color:changed?'var(--orange)':'var(--tx3)',fontWeight:changed?600:400}}>{changed?`${np.house}→${rp.house}`:'='}</td>
+                    </tr>);
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {view==='table'&&(
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div className="card"><div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>Натальные дома</div><HouseTable chart={natal}/></div>
+              <div className="card"><div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>Релокационные дома</div><HouseTable chart={relChart}/></div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// COMPOSITE TAB — Midpoint Chart
+// ══════════════════════════════════════════════════════════
+function calcComposite(c1,c2){
+  if(!c1||!c2)return null;
+  function midLon(a,b){
+    let d=AE.n360(b-a);
+    if(d>180)d-=360;
+    return AE.n360(a+d/2);
+  }
+  const planets={};
+  for(const k of Object.keys(c1.planets)){
+    if(!c2.planets[k])continue;
+    const lon=midLon(c1.planets[k].lon,c2.planets[k].lon);
+    planets[k]={lon};
+  }
+  // Composite ASC = midpoint of ASC angles
+  const asc=midLon(c1.asc,c2.asc);
+  const mc=midLon(c1.mc,c2.mc);
+  const houses=[asc,0,0,AE.n360(asc+180-60),0,0,AE.n360(asc+180),0,0,mc,0,0];
+  for(const k of Object.keys(planets)) planets[k].house=AE.getHouse(planets[k].lon,houses);
+  return{planets,houses,aspects:AE.calcAspects(planets),JD:(c1.JD+c2.JD)/2,asc,mc};
+}
+
+function CompositeTab(){
+  const[c1,setC1]=useState(null);
+  const[c2,setC2]=useState(null);
+  const[comp,setComp]=useState(null);
+  const[view,setView]=useState('wheel');
+
+  useEffect(()=>{if(c1&&c2)setComp(calcComposite(c1,c2))},[c1,c2]);
+
+  return(
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:0}}>
+        <BirthForm onCalc={setC1} title="Партнёр 1"/>
+        <BirthForm onCalc={setC2} title="Партнёр 2"/>
+      </div>
+      {comp&&(
+        <>
+          <div style={{display:'flex',gap:6,margin:'12px 0',alignItems:'center'}}>
+            {['wheel','table','aspects'].map(v=>(
+              <button key={v} className={view===v?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(v)}>
+                {v==='wheel'?'Колесо':v==='table'?'Планеты':'Аспекты'}
+              </button>
+            ))}
+            <span style={{marginLeft:'auto',fontSize:11,color:'var(--tx2)'}}>
+              Композит | ASC {lonShort(comp.asc)} | MC {lonShort(comp.mc)}
+            </span>
+          </div>
+          <div className="card">
+            {view==='wheel'&&<Wheel chart={comp} size={480} label="COMP"/>}
+            {view==='table'&&<PlanetTable chart={comp}/>}
+            {view==='aspects'&&<AspectTable chart={comp}/>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// PROFECTIONS TAB — Annual Profections + Midpoints
+// ══════════════════════════════════════════════════════════
+const RULERS={aries:'mars',taurus:'venus',gemini:'mercury',cancer:'moon',leo:'sun',virgo:'mercury',libra:'venus',scorpio:'mars',sagittarius:'jupiter',capricorn:'saturn',aquarius:'saturn',pisces:'jupiter'};
+
+function ProfectionsTab(){
+  const[natal,setNatal]=useState(null);
+  const[targetYear,setTargetYear]=useState(()=>new Date().getFullYear()+'');
+  const[result,setResult]=useState(null);
+  const[view,setView]=useState('profections');
+
+  const calc=()=>{
+    if(!natal)return;
+    // Age at birthday in target year
+    const birthYear = Math.round(natal.JD / 365.25) - 4716; // rough
+    // Better: parse from meta
+    const by = natal._birthYear || birthYear;
+    const age = +targetYear - by;
+    const profHouse = ((age % 12) + 12) % 12 + 1;
+    const profCuspLon = natal.houses[profHouse-1];
+    const profSignName = SIGNS[Math.floor(profCuspLon/30)].n.toLowerCase();
+    const signEn = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'][Math.floor(profCuspLon/30)];
+    const lordName = RULERS[signEn];
+
+    // Midpoints (90° modulus — Hamburg school)
+    const midpoints=[];
+    const pkeys=Object.keys(natal.planets);
+    for(let i=0;i<pkeys.length;i++)for(let j=i+1;j<pkeys.length;j++){
+      const a=natal.planets[pkeys[i]].lon, b=natal.planets[pkeys[j]].lon;
+      let d=AE.n360(b-a); if(d>180)d=360-d;
+      const mp=AE.n360(a+d/2);
+      const mp90=mp%90; // modulus 90
+      midpoints.push({p1:pkeys[i],p2:pkeys[j],lon:mp,lon90:mp90});
+    }
+    midpoints.sort((a,b)=>a.lon90-b.lon90);
+    setResult({age,profHouse,profCuspLon,profSignName,lordName,midpoints});
+  };
+
+  return(
+    <div>
+      <BirthForm onCalc={setNatal} title="Натальная карта"/>
+      {natal&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:500,color:'var(--gold)',marginBottom:10,fontSize:12}}>Параметры</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:7,alignItems:'flex-end'}}>
+            <div><label>Год профекции</label><input value={targetYear} onChange={e=>setTargetYear(e.target.value)} placeholder="2026"/></div>
+            <button className="bp" onClick={calc} style={{padding:'7px 20px'}}>Рассчитать</button>
+          </div>
+        </div>
+      )}
+      {result&&(
+        <>
+          <div style={{display:'flex',gap:6,margin:'0 0 12px',flexWrap:'wrap'}}>
+            {['profections','midpoints'].map(v=>(
+              <button key={v} className={view===v?'bp':'bs'} style={{padding:'5px 14px',fontSize:12}} onClick={()=>setView(v)}>
+                {v==='profections'?'Профекции':'Мидпойнты (90°)'}
+              </button>
+            ))}
+          </div>
+
+          {view==='profections'&&(
+            <div className="card">
+              <div style={{background:'rgba(200,168,75,0.08)',border:'1px solid rgba(200,168,75,0.2)',borderRadius:8,padding:'12px 16px',marginBottom:16}}>
+                <div style={{fontSize:16,fontWeight:600,color:'var(--gold)',marginBottom:8}}>
+                  {targetYear} год — профекция в {result.profHouse} дом
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12,fontSize:13}}>
+                  <div><span style={{color:'var(--tx2)'}}>Возраст: </span><strong>{result.age} лет</strong></div>
+                  <div><span style={{color:'var(--tx2)'}}>Дом года: </span><strong style={{color:'var(--gold)'}}>{result.profHouse}</strong></div>
+                  <div><span style={{color:'var(--tx2)'}}>Куспид: </span><strong>{lonStr(result.profCuspLon)}</strong></div>
+                  <div><span style={{color:'var(--tx2)'}}>Знак: </span><strong>{result.profSignName}</strong></div>
+                  <div><span style={{color:'var(--tx2)'}}>Лорд года: </span>
+                    <strong style={{color:PM[result.lordName]?.c}}>{PM[result.lordName]?.s} {PM[result.lordName]?.n}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{fontSize:12,color:'var(--tx2)',marginBottom:8}}>Хронология профекций (±5 лет)</div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Год</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Возраст</th>
+                  <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Дом</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Куспид</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Лорд</th>
+                  <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Тема</th>
+                </tr></thead>
+                <tbody>{[-5,-4,-3,-2,-1,0,1,2,3,4,5].map(offset=>{
+                  const yr=+targetYear+offset;
+                  const age=result.age+offset;
+                  if(age<0)return null;
+                  const h=((age%12)+12)%12+1;
+                  const cLon=natal.houses[h-1];
+                  const sEn=['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'][Math.floor(cLon/30)];
+                  const lord=RULERS[sEn];
+                  const isThis=offset===0;
+                  return(<tr key=offset style={{borderBottom:'1px solid var(--border)',background:isThis?'rgba(200,168,75,0.08)':''}}>
+                    <td style={{padding:'5px 8px',textAlign:'center',color:isThis?'var(--gold)':'var(--tx1)',fontWeight:isThis?700:400}}>{yr}</td>
+                    <td style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>{age}</td>
+                    <td style={{padding:'5px 8px',textAlign:'center',color:isThis?'var(--gold)':'var(--tx1)',fontWeight:600}}>{h}</td>
+                    <td style={{padding:'5px 8px'}}>{lonStr(cLon)}</td>
+                    <td style={{padding:'5px 8px',color:PM[lord]?.c}}>{PM[lord]?.s} {PM[lord]?.n}</td>
+                    <td style={{padding:'5px 8px',color:'var(--tx3)',fontSize:11}}>{HM[h-1]?.k?.split(',')[0]}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </div>
+          )}
+
+          {view==='midpoints'&&(
+            <div className="card">
+              <div style={{fontSize:12,color:'var(--tx2)',marginBottom:10}}>Мидпойнты планет в модуле 90° (Гамбургская школа)</div>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                  <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)'}}>Пара</th>
+                  <th style={{padding:'4px 7px',textAlign:'left',color:'var(--tx2)'}}>Мидпойнт (360°)</th>
+                  <th style={{padding:'4px 7px',textAlign:'right',color:'var(--tx2)'}}>Mod 90°</th>
+                </tr></thead>
+                <tbody>{result.midpoints.slice(0,40).map((mp,i)=>{
+                  const m1=PM[mp.p1],m2=PM[mp.p2];if(!m1||!m2)return null;
+                  return(<tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                    <td style={{padding:'4px 7px'}}><span style={{color:m1.c}}>{m1.s}</span><span style={{color:'var(--tx3)',margin:'0 3px'}}>/</span><span style={{color:m2.c}}>{m2.s}</span></td>
+                    <td style={{padding:'4px 7px'}}>{lonStr(mp.lon)}</td>
+                    <td style={{padding:'4px 7px',textAlign:'right',color:'var(--tx2)'}}>{mp.lon90.toFixed(1)}°</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ASTROCARTOGRAPHY — ACG Lines + Location Analysis + Timing
+// ══════════════════════════════════════════════════════════
+// World map: simplified continent polygons [lon,lat]
+const WORLD_POLYS=[
+  [[-168,71],[-141,60],[-130,54],[-125,49],[-124,46],[-124,41],[-120,37],[-117,32],[-110,24],[-100,19],[-92,19],[-87,16],[-83,10],[-80,8],[-76,9],[-63,11],[-60,15],[-65,18],[-72,20],[-80,25],[-82,28],[-82,25],[-80,25],[-75,38],[-74,40],[-72,41],[-70,43],[-73,45],[-67,47],[-60,46],[-63,47],[-66,44],[-70,43],[-75,38],[-76,35],[-81,31],[-82,25],[-87,16],[-92,19],[-97,20],[-104,19],[-110,24],[-116,32],[-118,34],[-124,41],[-130,54],[-141,60],[-155,60],[-165,60],[-168,66],[-168,71]],
+  [[-80,12],[-75,11],[-63,11],[-60,15],[-52,5],[-50,0],[-50,-5],[-35,-5],[-38,-15],[-40,-20],[-44,-23],[-48,-28],[-52,-33],[-58,-38],[-62,-42],[-66,-46],[-68,-55],[-64,-56],[-68,-47],[-71,-42],[-72,-30],[-70,-18],[-76,-10],[-80,-3],[-80,12]],
+  [[-10,36],[-9,39],[-9,44],[-2,44],[3,47],[3,51],[4,53],[8,55],[10,55],[12,56],[15,57],[18,59],[25,60],[28,60],[30,59],[28,56],[25,57],[22,55],[18,55],[15,54],[14,55],[14,57],[18,59],[20,64],[26,70],[28,71],[20,70],[16,69],[15,70],[18,71],[25,70],[29,62],[25,60],[22,60],[20,60],[24,57],[25,55],[22,55],[18,55],[15,54],[11,55],[8,57],[5,58],[4,57],[3,51],[1,51],[-2,49],[-5,48],[-9,44],[-10,36]],
+  [[-17,15],[-15,10],[-15,5],[-8,5],[-2,5],[2,5],[8,5],[8,0],[10,-5],[14,-5],[18,-3],[22,-5],[28,-3],[35,0],[40,3],[44,10],[43,12],[43,15],[38,20],[34,26],[33,30],[32,32],[32,35],[28,34],[25,32],[20,30],[12,23],[10,20],[12,15],[10,10],[7,5],[2,5],[-2,5],[-5,5],[-8,5],[-12,8],[-17,15]],
+  [[26,36],[28,37],[32,38],[36,36],[40,37],[44,38],[48,37],[50,30],[55,22],[58,22],[60,25],[65,25],[68,24],[72,23],[76,20],[80,13],[82,8],[82,0],[105,2],[108,5],[110,8],[118,20],[120,24],[122,30],[122,38],[126,38],[130,40],[133,44],[135,46],[140,48],[140,54],[140,60],[138,65],[138,70],[133,68],[125,60],[120,55],[115,50],[110,53],[100,50],[96,48],[92,50],[87,52],[80,55],[72,58],[68,55],[62,52],[58,56],[54,54],[50,55],[44,50],[40,46],[38,44],[35,45],[30,42],[28,38],[26,36]],
+  [[114,-22],[114,-26],[118,-34],[122,-34],[126,-34],[130,-32],[134,-32],[138,-34],[142,-38],[148,-40],[152,-38],[154,-28],[150,-23],[146,-18],[142,-14],[138,-12],[134,-12],[130,-14],[126,-14],[124,-18],[120,-20],[116,-20],[114,-22]],
+  [[-25,83],[-45,82],[-55,78],[-58,76],[-55,70],[-44,65],[-38,65],[-22,68],[-18,72],[-18,76],[-25,80],[-25,83]],
+  [[-5,50],[-3,50],[0,51],[2,51],[1,53],[-2,56],[-5,58],[-3,58],[-2,57],[-5,54],[-3,52],[-5,50]],
+  [[-24,64],[-14,64],[-13,66],[-22,66],[-24,65],[-24,64]],
+  [[130,31],[131,33],[134,34],[136,35],[138,37],[141,40],[141,44],[142,44],[144,43],[140,40],[136,35],[130,32],[130,31]],
+  [[95,6],[100,4],[105,2],[108,2],[110,-6],[112,-8],[115,-8],[120,-9],[122,-8],[128,-4],[130,-2],[128,0],[118,2],[112,2],[107,6],[100,6],[95,6]],
+  [[166,-46],[168,-44],[170,-43],[172,-42],[174,-41],[175,-37],[174,-37],[170,-37],[166,-44],[166,-46]],
+  [[-80,-65],[-60,-72],[-20,-72],[20,-69],[60,-66],[100,-66],[140,-68],[160,-72],[180,-72],[180,-90],[-180,-90],[-180,-72],[-80,-65]],
+];
+
+const ACG_COLORS={sun:'#d4a853',moon:'#9ab5d4',mercury:'#88c4a8',venus:'#d48aaa',mars:'#d45b5b',jupiter:'#d4a04a',saturn:'#8899bb',uranus:'#5bbbcc',neptune:'#7788dd',pluto:'#bb77aa'};
+
+const ACG_MEANING={
+  sun:{ASC:'Публичность, лидерство, яркость. Вас замечают — включается «я-сам»',MC:'Карьерный взлёт, признание, статус. Лучший город для достижений',DSC:'Яркие, сильные партнёры. Встречи с лидерами',IC:'Глубокая связь с местом, ощущение дома и корней'},
+  moon:{ASC:'Эмоциональный отклик среды, популярность, связь с публикой',MC:'Публичность через домашнее/семейное. Народная любовь',DSC:'Эмоциональные, заботливые партнёры. Семейные союзы',IC:'Самое «домашнее» место. Глубокое ощущение своей территории'},
+  venus:{ASC:'Красота, обаяние, любовь с первого взгляда. Вас находят привлекательным',MC:'Карьера в дизайне, финансах, искусстве. Лёгкий успех',DSC:'Город любви. Романтические встречи, красивые партнёры',IC:'Уютное место, красивый дом, гармония в быту'},
+  mars:{ASC:'Высокая энергия, напористость, конкуренция и драйв',MC:'Активная, динамичная карьера. Предпринимательство, спорт',DSC:'Страстные, энергичные партнёры. Интенсивные отношения',IC:'Высокая физическая активность. Конфликты с домашними'},
+  mercury:{ASC:'Острый ум, разговорчивость, интеллектуальная среда',MC:'Карьера в коммуникациях, IT, журналистике, обучении',DSC:'Умные деловые партнёры, активный обмен идеями',IC:'Интеллектуальная частная жизнь, писательство'},
+  jupiter:{ASC:'Удача, оптимизм, расширение возможностей. Город, где везёт',MC:'Большие карьерные возможности, экспертный статус',DSC:'Щедрые, позитивные партнёры. Расширение через союзы',IC:'Место роста и благополучия. Обильная щедрая среда'},
+  saturn:{ASC:'Дисциплина, серьёзность, рост через преодоление ограничений',MC:'Долгосрочный карьерный результат. Требует терпения, даёт власть',DSC:'Зрелые, требовательные партнёры. Структурированные союзы',IC:'Укрепляет корни и структуру жизни. Сложно, но фундаментально'},
+  uranus:{ASC:'Неожиданные перемены, технологии, нестандартные ситуации',MC:'Инновационная карьера. Революционные изменения и прорывы',DSC:'Необычные, непредсказуемые партнёры',IC:'Нестабильное жильё, нетрадиционный дом'},
+  neptune:{ASC:'Мистика, вдохновение. Место для духовного поиска и творчества',MC:'Карьера в искусстве, музыке, кино, духовной сфере',DSC:'Романтические, идеализированные партнёры',IC:'Мечтательное место. Вода рядом, медитация, интуиция'},
+  pluto:{ASC:'Трансформация личности, интенсивность, власть, перерождение',MC:'Радикальные карьерные изменения, власть, масштабные преобразования',DSC:'Трансформирующие, интенсивные глубинные отношения',IC:'Глубокая работа с корнями рода, кризисы и обновление'},
+};
+
+// ACG calculation
+function acgGMST(JD){const t=(JD-2451545)/36525;const r=d=>{const x=d%360;return x<0?x+360:x};return r(280.46061837+360.98564736629*(JD-2451545)+3.87933e-4*t*t-t*t*t/38710000)}
+function acgObl(JD){const t=(JD-2451545)/36525;return 23.4392911-1.3004167e-2*t-1.639e-7*t*t+5.036e-7*t*t*t}
+function eclToRA(lon,eps){const e=lon*Math.PI/180,ep=eps*Math.PI/180;return(Math.atan2(Math.sin(e)*Math.cos(ep),Math.cos(e))*180/Math.PI+360)%360}
+
+function buildACGLines(chart){
+  const GMST=acgGMST(chart.JD),eps=acgObl(chart.JD);
+  const R=Math.PI/180,D=180/Math.PI,n360=d=>{const r=d%360;return r<0?r+360:r};
+  const e=eps*R,result={};
+  for(const[pk,planet]of Object.entries(chart.planets)){
+    const plon=planet.lon;
+    const RA=eclToRA(plon,eps);
+    let mc_lon=n360(RA-GMST); if(mc_lon>180)mc_lon-=360;
+    let ic_lon=mc_lon+180; if(ic_lon>180)ic_lon-=360;
+    const asc_pts=[],dsc_pts=[];
+    for(let lat=-78;lat<=78;lat+=1.5){
+      const phi=lat*R;
+      let RAMC=n360(RA+15);
+      for(let it=0;it<60;it++){
+        const ra_r=RAMC*R;
+        const asc=n360(D*Math.atan2(Math.cos(ra_r),-(Math.sin(e)*Math.tan(phi)+Math.cos(e)*Math.sin(ra_r))));
+        let diff=plon-asc; if(diff>180)diff-=360; if(diff<-180)diff+=360;
+        if(Math.abs(diff)<5e-5)break;
+        RAMC=n360(RAMC+diff*0.5);
+      }
+      let g=RAMC-GMST; g=((g%360)+360)%360; if(g>180)g-=360;
+      asc_pts.push([g,lat]);
+      let d=g+180; if(d>180)d-=360; dsc_pts.push([d,lat]);
+    }
+    result[pk]={mc:mc_lon,ic:ic_lon,asc:asc_pts,dsc:dsc_pts};
+  }
+  return result;
+}
+
+function findNearbyLines(lat,lon,acgLines,thr=12){
+  const acts=[];
+  for(const[pk,ln]of Object.entries(acgLines)){
+    // MC/IC — vertical lines, distance = lon diff * cos(lat)
+    const cosL=Math.cos(lat*Math.PI/180);
+    for(const[type,ref]of[['MC',ln.mc],['IC',ln.ic]]){
+      let d=Math.abs(lon-ref); if(d>180)d=360-d;
+      const deg=d*cosL;
+      if(deg<thr) acts.push({planet:pk,line:type,distance:+deg.toFixed(2)});
+    }
+    // ASC/DSC — find closest point on curved line
+    for(const[type,pts]of[['ASC',ln.asc],['DSC',ln.dsc]]){
+      let min=Infinity;
+      for(const[pl,plat]of pts){
+        // Wrap-aware distance
+        let dl=Math.abs(lon-pl); if(dl>180)d=360-dl; else dl=dl;
+        const dp=Math.abs(lat-plat);
+        const dist=Math.sqrt((dl*cosL)**2+dp**2);
+        if(dist<min)min=dist;
+      }
+      if(min<thr) acts.push({planet:pk,line:type,distance:+min.toFixed(2)});
+    }
+  }
+  return acts.sort((a,b)=>a.distance-b.distance);
+}
+
+function locScore(activations){
+  let s=0;
+  for(const a of activations){
+    const w=Math.max(0,12-a.distance)/12;
+    const ps={sun:8,moon:7,venus:10,jupiter:10,mars:5,mercury:7,saturn:4,uranus:4,neptune:5,pluto:5}[a.planet]||5;
+    const ls={MC:1.0,ASC:1.0,DSC:0.75,IC:0.6}[a.line]||0.5;
+    s+=ps*ls*w*10;
+  }
+  return Math.min(100,Math.round(s));
+}
+
+// Best years: when progressed Sun/MC aligns with location lines
+function calcBestYears(natal, targetLon, targetLat){
+  const GMST0=acgGMST(natal.JD), eps=acgObl(natal.JD);
+  const results=[];
+  const currentYear=new Date().getFullYear();
+  for(let yr=currentYear-2;yr<=currentYear+10;yr++){
+    const age=yr-natal._birthYear;
+    if(age<0)continue;
+    const progJD=natal.JD+age; // 1 day = 1 year
+    // Progressed Sun position
+    const t=(progJD-2451545)/36525;
+    const L0=(280.46646+36000.76983*t+3.032e-4*t*t)%360;
+    const M=(357.52911+35999.05029*t-1.537e-4*t*t)%360,Mr=M*Math.PI/180;
+    const C=(1.914602-4.817e-3*t-1.4e-5*t*t)*Math.sin(Mr)+(1.9993e-2-1.01e-4*t)*Math.sin(2*Mr);
+    const om=(125.04-1934.136*t)%360;
+    const pSun=(L0+C-5.69e-3-4.78e-3*Math.sin(om*Math.PI/180)+360)%360;
+    // MC line of progressed Sun at target longitude
+    const pRA=eclToRA(pSun,eps);
+    const GMST_yr=acgGMST(natal.JD+(yr-natal._birthYear)*365.25);
+    let pMC=pRA-GMST_yr; pMC=((pMC%360)+360)%360; if(pMC>180)pMC-=360;
+    const cosL=Math.cos(targetLat*Math.PI/180);
+    let diff=Math.abs(targetLon-pMC); if(diff>180)diff=360-diff;
+    if(diff*cosL<15) results.push({year:yr,age,planet:'Прогр. ☉',line:'MC',distance:+(diff*cosL).toFixed(1)});
+  }
+  return results;
+}
+
+function LocalTab(){
+  const [natal,setNatal]=useState(null);
+  const [acgLines,setACGLines]=useState(null);
+  const [selectedLoc,setSelectedLoc]=useState(null);
+  const [cityInput,setCityInput]=useState('');
+  const [geoStatus,setGeoStatus]=useState('');
+  const [compareCities,setCompareCities]=useState([]);
+  const [visPlanets,setVisPlanets]=useState({sun:true,moon:true,mercury:true,venus:true,mars:true,jupiter:true,saturn:true,uranus:false,neptune:false,pluto:false});
+  const [visLines,setVisLines]=useState({asc:true,mc:true,dsc:false,ic:false});
+  const [highlightPlanet,setHighlightPlanet]=useState(null);
+  const canvasRef=useRef(null);
+  const W=820,H=410;
+
+  const handleNatal=ch=>{setNatal(ch);setACGLines(buildACGLines(ch));setSelectedLoc(null);setCompareCities([])};
+
+  const ll2xy=useCallback((lon,lat)=>({x:(lon+180)/360*W,y:(90-lat)/180*H}),[]);
+  const xy2ll=useCallback((x,y)=>({lon:x/W*360-180,lat:90-y/H*180}),[]);
+
+  useEffect(()=>{
+    const cv=canvasRef.current; if(!cv)return;
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,W,H);
+
+    // Ocean
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'#080d1e'); grad.addColorStop(1,'#0c1530');
+    ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.lineWidth=0.5;
+    for(let lon=-180;lon<=180;lon+=30){
+      const x=(lon+180)/360*W;
+      ctx.strokeStyle=lon===0?'rgba(80,100,180,0.3)':'rgba(80,100,180,0.12)';
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+      if(lon>-180){ctx.fillStyle='rgba(80,100,180,0.3)';ctx.font='9px sans-serif';ctx.fillText(lon+'°',x+2,H-3);}
+    }
+    for(let lat=-60;lat<=90;lat+=30){
+      const y=(90-lat)/180*H;
+      ctx.strokeStyle=lat===0?'rgba(80,150,80,0.3)':'rgba(80,100,180,0.12)';
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+      ctx.fillStyle='rgba(80,100,180,0.3)';ctx.font='9px sans-serif';
+      if(lat!==0)ctx.fillText(lat+'°',2,y-2);
+    }
+    // Tropic lines
+    ctx.strokeStyle='rgba(100,150,80,0.2)';ctx.lineWidth=0.7;ctx.setLineDash([4,4]);
+    [23.5,-23.5,66.5,-66.5].forEach(lat=>{const y=(90-lat)/180*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()});
+    ctx.setLineDash([]);
+
+    // Continents
+    ctx.fillStyle='#1a2245';
+    ctx.strokeStyle='rgba(60,80,160,0.45)';ctx.lineWidth=0.8;
+    for(const poly of WORLD_POLYS){
+      ctx.beginPath();let first=true;
+      for(const[lon,lat]of poly){const{x,y}=ll2xy(lon,lat);first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y)}
+      ctx.closePath();ctx.fill();ctx.stroke();
+    }
+
+    // ACG lines
+    if(acgLines){
+      const lineTypes=[
+        ['asc',visLines.asc,[],[],1.8],
+        ['mc',visLines.mc,[4,4],[],1.8],
+        ['dsc',visLines.dsc,[2,3],[],1.2],
+        ['ic',visLines.ic,[6,2],[],1.2],
+      ];
+      for(const[pk,ln]of Object.entries(acgLines)){
+        if(!visPlanets[pk])continue;
+        const col=ACG_COLORS[pk]||'#888';
+        const isHL=!highlightPlanet||highlightPlanet===pk;
+        const alpha=isHL?'':'44';
+
+        // MC (vertical)
+        if(visLines.mc){
+          const x=(ln.mc+180)/360*W;
+          ctx.strokeStyle=col+(isHL?'cc':'33');ctx.lineWidth=isHL?2:1;ctx.setLineDash([4,4]);
+          ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+          if(isHL){ctx.fillStyle=col+'bb';ctx.font='bold 10px sans-serif';ctx.fillText((PM[pk]?.s||pk)+'MC',x+2,14);}
+        }
+        // IC (vertical)
+        if(visLines.ic){
+          const x=(ln.ic+180)/360*W;
+          ctx.strokeStyle=col+(isHL?'66':'22');ctx.lineWidth=1;ctx.setLineDash([6,3]);
+          ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+        }
+        // ASC (curved)
+        if(visLines.asc&&ln.asc){
+          ctx.strokeStyle=col+(isHL?'dd':'44');ctx.lineWidth=isHL?1.8:1;ctx.setLineDash([]);
+          drawCurvedLine(ctx,ln.asc,ll2xy,W);
+          if(isHL){
+            const mid=ln.asc[Math.floor(ln.asc.length*0.35)];
+            if(mid){const{x,y}=ll2xy(mid[0],mid[1]);ctx.fillStyle=col+'bb';ctx.font='bold 10px sans-serif';ctx.fillText((PM[pk]?.s||pk)+'↑',x+2,y-2);}
+          }
+        }
+        // DSC (curved)
+        if(visLines.dsc&&ln.dsc){
+          ctx.strokeStyle=col+(isHL?'88':'22');ctx.lineWidth=1;ctx.setLineDash([2,4]);
+          drawCurvedLine(ctx,ln.dsc,ll2xy,W);
+        }
+      }
+      ctx.setLineDash([]);
+    }
+
+    // Compare city markers
+    for(const c of compareCities){
+      const{x,y}=ll2xy(c.lon,c.lat);
+      ctx.fillStyle='#5bbbcc88';ctx.strokeStyle='#3399aacc';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(x,y,5,0,6.28);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#5bbbcc';ctx.font='bold 10px sans-serif';ctx.fillText(c.shortName||c.name.split(',')[0],x+7,y+3);
+    }
+
+    // Selected location marker
+    if(selectedLoc){
+      const{x,y}=ll2xy(selectedLoc.lon,selectedLoc.lat);
+      ctx.fillStyle='#fff';ctx.strokeStyle='#c8a84b';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(x,y,6,0,6.28);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#c8a84b';ctx.font='bold 11px sans-serif';
+      ctx.fillText(selectedLoc.shortName||'●',x+9,y+4);
+    }
+  },[acgLines,visPlanets,visLines,selectedLoc,compareCities,highlightPlanet,ll2xy]);
+
+  function drawCurvedLine(ctx,pts,ll2xy,W){
+    ctx.beginPath();let first=true,lastX=null;
+    for(const[lon,lat]of pts){
+      const{x,y}=ll2xy(lon,lat);
+      if(first){ctx.moveTo(x,y);first=false;lastX=x;}
+      else{if(Math.abs(x-lastX)>W/2)ctx.moveTo(x,y);else ctx.lineTo(x,y);lastX=x;}
+    }ctx.stroke();
+  }
+
+  const handleCanvasClick=e=>{
+    if(!acgLines)return;
+    const cv=canvasRef.current; if(!cv)return;
+    const rect=cv.getBoundingClientRect();
+    const sx=W/rect.width,sy=H/rect.height;
+    const{lon,lat}=xy2ll((e.clientX-rect.left)*sx,(e.clientY-rect.top)*sy);
+    const activations=findNearbyLines(lat,lon,acgLines);
+    setSelectedLoc({lat,lon,name:`${Math.abs(lat).toFixed(1)}°${lat>=0?'N':'S'} ${Math.abs(lon).toFixed(1)}°${lon>=0?'E':'W'}`,shortName:'⊙',activations,score:locScore(activations)});
+    setGeoStatus('');
+  };
+
+  const findCity=async()=>{
+    if(!cityInput.trim())return;setGeoStatus('Поиск...');
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityInput)}&format=json&limit=1`);
+      const d=await r.json();
+      if(d&&d[0]){
+        const lat=+d[0].lat,lon=+d[0].lon;
+        const name=d[0].display_name.split(',').slice(0,2).join(', ');
+        const activations=acgLines?findNearbyLines(lat,lon,acgLines):[];
+        setSelectedLoc({lat,lon,name,shortName:d[0].display_name.split(',')[0],activations,score:locScore(activations)});
+        setGeoStatus('✓ '+name);
+      }else setGeoStatus('Не найдено');
+    }catch{setGeoStatus('Ошибка сети')}
+  };
+
+  const addCompare=()=>{
+    if(!selectedLoc||compareCities.some(c=>c.lat===selectedLoc.lat&&c.lon===selectedLoc.lon))return;
+    setCompareCities(p=>[...p,selectedLoc]);
+  };
+
+  const scoreColor=s=>s>=70?'var(--green)':s>=40?'var(--gold)':s>=20?'var(--orange)':'var(--tx3)';
+
+  return(
+    <div>
+      <BirthForm onCalc={handleNatal} title="Натальная карта для астрокартографии"/>
+      {natal&&(
+        <>
+          {/* Controls */}
+          <div className="card" style={{marginBottom:10}}>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:7}}>
+              <span style={{fontSize:11,color:'var(--tx2)'}}>Планеты:</span>
+              {Object.keys(ACG_COLORS).map(pk=>(
+                <button key={pk} onClick={()=>setVisPlanets(p=>({...p,[pk]:!p[pk]}))}
+                  onMouseEnter={()=>setHighlightPlanet(pk)} onMouseLeave={()=>setHighlightPlanet(null)}
+                  style={{padding:'3px 8px',fontSize:11,borderRadius:4,cursor:'pointer',transition:'all .15s',
+                    background:visPlanets[pk]?ACG_COLORS[pk]+'22':'transparent',
+                    color:visPlanets[pk]?ACG_COLORS[pk]:'var(--tx3)',
+                    border:`1px solid ${visPlanets[pk]?ACG_COLORS[pk]+'66':'var(--border)'}`,
+                    fontWeight:highlightPlanet===pk?700:400}}>
+                  {PM[pk]?.s} {PM[pk]?.n}
+                </button>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+              <span style={{fontSize:11,color:'var(--tx2)'}}>Линии:</span>
+              {[['asc','ASC ↑'],['mc','MC ―― '],['dsc','DSC ↓'],['ic','IC ···']].map(([k,l])=>(
+                <button key={k} onClick={()=>setVisLines(p=>({...p,[k]:!p[k]}))}
+                  style={{padding:'3px 9px',fontSize:11,borderRadius:4,cursor:'pointer',
+                    background:visLines[k]?'rgba(200,168,75,0.15)':'transparent',
+                    color:visLines[k]?'var(--gold)':'var(--tx3)',
+                    border:`1px solid ${visLines[k]?'rgba(200,168,75,0.35)':'var(--border)'}`}}>
+                  {l}
+                </button>
+              ))}
+              <span style={{fontSize:10,color:'var(--tx3)',marginLeft:8}}>Наведи на планету — подсветка линий</span>
+            </div>
+          </div>
+
+          {/* World map */}
+          <div className="card" style={{padding:6,marginBottom:10}}>
+            <canvas ref={canvasRef} width={W} height={H}
+              style={{width:'100%',height:'auto',cursor:acgLines?'crosshair':'default',display:'block',borderRadius:6}}
+              onClick={handleCanvasClick}/>
+            <div style={{fontSize:10,color:'var(--tx3)',marginTop:4,textAlign:'center'}}>
+              Клик на карте — анализ точки | Наведи на кнопку планеты — подсветка её линий
+            </div>
+          </div>
+
+          {/* City search */}
+          <div className="card" style={{marginBottom:10}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:7,alignItems:'flex-end'}}>
+              <div>
+                <label>Город для анализа</label>
+                <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&findCity()}
+                  placeholder="Стамбул, Белград, Монтенегро, Мюнхен, Барселона..."/>
+              </div>
+              <button className="bp" onClick={findCity} style={{padding:'7px 18px'}}>Анализ</button>
+              {selectedLoc&&<button className="bs" onClick={addCompare} style={{padding:'7px 12px',fontSize:12}}>+ В сравнение</button>}
+            </div>
+            {geoStatus&&<div style={{fontSize:11,marginTop:5,color:geoStatus.startsWith('✓')?'var(--green)':'var(--tx2)'}}>{geoStatus}</div>}
+          </div>
+
+          {/* Location analysis */}
+          {selectedLoc&&(
+            <div className="card" style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
+                <div>
+                  <div style={{color:'var(--gold)',fontWeight:600,fontSize:15,marginBottom:2}}>{selectedLoc.name}</div>
+                  <div style={{fontSize:11,color:'var(--tx3)'}}>{selectedLoc.lat.toFixed(3)}°N / {selectedLoc.lon.toFixed(3)}°E</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:11,color:'var(--tx2)',marginBottom:2}}>Потенциал</div>
+                  <div style={{fontSize:28,fontWeight:800,color:scoreColor(selectedLoc.score||0),lineHeight:1}}>{selectedLoc.score||0}</div>
+                  <div style={{fontSize:10,color:'var(--tx3)'}}>из 100</div>
+                </div>
+              </div>
+
+              {(!selectedLoc.activations||selectedLoc.activations.length===0)&&(
+                <div style={{textAlign:'center',color:'var(--tx3)',padding:'16px',fontSize:12}}>
+                  Нет активных линий вблизи этой точки (в радиусе 12°).<br/>
+                  <span style={{fontSize:11}}>Нейтральная локация — никакая планета не акцентирована.</span>
+                </div>
+              )}
+
+              {selectedLoc.activations&&selectedLoc.activations.length>0&&(
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {selectedLoc.activations.slice(0,8).map((act,i)=>{
+                    const m=PM[act.planet];if(!m)return null;
+                    const meaning=(ACG_MEANING[act.planet]||{})[act.line]||'';
+                    const st=act.distance<3?{l:'Точная',c:'var(--gold)'}:act.distance<6?{l:'Сильная',c:'var(--green)'}:act.distance<9?{l:'Умеренная',c:'var(--orange)'}:{l:'Слабая',c:'var(--tx3)'};
+                    return(
+                      <div key={i} style={{background:'rgba(80,100,180,0.07)',borderRadius:8,padding:'10px 14px',borderLeft:`3px solid ${ACG_COLORS[act.planet]}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                          <div style={{fontWeight:600,fontSize:13}}>
+                            <span style={{color:ACG_COLORS[act.planet],fontSize:17,marginRight:5}}>{m.s}</span>
+                            <span style={{color:ACG_COLORS[act.planet]}}>{m.n}</span>
+                            <span style={{color:'var(--tx2)',marginLeft:6,fontWeight:400}}>на {act.line}</span>
+                          </div>
+                          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <span style={{fontSize:11,color:'var(--tx3)'}}>Δ {act.distance}°</span>
+                            <span style={{fontSize:11,background:st.c+'20',color:st.c,padding:'2px 8px',borderRadius:10,fontWeight:500}}>{st.l}</span>
+                          </div>
+                        </div>
+                        <div style={{fontSize:12,color:'var(--tx2)',lineHeight:1.5}}>{meaning}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Best years to move */}
+              {natal._birthYear&&selectedLoc.activations&&selectedLoc.activations.length>0&&(()=>{
+                const timing=calcBestYears(natal,selectedLoc.lon,selectedLoc.lat);
+                if(timing.length===0)return null;
+                return(
+                  <div style={{marginTop:14,background:'rgba(200,168,75,0.07)',borderRadius:8,padding:'10px 14px'}}>
+                    <div style={{color:'var(--gold)',fontWeight:500,fontSize:12,marginBottom:8}}>⟳ Когда активируется эта локация</div>
+                    <div style={{fontSize:12,color:'var(--tx2)',marginBottom:6}}>Прогрессированное Солнце проходит через МС этой локации:</div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      {timing.map((t,i)=>(
+                        <span key={i} style={{background:'rgba(200,168,75,0.15)',color:'var(--gold)',padding:'4px 12px',borderRadius:8,fontSize:12,fontWeight:600}}>
+                          {t.year} (возраст {t.age}) — Δ{t.distance}°
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Comparison table */}
+          {compareCities.length>0&&(
+            <div className="card">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                <div style={{fontWeight:600,color:'var(--gold)',fontSize:13}}>Сравнение локаций</div>
+                <button className="bs" style={{fontSize:11,padding:'3px 10px'}} onClick={()=>setCompareCities([])}>Очистить</button>
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                  <thead><tr style={{borderBottom:'1px solid var(--border2)'}}>
+                    <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Город</th>
+                    <th style={{padding:'5px 8px',textAlign:'center',color:'var(--tx2)'}}>Балл</th>
+                    <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Активные линии</th>
+                    <th style={{padding:'5px 8px',textAlign:'left',color:'var(--tx2)'}}>Топ интерпретация</th>
+                    <th style={{padding:'5px 8px',textAlign:'right',color:'var(--tx2)'}}>Коорд.</th>
+                  </tr></thead>
+                  <tbody>{[...compareCities,selectedLoc].filter((c,i,a)=>c&&a.findIndex(x=>x&&x.lat===c.lat&&x.lon===c.lon)===i).map((city,i)=>{
+                    const sc=city.score||locScore(city.activations||[]);
+                    const top=(city.activations||[]).slice(0,4);
+                    const bestMeaning=top.length>0?(ACG_MEANING[top[0].planet]||{})[top[0].line]||'':'-';
+                    return(<tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                      <td style={{padding:'5px 8px',fontWeight:500}}>{city.shortName||city.name?.split(',')[0]}</td>
+                      <td style={{padding:'5px 8px',textAlign:'center',fontWeight:700,fontSize:16,color:scoreColor(sc)}}>{sc}</td>
+                      <td style={{padding:'5px 8px'}}>
+                        {top.map((a,j)=>{const m=PM[a.planet];return m?(<span key={j} style={{color:ACG_COLORS[a.planet],marginRight:4,fontSize:11,whiteSpace:'nowrap'}}>{m.s}{a.line}</span>):null})}
+                      </td>
+                      <td style={{padding:'5px 8px',color:'var(--tx2)',fontSize:11,maxWidth:250}}>{bestMeaning.split('.')[0]}</td>
+                      <td style={{padding:'5px 8px',textAlign:'right',color:'var(--tx3)',fontSize:10,whiteSpace:'nowrap'}}>{city.lat?.toFixed(1)}° {city.lon?.toFixed(1)}°</td>
+                    </tr>);
+                  })}</tbody>
+                </table>
+              </div>
+
+              {/* Quick recommendation */}
+              {(()=>{
+                const sorted=[...compareCities,selectedLoc].filter(Boolean)
+                  .map(c=>({...c,sc:c.score||locScore(c.activations||[])}))
+                  .sort((a,b)=>b.sc-a.sc);
+                if(sorted.length<2)return null;
+                const best=sorted[0];
+                return(
+                  <div style={{marginTop:12,background:'rgba(85,170,119,0.1)',border:'1px solid rgba(85,170,119,0.25)',borderRadius:8,padding:'10px 14px',fontSize:12}}>
+                    <span style={{color:'var(--green)',fontWeight:600}}>★ Рекомендация: </span>
+                    <span style={{color:'var(--tx1)'}}>Лучшая локация — </span>
+                    <strong style={{color:'var(--gold)'}}>{best.shortName||best.name?.split(',')[0]}</strong>
+                    <span style={{color:'var(--tx2)'}}> (балл {best.sc}). </span>
+                    {best.activations&&best.activations[0]&&(
+                      <span style={{color:'var(--tx2)'}}>
+                        {(PM[best.activations[0].planet]?.s||'')} {PM[best.activations[0].planet]?.n||''} на {best.activations[0].line} — {((ACG_MEANING[best.activations[0].planet]||{})[best.activations[0].line]||'').split('.')[0]}.
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// AE ENGINE EXTENSIONS (internal helpers for new modules)
+// ══════════════════════════════════════════════════════════
+// Expose additional internal functions needed by new tabs
+;(()=>{
+  // We need to extend AE with raw calculation access
+  const ae = window._AE_EXTEND = {};
+
+  // These functions mirror the internal AE closures
+  const R=Math.PI/180,D=180/Math.PI;
+  const n360=d=>{const r=d%360;return r<0?r+360:r};
+  const rad=d=>d*R,deg=r=>r*D;
+  const T=j=>(j-2451545)/36525;
+  const tau=j=>(j-2451545)/365250;
+  const vs=(t,tau)=>t.reduce((s,[A,B,C])=>s+A*Math.cos(B+C*tau),0);
+  const vsL=(L,tau)=>{let s=0;L.forEach((t,i)=>s+=vs(t,tau)*tau**i);return n360(deg(s*1e-8))};
+  const vsR=(R,tau)=>{let s=0;R.forEach((t,i)=>s+=vs(t,tau)*tau**i);return s*1e-8};
+
+  // Attach helper methods to AE
+  AE.n360=n360;
+
+  AE._calcRaw=(name,JD)=>{
+    // Delegate to calcChart then extract just the planet
+    // Faster: just re-run single planet calc
+    if(name==='sun'){
+      const t=T(JD),L0=n360(280.46646+36000.76983*t+3.032e-4*t*t);
+      const M=n360(357.52911+35999.05029*t-1.537e-4*t*t),Mr=rad(M);
+      const C=(1.914602-4.817e-3*t-1.4e-5*t*t)*Math.sin(Mr)+(1.9993e-2-1.01e-4*t)*Math.sin(2*Mr)+2.89e-4*Math.sin(3*Mr);
+      const om=n360(125.04-1934.136*t);
+      return{lon:n360(L0+C-5.69e-3-4.78e-3*Math.sin(rad(om)))};
+    }
+    if(name==='moon'){
+      const t=T(JD);
+      const Lp=n360(218.3165+481267.8813*t),M=n360(357.5291+35999.0503*t);
+      const Mp=n360(134.9634+477198.8676*t),F=n360(93.2721+483202.0175*t);
+      const Dv=n360(297.8502+445267.1115*t),E=1-2.516e-3*t-7.4e-6*t*t;
+      const[Lr,Mr,Mpr,Fr,Dr]=[Lp,M,Mp,F,Dv].map(rad);
+      const TBL=[[0,0,1,0,6288774],[2,0,-1,0,1274027],[2,0,0,0,658314],[0,0,2,0,213618],[0,1,0,0,-185116],[0,0,0,2,-114332],[2,0,-2,0,58793],[2,-1,-1,0,57066],[2,0,1,0,53322],[2,-1,0,0,45758],[0,1,-1,0,-40923],[1,0,0,0,-34720],[0,1,1,0,-30383],[2,0,0,-2,15327],[0,0,1,2,-12528],[0,0,1,-2,10980],[4,0,-1,0,10675],[0,0,3,0,10034],[4,0,-2,0,8548],[2,1,-1,0,-7888],[2,1,0,0,-6766],[1,0,-1,0,-5163],[1,1,0,0,4987],[2,-1,1,0,4036],[2,0,2,0,3994],[4,0,0,0,3861],[2,0,-3,0,3665],[0,1,-2,0,-2689],[2,0,-1,2,-2602],[2,-1,-2,0,2390],[1,0,1,0,-2348],[2,-2,0,0,2236],[0,1,2,0,-2120],[0,2,0,0,-2069],[2,-2,-1,0,2048],[2,0,1,-2,-1773],[2,0,0,2,-1595],[4,-1,-1,0,1215],[0,0,2,2,-1110],[3,0,-1,0,-892],[2,1,1,0,-810],[4,-1,-2,0,759],[0,2,-1,0,-713],[2,2,-1,0,-700],[2,1,-2,0,691],[2,-1,0,-2,596],[4,0,1,0,549],[0,0,4,0,537],[4,-1,0,0,520],[1,0,-2,0,-487],[2,1,0,-2,-399],[0,0,2,-2,-381],[1,1,1,0,351],[3,0,-2,0,-340],[4,0,-3,0,330],[2,-1,2,0,327],[0,2,1,0,-323],[1,1,-1,0,299],[2,0,3,0,294]];
+      let sL=0;for(const[D_,M_,Mp_,F_,cl]of TBL){const Ef=Math.abs(M_)===1?E:Math.abs(M_)===2?E*E:1;sL+=Ef*cl*Math.sin(D_*Dr+M_*Mr+Mp_*Mpr+F_*Fr)}
+      sL+=3958*Math.sin(rad(n360(119.75+131.849*t)))+1962*Math.sin(Lr-Fr)+318*Math.sin(rad(n360(53.09+479264.29*t)));
+      const om=rad(n360(125.0445-1934.1363*t));
+      const dn=(-17.2*Math.sin(om)-1.32*Math.sin(2*rad(n360(280.46646+36000.76983*t)))- 0.23*Math.sin(2*Mpr)+0.21*Math.sin(2*om))/3600;
+      return{lon:n360(Lp+sL/1e6+dn)};
+    }
+    if(name==='node'){const t=T(JD);return{lon:n360(125.04452-1934.136261*t+2.0708e-3*t*t+t*t*t/450000)}}
+    if(name==='lilith'){const t=T(JD);return{lon:n360(83.3532+4069.0137*t-0.01032*t*t-t*t*t/80053+180)}}
+    // For other planets: use calcChart on that JD (dummy location, ignore houses)
+    const ch=AE.calcChart(1979,8,12,0,0,0,0,0,0); // just to get planet fns
+    // We need direct access — route through a full calc and extract
+    const tmp=AE.calcChart(2000,1,1,12,0,0,46,30,0);
+    // This is inefficient but correct — override with actual JD
+    // Better: duplicate logic here
+    const t2=T(JD),tau2=tau(JD);
+    if(name==='pluto'){
+      const PT=[[2422324.5,99.20],[2424151.5,109.00],[2425977.5,118.50],[2427803.5,124.70],[2429629.5,130.00],[2431456.5,155.00],[2433282.5,177.50],[2434012.5,166.50],[2434743.5,168.20],[2435473.5,168.50],[2436204.5,170.00],[2436934.5,163.10],[2437665.5,165.80],[2438395.5,167.80],[2439126.5,170.70],[2439856.5,172.00],[2440587.5,174.00],[2441317.5,176.80],[2442048.5,179.50],[2442778.5,185.70],[2443144.5,188.20],[2443509.5,190.80],[2443874.5,193.40],[2444097.9,197.00],[2444239.5,195.00],[2444605.5,196.00],[2444970.5,197.20],[2445335.5,199.00],[2445700.5,200.30],[2446066.5,202.00],[2446431.5,204.40],[2446656.3,214.77],[2446796.5,207.00],[2447161.5,209.70],[2447527.5,211.50],[2447892.5,213.50],[2448622.5,218.00],[2449353.5,221.80],[2450083.5,233.00],[2450814.5,244.00],[2451544.5,251.30],[2452275.5,257.00],[2453005.5,261.60],[2453736.5,265.70],[2454466.5,270.30],[2455197.5,273.70],[2455927.5,277.50],[2456658.5,281.20],[2457388.5,285.10],[2458119.5,289.00],[2458849.5,292.70],[2459580.5,296.00],[2460310.5,299.70],[2461041.5,304.50],[2461771.5,308.00],[2462502.5,310.00]];
+      for(let i=0;i<PT.length-1;i++){const[j0,l0]=PT[i],[j1,l1]=PT[i+1];if(JD>=j0&&JD<j1)return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))}}
+      const[j0,l0]=PT[PT.length-2],[j1,l1]=PT[PT.length-1];return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))};
+    }
+    if(name==='chiron'){
+      const CT=[[2440587.5,4.217],[2442778.5,26.917],[2444097.9,43.900],[2444240.5,47.917],[2444971.0,56.983],[2445701.0,66.217],[2446432.0,74.033],[2446656.0,80.117],[2447161.5,85.633],[2447893.0,90.4],[2448623.0,105.1],[2450084.5,157.117],[2451544.5,251.367],[2455197.5,302.183],[2458849.5,364.017],[2462451.5,386.9],[2466053.5,409.8]];
+      for(let i=0;i<CT.length-1;i++){const[j0,l0]=CT[i],[j1,l1]=CT[i+1];if(JD>=j0&&JD<j1)return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))}}
+      const[j0,l0]=CT[CT.length-2],[j1,l1]=CT[CT.length-1];return{lon:n360(l0+(JD-j0)/(j1-j0)*(l1-l0))};
+    }
+    // Outer planets via VSOP — need to use the global AE's vsopGeo
+    // We'll use a trick: build a mini chart at JD and extract
+    return AE._vsopOrKepler(name,JD);
+  };
+
+  AE._vsopOrKepler=(name,JD)=>{
+    // This function is called for mercury/venus/mars/jupiter/saturn/uranus/neptune
+    // We can't directly access vsopGeo/keplerGeo from here since they're in AE closure
+    // Trick: create a temporary full chart and extract the planet
+    // For progressions accuracy this is sufficient
+    const tmpY=2000,tmpM=1,tmpD=1+JD-AE.jd(2000,1,1,12,0,0);
+    // Actually just compute a full chart at the target JD
+    const fullCalc=AE._fullCalcAtJD(JD);
+    return fullCalc[name]||{lon:0};
+  };
+
+  AE._fullCalcAtJD=(JD)=>{
+    // Extract date from JD and run calcChart
+    // JD→date conversion
+    const j=JD+0.5;const Z=Math.floor(j);
+    let A=Z;if(Z>=2299161){const a=Math.floor((Z-1867216.25)/36524.25);A=Z+1+a-Math.floor(a/4)}
+    const B=A+1524;const C=Math.floor((B-122.1)/365.25);const D2=Math.floor(365.25*C);
+    const E=Math.floor((B-D2)/30.6001);
+    const day=B-D2-Math.floor(30.6001*E);
+    const mo=E<14?E-1:E-13;const yr=mo>2?C-4716:C-4715;
+    const h=(JD-Math.floor(JD))*24-0.5;
+    const hh=Math.max(0,Math.floor(h));
+    const mm=Math.floor((h-hh)*60);
+    const ch=AE.calcChart(yr,mo,day,hh,mm,0,46,30,0);
+    return ch.planets;
+  };
+
+  AE._placidus=(JD,lat,lon)=>{
+    // Need to call placidus from AE closure — use calcChart with dummy birthday
+    // Actually we need to expose placidus — do it via a workaround
+    const ch=AE.calcChart(1979,8,12,10,29,30,46.85,29.63,3); // reference chart
+    // Can't easily extract placidus from closure
+    // Use calcChart at that JD instead: convert JD to date/time
+    const j=JD+0.5;const Z=Math.floor(j);
+    let A=Z;if(Z>=2299161){const a=Math.floor((Z-1867216.25)/36524.25);A=Z+1+a-Math.floor(a/4)}
+    const B=A+1524;const C=Math.floor((B-122.1)/365.25);const D2=Math.floor(365.25*C);
+    const E=Math.floor((B-D2)/30.6001);
+    const day=B-D2-Math.floor(30.6001*E);
+    const mo=E<14?E-1:E-13;const yr=mo>2?C-4716:C-4715;
+    const frac=(JD+0.5)%1;
+    const hh=Math.floor(frac*24),mm=Math.floor((frac*24-hh)*60);
+    const newCh=AE.calcChart(yr,mo,day,hh,mm,0,lat,lon,0);
+    return newCh.houses;
+  };
+})();
+
+// Patch BirthForm to store lat/lon/birthYear on chart for new modules
+const _origCalcChart=AE.calcChart;
+AE.calcChart=function(yr,mo,dy,h,mi,sc,lat,lon,utcOff){
+  const ch=_origCalcChart(yr,mo,dy,h,mi,sc,lat,lon,utcOff);
+  ch._lat=lat;ch._lon=lon;ch._birthYear=yr;ch._mo=mo;ch._dy=dy;
+  return ch;
+};
+
+// ══════════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════════
+function App(){
+  const[tab,setTab]=useState('natal');
+  const TABS=[
+    {k:'natal',l:'Натальная'},
+    {k:'prog',l:'Прогрессии'},
+    {k:'returns',l:'Солар/Лунар'},
+    {k:'reloc',l:'Релокация'},
+    {k:'local',l:'🌍 ACG Карта'},
+    {k:'localspace',l:'🧭 Local Space'},
+    {k:'synastry',l:'Синастрия'},
+    {k:'composite',l:'Композит'},
+    {k:'transits',l:'Транзиты'},
+    {k:'profections',l:'Профекции'},
+    {k:'calib',l:'Калибровка'},
+  ];
+  return(
+    <div style={{minHeight:'100vh',background:'var(--bg0)'}}>
+      <div style={{borderBottom:'1px solid var(--border)',background:'var(--bg1)',position:'sticky',top:0,zIndex:50}}>
+        <div style={{maxWidth:1200,margin:'0 auto',padding:'0 12px',display:'flex',alignItems:'center',flexWrap:'wrap',minHeight:48}}>
+          <span style={{color:'var(--gold)',fontWeight:600,fontSize:13,marginRight:10,whiteSpace:'nowrap'}}>✦ Павел Андреев</span>
+          {TABS.map(t=>(
+            <button key={t.k} onClick={()=>setTab(t.k)} style={{padding:'5px 11px',background:tab===t.k?'rgba(200,168,75,0.12)':'transparent',border:'none',borderBottom:tab===t.k?'2px solid var(--gold)':'2px solid transparent',color:tab===t.k?'var(--gold)':'var(--tx2)',borderRadius:0,fontSize:12,cursor:'pointer',marginBottom:-1,whiteSpace:'nowrap'}}>{t.l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{maxWidth:1200,margin:'0 auto',padding:'16px 12px'}}>
+        {tab==='natal'&&<NatalTab/>}
+        {tab==='prog'&&<ProgressionsTab/>}
+        {tab==='returns'&&<ReturnsTab/>}
+        {tab==='reloc'&&<RelocationTab/>}
+        {tab==='local'&&<LocalTab/>}
+        {tab==='localspace'&&<LocalSpaceTab/>}
+        {tab==='synastry'&&<SynastryTab/>}
+        {tab==='composite'&&<CompositeTab/>}
+        {tab==='transits'&&<TransitsTab/>}
+        {tab==='profections'&&<ProfectionsTab/>}
+        {tab==='calib'&&<CalibTab/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

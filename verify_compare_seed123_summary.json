@@ -1,0 +1,318 @@
+{
+  "inputs": {
+    "baseline_csv": "verify_report_seed123_baseline.csv",
+    "robust_csv": "verify_report_seed123_robust.csv",
+    "top_n": 10
+  },
+  "row_counts": {
+    "baseline": 1999,
+    "robust": 1999,
+    "matched": 1999,
+    "only_baseline": 0,
+    "only_robust": 0
+  },
+  "overall": {
+    "improved_rows": 40,
+    "worsened_rows": 0,
+    "unchanged_rows": 1959,
+    "robust_utc_adjusted_rows": 40
+  },
+  "ci": {
+    "status": "pass",
+    "checks": {
+      "asc_mae_delta_le_threshold": {
+        "lhs": -8.960755377688841,
+        "op": "<=",
+        "rhs": 0.0,
+        "pass": true
+      },
+      "worsened_rows_le_threshold": {
+        "lhs": 0,
+        "op": "<=",
+        "rhs": 0,
+        "pass": true
+      }
+    }
+  },
+  "metrics": {
+    "sun": {
+      "n": {
+        "baseline": 1998,
+        "robust": 1998,
+        "delta": 0
+      },
+      "mae_arcmin": {
+        "baseline": 4.497517517517517,
+        "robust": 4.481736736736737,
+        "delta": -0.015780780780779935
+      },
+      "median_arcmin": {
+        "baseline": 0.28,
+        "robust": 0.28,
+        "delta": 0.0
+      },
+      "p90_arcmin": {
+        "baseline": 0.67,
+        "robust": 0.66,
+        "delta": -0.010000000000000009
+      },
+      "p99_arcmin": {
+        "baseline": 10.89,
+        "robust": 10.46,
+        "delta": -0.4299999999999997
+      },
+      "max_arcmin": {
+        "baseline": 5920.45,
+        "robust": 5920.45,
+        "delta": 0.0
+      },
+      "err_gt_5": {
+        "baseline": 35,
+        "robust": 34,
+        "delta": -1
+      },
+      "err_gt_30": {
+        "baseline": 7,
+        "robust": 7,
+        "delta": 0
+      },
+      "sign_ok": {
+        "baseline": 1996,
+        "robust": 1996,
+        "delta": 0
+      },
+      "sign_pct": {
+        "baseline": 99.89989989989989,
+        "robust": 99.89989989989989,
+        "delta": 0.0
+      }
+    },
+    "moon": {
+      "n": {
+        "baseline": 1998,
+        "robust": 1998,
+        "delta": 0
+      },
+      "mae_arcmin": {
+        "baseline": 21.221871871871873,
+        "robust": 21.00311811811812,
+        "delta": -0.21875375375375228
+      },
+      "median_arcmin": {
+        "baseline": 0.27,
+        "robust": 0.27,
+        "delta": 0.0
+      },
+      "p90_arcmin": {
+        "baseline": 0.56,
+        "robust": 0.55,
+        "delta": -0.010000000000000009
+      },
+      "p99_arcmin": {
+        "baseline": 148.27,
+        "robust": 146.34,
+        "delta": -1.9300000000000068
+      },
+      "max_arcmin": {
+        "baseline": 8773.37,
+        "robust": 8773.37,
+        "delta": 0.0
+      },
+      "err_gt_5": {
+        "baseline": 137,
+        "robust": 129,
+        "delta": -8
+      },
+      "err_gt_30": {
+        "baseline": 97,
+        "robust": 93,
+        "delta": -4
+      },
+      "sign_ok": {
+        "baseline": 1987,
+        "robust": 1988,
+        "delta": 1
+      },
+      "sign_pct": {
+        "baseline": 99.44944944944945,
+        "robust": 99.49949949949949,
+        "delta": 0.05005005005004648
+      }
+    },
+    "asc": {
+      "n": {
+        "baseline": 1999,
+        "robust": 1999,
+        "delta": 0
+      },
+      "mae_arcmin": {
+        "baseline": 69.88333166583291,
+        "robust": 60.92257628814407,
+        "delta": -8.960755377688841
+      },
+      "median_arcmin": {
+        "baseline": 0.28,
+        "robust": 0.28,
+        "delta": 0.0
+      },
+      "p90_arcmin": {
+        "baseline": 0.5,
+        "robust": 0.5,
+        "delta": 0.0
+      },
+      "p99_arcmin": {
+        "baseline": 1382.8,
+        "robust": 1326.58,
+        "delta": -56.22000000000003
+      },
+      "max_arcmin": {
+        "baseline": 8811.95,
+        "robust": 8811.95,
+        "delta": 0.0
+      },
+      "err_gt_5": {
+        "baseline": 176,
+        "robust": 171,
+        "delta": -5
+      },
+      "err_gt_30": {
+        "baseline": 164,
+        "robust": 151,
+        "delta": -13
+      },
+      "sign_ok": {
+        "baseline": 1938,
+        "robust": 1949,
+        "delta": 11
+      },
+      "sign_pct": {
+        "baseline": 96.94847423711856,
+        "robust": 97.49874937468735,
+        "delta": 0.5502751375687893
+      }
+    }
+  },
+  "top_improvements": [
+    {
+      "name": "Sitter, Willem de",
+      "date": "1872/05/06",
+      "time": "01:45",
+      "lat": "52.167",
+      "lon": "4.5",
+      "delta_sum_arcmin": -1589.79,
+      "delta_sun_arcmin": -2.42,
+      "delta_moon_arcmin": -32.550000000000004,
+      "delta_asc_arcmin": -1554.82,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Flament, Edouard",
+      "date": "1880/08/27",
+      "time": "20:00",
+      "lat": "48.917",
+      "lon": "2.267",
+      "delta_sum_arcmin": -1468.62,
+      "delta_sun_arcmin": -1.0499999999999998,
+      "delta_moon_arcmin": -17.49,
+      "delta_asc_arcmin": -1450.08,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Bauër, Gérard",
+      "date": "1888/10/07",
+      "time": "16:00",
+      "lat": "48.867",
+      "lon": "2.333",
+      "delta_sum_arcmin": -1078.22,
+      "delta_sun_arcmin": -1.07,
+      "delta_moon_arcmin": -27.589999999999996,
+      "delta_asc_arcmin": -1049.56,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Veth, Gerda",
+      "date": "1894/02/10",
+      "time": "08:30",
+      "lat": "52.383",
+      "lon": "4.633",
+      "delta_sum_arcmin": -1061.3700000000001,
+      "delta_sun_arcmin": -0.9600000000000001,
+      "delta_moon_arcmin": -16.28,
+      "delta_asc_arcmin": -1044.13,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "John I Albert, King of Poland",
+      "date": "1459/12/27",
+      "time": "12:00",
+      "lat": "50.05",
+      "lon": "19.967",
+      "delta_sum_arcmin": -961.7499999999993,
+      "delta_sun_arcmin": -1.2699999999999818,
+      "delta_moon_arcmin": -15.429999999999382,
+      "delta_asc_arcmin": -945.05,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Silbermann, Andreas",
+      "date": "1678/05/16",
+      "time": "03:00",
+      "lat": "50.8",
+      "lon": "13.533",
+      "delta_sum_arcmin": -946.78,
+      "delta_sun_arcmin": -1.2000000000000455,
+      "delta_moon_arcmin": -17.460000000000036,
+      "delta_asc_arcmin": -928.1199999999999,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Nature:Arica Earthquake and Tsunami:Chile 1868",
+      "date": "1868/08/13",
+      "time": "16:45",
+      "lat": "-18.483",
+      "lon": "-70.333",
+      "delta_sum_arcmin": -931.9200000000001,
+      "delta_sun_arcmin": -2.4000000000000004,
+      "delta_moon_arcmin": -35.140000000000015,
+      "delta_asc_arcmin": -894.3800000000001,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Groeneweg, Susanna",
+      "date": "1875/03/04",
+      "time": "12:00",
+      "lat": "51.85",
+      "lon": "4.533",
+      "delta_sum_arcmin": -894.6700000000001,
+      "delta_sun_arcmin": -2.5,
+      "delta_moon_arcmin": -32.97,
+      "delta_asc_arcmin": -859.2,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Rodney, Caesar",
+      "date": "1728/10/07",
+      "time": "23:50",
+      "lat": "39.117",
+      "lon": "-75.75",
+      "delta_sum_arcmin": -740.0199999999996,
+      "delta_sun_arcmin": -2.4700000000000273,
+      "delta_moon_arcmin": -35.10999999999967,
+      "delta_asc_arcmin": -702.4399999999999,
+      "robust_utc_adjusted": 1
+    },
+    {
+      "name": "Papini, Giovanni",
+      "date": "1881/01/09",
+      "time": "18:10",
+      "lat": "43.767",
+      "lon": "11.25",
+      "delta_sum_arcmin": -722.1199999999999,
+      "delta_sun_arcmin": -2.5400000000000005,
+      "delta_moon_arcmin": -30.470000000000002,
+      "delta_asc_arcmin": -689.1099999999999,
+      "robust_utc_adjusted": 1
+    }
+  ],
+  "top_regressions": []
+}

@@ -1,0 +1,37 @@
+{
+  "stats": {
+    "total": 65041,
+    "no_coords": 12,
+    "no_utc": 11,
+    "no_time": 40,
+    "parse_error": 0,
+    "computed": 64978
+  },
+  "results": {
+    "sun": {
+      "n": 64978,
+      "mae_arcmin": 6.2,
+      "rmse_arcmin": 157.65,
+      "sign_accuracy_pct": 99.78,
+      "within30min_pct": 99.49,
+      "within1deg_pct": 99.57
+    },
+    "moon": {
+      "n": 64978,
+      "mae_arcmin": 35.73,
+      "rmse_arcmin": 502.29,
+      "sign_accuracy_pct": 99.33,
+      "within30min_pct": 95.18,
+      "within1deg_pct": 97.61
+    },
+    "asc": {
+      "n": 64978,
+      "mae_arcmin": 64.48,
+      "rmse_arcmin": 383.32,
+      "sign_accuracy_pct": 96.98,
+      "within30min_pct": 92.31,
+      "within1deg_pct": 92.63
+    }
+  },
+  "top_errors": []
+}
