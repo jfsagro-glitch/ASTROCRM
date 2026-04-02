@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 
 export async function downloadPDF(
@@ -11,7 +11,7 @@ export async function downloadPDF(
 
   try {
     const canvas = await html2canvas(el, {
-      scale: 2, useCORS: true, allowTaint: true, logging: false,
+      scale: 2, useCORS: true, allowTaint: false, logging: false,
       backgroundColor: '#07090f',
       windowWidth: Math.max(el.scrollWidth, 1200),
     });
@@ -55,7 +55,7 @@ export async function downloadPDF(
     pdf.save(filename);
   } catch (err) {
     console.error('PDF export failed', err);
-    alert('PDF export failed. See console for details.');
+    alert(`PDF export failed: ${(err as Error)?.message || 'Unknown error'}`);
   }
 }
 
@@ -85,7 +85,7 @@ export async function downloadTabsPDF(
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         logging: false,
         backgroundColor: BG,
         windowWidth: Math.max(el.scrollWidth, 1200),
@@ -130,6 +130,6 @@ export async function downloadTabsPDF(
     if (!isFirst) pdf.save(filename);
   } catch (err) {
     console.error('PDF export failed', err);
-    alert('PDF export failed. See console for details.');
+    alert(`PDF export failed: ${(err as Error)?.message || 'Unknown error'}`);
   }
 }
