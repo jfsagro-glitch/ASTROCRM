@@ -36,13 +36,13 @@ import { useLang } from '../i18n/LanguageContext';
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const chartThemes = {
   cosmic: {
-    name: 'Cosmic Midnight',
-    container: 'bg-slate-900 text-slate-200 border-slate-700 shadow-2xl shadow-purple-900/20',
-    header: 'text-purple-300', card: 'bg-slate-800/60 border-slate-700/50 backdrop-blur-md',
-    accent: 'text-purple-400', text: 'text-slate-300', symbol: 'text-indigo-400',
-    btn: 'bg-indigo-600 hover:bg-indigo-700 text-white',
-    tabActive: 'bg-slate-700 text-purple-300 border-purple-500',
-    tabInactive: 'text-slate-400 hover:text-slate-200 border-transparent',
+    name: 'Midnight Gold',
+    container: 'text-amber-50/95 border-amber-300/20',
+    header: 'text-amber-200', card: 'bg-slate-950/45 border-amber-300/20 backdrop-blur-xl',
+    accent: 'text-amber-300', text: 'text-amber-50/75', symbol: 'text-amber-300',
+    btn: 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-600/20',
+    tabActive: 'bg-amber-300/12 text-amber-200 border-amber-300',
+    tabInactive: 'text-amber-50/60 hover:text-amber-100 border-transparent hover:border-amber-400/40',
     wheelTheme: 'dark' as const,
   },
   ethereal: {
@@ -1573,7 +1573,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   ] as const;
 
   return (
-    <div className={`min-h-screen ${theme.container} transition-all duration-300`}>
+    <div className={`relative min-h-screen ${theme.container} transition-all duration-500`}>
       {/* Navbar */}
       <nav className={`sticky top-0 z-10 border-b backdrop-blur-md ${theme.container}`}
         style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
@@ -1605,7 +1605,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 space-y-6">
         <BirthForm value={birth} onChange={setBirth} label={tr.birthData} theme={theme} />
 
         <div className="flex gap-3 flex-wrap">
@@ -1623,10 +1623,10 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
         {error && <Err msg={error} />}
 
-        <div className="flex gap-1 border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+        <div className="flex gap-2 border-b pb-1 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
           {tabs.map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}
@@ -1634,8 +1634,10 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab}
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}>
+            initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -12, filter: 'blur(6px)' }}
+            transition={{ duration: 0.26, ease: 'easeOut' }}>
 
             {activeTab === 'natal' && natalChart && (
               <div id="chart-export" className="space-y-4">

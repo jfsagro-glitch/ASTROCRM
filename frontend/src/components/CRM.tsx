@@ -289,15 +289,15 @@ export default function CRM() {
 
   // ── Loading ──
   if (!ready) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+    <div className="min-h-screen flex items-center justify-center bg-transparent">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400" />
     </div>
   );
 
   // ── Login ──
   if (!user) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white p-10 rounded-xl shadow-lg space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-transparent px-4">
+      <div className="max-w-md w-full glass-panel p-10 rounded-xl space-y-6">
         <div className="flex justify-end -mt-4 -mr-4">
           <button onClick={() => setLang(lang === 'en' ? 'ru' : 'en')}
             className="px-2.5 py-1 rounded-md text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors">
@@ -305,22 +305,22 @@ export default function CRM() {
           </button>
         </div>
         <div className="text-center">
-          <Star className="h-10 w-10 text-indigo-600 mx-auto mb-2" />
-          <h2 className="text-3xl font-extrabold text-gray-900">{tr.crmTitle}</h2>
-          <p className="mt-2 text-sm text-gray-600">{tr.crmSubtitle}</p>
+          <Star className="h-10 w-10 text-amber-300 mx-auto mb-2" />
+          <h2 className="text-3xl font-extrabold text-amber-100">{tr.crmTitle}</h2>
+          <p className="mt-2 text-sm text-amber-100/75">{tr.crmSubtitle}</p>
         </div>
         {firebaseConfigured ? (
           <button onClick={loginWithGoogle}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md text-sm">
+            className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold rounded-md text-sm">
             {tr.signInGoogle}
           </button>
         ) : (
-          <div className="rounded-md bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+          <div className="rounded-md bg-amber-300/8 border border-amber-300/35 p-4 text-sm text-amber-100/90">
             <p className="font-semibold mb-1">{tr.firebaseNotConfigured}</p>
             <p>{tr.firebaseSetupHint}</p>
           </div>
         )}
-        <p className="text-center"><Link to="/" className="text-sm text-indigo-600 hover:underline">{tr.backToPortal}</Link></p>
+        <p className="text-center"><Link to="/" className="text-sm gold-link hover:underline">{tr.backToPortal}</Link></p>
       </div>
     </div>
   );
@@ -329,21 +329,21 @@ export default function CRM() {
   const totalRevenue  = consultations.filter(c => c.paymentStatus === 'paid').reduce((s, c) => s + (c.price || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-transparent text-amber-50">
       {/* Navbar */}
-      <nav className="bg-white shadow-sm">
+      <nav className="glass-panel">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <Star className="h-7 w-7 text-indigo-600" />
-                <span className="text-xl font-bold text-gray-900">HOLO CRM</span>
+                <Star className="h-7 w-7 text-amber-300" />
+                <span className="text-xl font-bold text-amber-100">HOLO CRM</span>
               </div>
               <div className="hidden sm:flex gap-1">
                 {([['clients', tr.clients], ['consultations', tr.consultations]] as const).map(([k, label]) => (
                   <button key={k} onClick={() => setTab(k as 'clients' | 'consultations')}
-                    className={cn('px-3 py-1 text-sm font-medium rounded-md transition-colors',
-                      tab === k ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700')}>
+                    className={cn('px-3 py-1 text-sm font-medium rounded-md border transition-colors',
+                      tab === k ? 'bg-amber-300/15 border-amber-300/35 text-amber-100' : 'border-transparent text-amber-100/70 hover:text-amber-100 hover:border-amber-300/30')}>
                     {label}
                   </button>
                 ))}
