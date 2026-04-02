@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
 
-const port = Number(process.env.AI_PROXY_PORT || 8787);
+const port = Number(process.env.PORT || process.env.AI_PROXY_PORT || 8787);
 const app = express();
 
 app.use(express.json({ limit: '1mb' }));
@@ -46,6 +46,14 @@ function safeHandler(
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: 'ai-proxy',
+    health: '/api/health',
+  });
 });
 
 app.post('/api/natal', safeHandler(async (req) => {
