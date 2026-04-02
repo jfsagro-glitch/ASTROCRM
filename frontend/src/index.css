@@ -170,3 +170,19 @@ body {
 .pdf-export-bw td {
   border-color: #666666 !important;
 }
+
+.pdf-export-bw [class*="max-h-"] {
+  max-height: none !important;
+}
+
+.pdf-export-bw [class*="overflow-y-auto"],
+.pdf-export-bw [class*="overflow-auto"],
+.pdf-export-bw [class*="overflow-hidden"] {
+  overflow: visible !important;
+}
+
+.pdf-export-bw .sticky,
+.pdf-export-bw [class*="backdrop-blur"] {
+  position: static !important;
+  backdrop-filter: none !important;
+}

@@ -1,6 +1,29 @@
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 
+async function waitForRenderable(el: HTMLElement, timeoutMs = 5000): Promise<void> {
+  const start = Date.now();
+  let stableTicks = 0;
+  let lastHeight = 0;
+
+  while (Date.now() - start < timeoutMs) {
+    const rect = el.getBoundingClientRect();
+    const hasSize = rect.width > 0 && rect.height > 0;
+    const hasSpinner = !!el.querySelector('.animate-spin');
+    const height = Math.round(rect.height);
+
+    if (hasSize && !hasSpinner && Math.abs(height - lastHeight) <= 1) {
+      stableTicks += 1;
+      if (stableTicks >= 3) return;
+    } else {
+      stableTicks = 0;
+    }
+
+    lastHeight = height;
+    await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+  }
+}
+
 export async function downloadPDF(
   elementId: string,
   filename = 'chart.pdf',
@@ -81,6 +104,9 @@ export async function downloadTabsPDF(
 
       const el = document.getElementById(id);
       if (!el) continue;
+      await waitForRenderable(el as HTMLElement);
+
+      const captureWidth = Math.max(1180, Math.min(1400, el.scrollWidth || el.clientWidth || 1180));
 
       const canvas = await html2canvas(el, {
         scale: 2,
@@ -88,17 +114,17 @@ export async function downloadTabsPDF(
         allowTaint: false,
         logging: false,
         backgroundColor: BG,
-        windowWidth: Math.max(el.scrollWidth, 1200),
+        windowWidth: captureWidth,
         scrollY: -window.scrollY,
         onclone: (doc) => {
           doc.body.classList.add('pdf-export-bw');
           const target = doc.getElementById(id);
           if (target) {
             target.style.maxWidth = 'none';
-            target.style.width = '1600px';
+            target.style.width = `${captureWidth}px`;
             target.style.padding = '20px';
             target.style.margin = '0';
-            target.style.filter = 'grayscale(1) contrast(1.15)';
+            target.style.filter = 'grayscale(1)';
           }
         },
       });
