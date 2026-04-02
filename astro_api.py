@@ -23,7 +23,7 @@ from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
     profections, transits, tertiary_progressions, converse_progressions,
     ingress_chart, find_eclipses, find_stations, prenatal_syzygy,
-    transit_exact_dates, ephemerides_table,
+    transit_exact_dates, ephemerides_table, astro_summary,
 )
 from astro_synastry import (
     synastry_aspects, composite_chart, davison_chart, synastry_score,
@@ -122,6 +122,11 @@ class EphemeridesRequest(BaseModel):
     time_utc: Optional[str] = None
 
 
+class AstroSummaryRequest(BaseModel):
+    target_date: str
+    time_utc: Optional[str] = None
+
+
 class RelocateRequest(BaseModel):
     date: str; time: str; lat: float; lon: float; utc: float
     new_lat: float; new_lon: float
@@ -216,6 +221,16 @@ def calc_transits(req: PredictiveRequest):
 def calc_ephemerides(req: EphemeridesRequest):
     try:
         return _safe(ephemerides_table(req.start_date, req.days, req.time_utc or "12:00"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/predictive/astrosummary")
+def calc_astrosummary(req: AstroSummaryRequest):
+    try:
+        return _safe(astro_summary(req.target_date, req.time_utc or "12:00"))
     except HTTPException:
         raise
     except Exception as e:

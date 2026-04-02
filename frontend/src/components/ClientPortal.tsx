@@ -26,7 +26,7 @@ import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
   getConverseProgressions, getSynastry, getCompositeChart, getDavisonChart,
-  getRelocatedChart, getEphemerides, geocodeCity,
+  getRelocatedChart, getEphemerides, getAstroSummary, geocodeCity,
 } from '../services/astrologyService';
 import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
@@ -659,10 +659,63 @@ function EphemeridesView({ result, theme }: { result: AnyResult; theme: typeof c
   );
 }
 
+function AstroSummaryView({ result, theme }: { result: AnyResult; theme: typeof chartThemes[ThemeKey] }) {
+  const periods = (result.periods as Record<string, Record<string, unknown>>) ?? {};
+  const order: Array<[string, string]> = [
+    ['day', 'Астросводка дня'],
+    ['week', 'Астросводка недели'],
+    ['month', 'Астросводка месяца'],
+    ['year', 'Астросводка года'],
+  ];
+
+  return (
+    <div className="space-y-3">
+      {order.map(([k, title]) => {
+        const p = periods[k] ?? {};
+        const energy = String(p.energy ?? 'переменный');
+        const aspects = (p.key_aspects as string[]) ?? [];
+        const energyClass = energy === 'благоприятный'
+          ? 'bg-green-500/10 text-green-300 border-green-500/30'
+          : energy === 'напряженный'
+          ? 'bg-red-500/10 text-red-300 border-red-500/30'
+          : 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30';
+        return (
+          <div key={k} className={`rounded-xl border ${theme.card} p-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h4 className={`font-semibold ${theme.header}`}>{title}</h4>
+              <div className={`px-2 py-1 rounded-md border text-xs ${energyClass}`}>{energy}</div>
+            </div>
+            <div className={`text-xs ${theme.text} mb-3`}>
+              Период: {String(p.start_date ?? '')} — {String(p.end_date ?? '')}
+            </div>
+            <div className={`text-sm ${theme.text} mb-2`}>
+              {String(p.interpretation ?? '')}
+            </div>
+            <div className={`text-sm ${theme.text} mb-2`}>
+              <span className={theme.accent}>Фокус:</span> {String(p.focus ?? '')}
+            </div>
+            {!!aspects.length && (
+              <div className={`text-xs ${theme.text} mb-2`}>
+                <span className={theme.accent}>Ключевые аспекты:</span>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  {aspects.map((a, idx) => <li key={idx}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+            <div className={`text-sm ${theme.text}`}>
+              <span className={theme.accent}>Рекомендация:</span> {String(p.advice ?? '')}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Predictive Panel ─────────────────────────────────────────────────────────
 function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey] }) {
   const { tr } = useLang();
-  const [tab, setTab] = useState<'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'ephemerides'>('transits');
+  const [tab, setTab] = useState<'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'ephemerides'|'astrosummary'>('transits');
   const [targetDate, setTargetDate] = useState(new Date().toISOString().slice(0, 10));
   const [targetTime, setTargetTime] = useState('12:00');
   const [returnYear, setReturnYear] = useState(new Date().getFullYear());
@@ -684,6 +737,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
         case 'tertiary':      data = await getTertiaryProgressions(birth, targetDate); break;
         case 'converse':      data = await getConverseProgressions(birth, targetDate); break;
         case 'ephemerides':   data = await getEphemerides(targetDate, 30, targetTime); break;
+        case 'astrosummary':  data = await getAstroSummary(targetDate, targetTime); break;
       }
       setResult(data as AnyResult);
     } catch (e: unknown) { setError((e as Error).message); }
@@ -696,6 +750,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
     ['lunar-return', tr.lunarReturn], ['profections', tr.profections],
     ['tertiary', tr.tertiary], ['converse', tr.converse],
     ['ephemerides', 'Эфемериды'],
+    ['astrosummary', 'Астросводка'],
   ];
 
   const renderResult = () => {
@@ -710,6 +765,8 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
       return <ProfectionView result={result} theme={theme} />;
     if (type === 'ephemerides')
       return <EphemeridesView result={result} theme={theme} />;
+    if (type === 'astrosummary')
+      return <AstroSummaryView result={result} theme={theme} />;
     // Fallback
     return (
       <pre className={`text-xs ${theme.text} overflow-auto max-h-96 p-3 rounded-xl border ${theme.card}`}>

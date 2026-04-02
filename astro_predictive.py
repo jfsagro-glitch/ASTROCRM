@@ -491,6 +491,195 @@ def transits(natal_jd_utc, target_date_str, target_time_str="12:00", lat=0, lon=
     }
 
 
+def astro_summary(target_date_str, time_str="12:00"):
+    """
+    General (non-personal) astrology summary for day/week/month/year.
+    This is a collective horoscope based on transiting sky only.
+    """
+    base_jd = _parse_target_datetime(target_date_str, time_str)
+
+    RU_SIGN = {
+        "aries": "Овен", "taurus": "Телец", "gemini": "Близнецы", "cancer": "Рак",
+        "leo": "Лев", "virgo": "Дева", "libra": "Весы", "scorpio": "Скорпион",
+        "sagittarius": "Стрелец", "capricorn": "Козерог", "aquarius": "Водолей", "pisces": "Рыбы",
+    }
+
+    MAJOR_ASPECTS = {
+        "conjunction": (0, 4.0, "соединение"),
+        "sextile": (60, 3.0, "секстиль"),
+        "square": (90, 3.0, "квадрат"),
+        "trine": (120, 3.0, "трин"),
+        "opposition": (180, 3.0, "оппозиция"),
+    }
+
+    FOCUS_BY_SUN_SIGN = {
+        "aries": "инициативы и быстрых решений",
+        "taurus": "финансовой устойчивости и практичности",
+        "gemini": "коммуникации, обучения и обмена идеями",
+        "cancer": "семьи, дома и эмоциональной безопасности",
+        "leo": "творчества, лидерства и самопрезентации",
+        "virgo": "порядка, здоровья и рабочих процессов",
+        "libra": "партнерства и дипломатии",
+        "scorpio": "глубоких трансформаций и внутренних решений",
+        "sagittarius": "развития, путешествий и расширения горизонтов",
+        "capricorn": "карьеры, целей и дисциплины",
+        "aquarius": "сообществ, технологий и новых стратегий",
+        "pisces": "интуиции, восстановления и творчества",
+    }
+
+    RU_PLANET = {
+        "sun": "Солнце", "moon": "Луна", "mercury": "Меркурий", "venus": "Венера",
+        "mars": "Марс", "jupiter": "Юпитер", "saturn": "Сатурн", "uranus": "Уран",
+        "neptune": "Нептун", "pluto": "Плутон", "node": "Северный узел", "true_node": "Истинный узел",
+        "lilith": "Лилит", "chiron": "Хирон",
+    }
+
+    MOON_MOOD_BY_SIGN = {
+        "aries": "эмоциональный фон более импульсивный: решения принимаются быстро, но важно не резать с плеча.",
+        "taurus": "эмоции тяготеют к устойчивости: хочется ясности, предсказуемости и ощутимого результата.",
+        "gemini": "настроение подвижное и любознательное: хорошо идут диалог, обучение и обмен идеями.",
+        "cancer": "повышена чувствительность: полезно замедлиться, навести уют и восстановить внутренний ресурс.",
+        "leo": "эмоциональная энергия яркая: усиливается желание проявляться, вести и вдохновлять других.",
+        "virgo": "внимание к деталям выше обычного: продуктивны ревизия процессов и настройка распорядка.",
+        "libra": "возрастает потребность в гармонии и партнерстве: важны корректные договоренности.",
+        "scorpio": "фон глубокий и интенсивный: на поверхность выходят ключевые, давно назревшие темы.",
+        "sagittarius": "эмоции тянутся к расширению горизонтов: хорошо планировать поездки и обучение.",
+        "capricorn": "настроение собранное и стратегичное: легче держать фокус на целях и сроках.",
+        "aquarius": "больше свежих идей и нестандартных решений: полезен взгляд со стороны.",
+        "pisces": "усиливается интуиция и эмпатия: важен баланс между вдохновением и реальностью.",
+    }
+
+    PERIOD_STYLE = {
+        "день": "Это короткое окно, где особенно заметны тактические решения и эмоциональный тон.",
+        "неделя": "В недельном масштабе формируется рабочий ритм, расставляются акценты и приоритеты.",
+        "месяц": "Месячный горизонт показывает стратегию адаптации: что поддерживать, а что пересобирать.",
+        "год": "Годовая перспектива описывает главный вектор развития и долгие циклы изменений.",
+    }
+
+    def _major_aspects(planets):
+        pairs = [
+            ("sun", "moon"), ("sun", "mercury"), ("sun", "venus"), ("sun", "mars"),
+            ("venus", "mars"), ("mercury", "jupiter"), ("mars", "saturn"),
+            ("jupiter", "saturn"), ("saturn", "neptune"), ("uranus", "neptune"),
+            ("jupiter", "uranus"), ("mars", "jupiter"),
+        ]
+        out = []
+        for p1, p2 in pairs:
+            l1, l2 = planets.get(p1), planets.get(p2)
+            if l1 is None or l2 is None:
+                continue
+            diff = _aspect_diff(l1, l2)
+            for aname, (ang, orb, ru_name) in MAJOR_ASPECTS.items():
+                dev = abs(diff - ang)
+                if dev <= orb:
+                    out.append({
+                        "p1": p1,
+                        "p2": p2,
+                        "aspect": aname,
+                        "aspect_ru": ru_name,
+                        "orb": round(dev, 2),
+                    })
+                    break
+        out.sort(key=lambda a: a["orb"])
+        return out[:3]
+
+    def _period_block(label, start_jd, span_days):
+        end_jd = start_jd + max(0, span_days - 1)
+        center_jd = start_jd + span_days / 2.0
+        p = calc_planets(center_jd)
+        moon_sign = RU_SIGN.get(sign_name(p["moon"]), sign_name(p["moon"]))
+        sun_sign_key = sign_name(p["sun"])
+        sun_sign = RU_SIGN.get(sun_sign_key, sun_sign_key)
+        focus = FOCUS_BY_SUN_SIGN.get(sun_sign_key, "баланса и устойчивости")
+        aspects = _major_aspects(p)
+
+        supportive = sum(1 for a in aspects if a["aspect"] in {"trine", "sextile", "conjunction"})
+        tense = sum(1 for a in aspects if a["aspect"] in {"square", "opposition"})
+        if supportive >= tense + 1:
+            energy = "благоприятный"
+        elif tense >= supportive + 1:
+            energy = "напряженный"
+        else:
+            energy = "переменный"
+
+        aspect_lines = []
+        for a in aspects:
+            p1_ru = RU_PLANET.get(a["p1"], a["p1"])
+            p2_ru = RU_PLANET.get(a["p2"], a["p2"])
+            aspect_lines.append(f"{p1_ru} — {a['aspect_ru']} — {p2_ru} (орб {a['orb']}°)")
+
+        if aspects:
+            top = aspects[0]
+            top_aspect_text = (
+                f"Ведущий акцент периода дает аспект «{RU_PLANET.get(top['p1'], top['p1'])} — "
+                f"{top['aspect_ru']} — {RU_PLANET.get(top['p2'], top['p2'])}» "
+                f"с орбом {top['orb']}°: это одна из главных тем фона."
+            )
+        else:
+            top_aspect_text = (
+                "Ярко выраженных мажорных аспектов немного, поэтому важнее будут личная дисциплина, "
+                "контекст событий и качество коммуникации."
+            )
+
+        if energy == "благоприятный":
+            advice = (
+                "Используйте окно возможностей максимально осознанно: продвигайте инициативы, "
+                "выходите на переговоры, фиксируйте договоренности письменно и закладывайте запас "
+                "на масштабирование удачных решений. Хороший момент для мягкого, но уверенного лидерства."
+            )
+        elif energy == "напряженный":
+            advice = (
+                "Снижайте импульсивность и работайте короткими итерациями: сначала приоритизация, "
+                "потом действия. Проверяйте факты, не обостряйте конфликты из-за формулировок, "
+                "держите временной и финансовый резерв. Напряжение лучше превращать в структурные шаги."
+            )
+        else:
+            advice = (
+                "Оптимальная тактика — гибкий ритм: сначала тестируйте гипотезы малыми шагами, "
+                "затем усиливайте то, что реально работает. Сочетайте динамику и паузы на пересборку, "
+                "чтобы не терять качество решений на дистанции."
+            )
+
+        moon_mood = MOON_MOOD_BY_SIGN.get(sign_name(p["moon"]), "эмоциональный фон остается переменным, важно сохранять внутренний баланс.")
+        period_style = PERIOD_STYLE.get(label, "Период требует аккуратной настройки ритма и приоритетов.")
+
+        interpretation = (
+            f"Период {label}: Солнце в знаке {sun_sign}, Луна в знаке {moon_sign}. "
+            f"Главный вектор — тема {focus}, а общая энергетика оценивается как «{energy}». "
+            f"{period_style} {moon_mood} {top_aspect_text}"
+        )
+
+        return {
+            "label": label,
+            "start_date": _jd_to_date_str(start_jd),
+            "end_date": _jd_to_date_str(end_jd),
+            "sun_sign": sun_sign,
+            "moon_sign": moon_sign,
+            "energy": energy,
+            "focus": focus,
+            "key_aspects": aspect_lines,
+            "advice": advice,
+            "interpretation": interpretation,
+        }
+
+    day = _period_block("день", base_jd, 1)
+    week = _period_block("неделя", base_jd, 7)
+    month = _period_block("месяц", base_jd, 30)
+    year = _period_block("год", base_jd, 365)
+
+    return {
+        "type": "astrosummary",
+        "target_date": target_date_str,
+        "time_utc": time_str,
+        "periods": {
+            "day": day,
+            "week": week,
+            "month": month,
+            "year": year,
+        },
+    }
+
+
 def ephemerides_table(start_date_str, days=30, time_str="12:00"):
     """
     Build daily ephemerides for core planets.

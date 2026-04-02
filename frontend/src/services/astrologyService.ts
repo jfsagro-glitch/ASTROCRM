@@ -44,6 +44,13 @@ export async function getEphemerides(startDate: string, days = 30, timeUtc = '12
   });
 }
 
+export async function getAstroSummary(targetDate: string, timeUtc = '12:00') {
+  return post('/predictive/astrosummary', {
+    target_date: targetDate,
+    time_utc: timeUtc,
+  });
+}
+
 export async function getEphemerisStatus(): Promise<{
   available: boolean; using_se_files: boolean; ephe_dir?: string;
   files?: Record<string, { exists: boolean; bytes: number }>;
