@@ -31,6 +31,10 @@ from astro_synastry import (
 from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
+try:
+    import astro_se as _se_module
+except Exception:
+    _se_module = None   # type: ignore
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -480,6 +484,23 @@ def calc_parans(req: RelocateRequest):
 @app.get("/health")
 def health():
     return {"ok": True, "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/ephemeris/status")
+def ephemeris_status():
+    """Return Swiss Ephemeris engine status and data file inventory."""
+    if _se_module is None:
+        return {"available": False, "note": "swisseph not installed"}
+    return _se_module.status()
+
+
+@app.post("/ephemeris/download")
+def ephemeris_download():
+    """Trigger download of Swiss Ephemeris data files (sepl/semo/seas_18.se1)."""
+    if _se_module is None:
+        raise HTTPException(503, "swisseph not installed")
+    results = _se_module.download_ephemeris_files(verbose=False)
+    return {"downloaded": results}
 
 
 @app.get("/timezone")

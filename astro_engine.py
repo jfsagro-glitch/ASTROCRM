@@ -19,6 +19,15 @@ import sys
 
 import astro_time as at
 
+# Swiss Ephemeris bridge — provides sub-arcsecond accuracy when available.
+# Gracefully degrades to the built-in VSOP/Meeus formulas when not present.
+try:
+    import astro_se as _se
+    _SE_OK = _se.is_available()
+except Exception:
+    _se = None      # type: ignore
+    _SE_OK = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CORE MATH
@@ -380,6 +389,14 @@ PLANET_ORDER = ["sun","moon","mercury","venus","mars","jupiter","saturn",
                 "uranus","neptune","pluto","node","lilith","chiron"]
 
 def calc_planets(JD):
+    """Return dict {planet: longitude_degrees} for all bodies in PLANET_ORDER.
+    Uses Swiss Ephemeris (sub-arcsecond) when available, falls back to VSOP87/Meeus."""
+    if _SE_OK:
+        results = {}
+        for p in PLANET_ORDER:
+            r = _se.calc_body(JD, p)
+            results[p] = r["lon"] if r is not None else PLANET_FUNCS[p](JD)
+        return results
     return {p: PLANET_FUNCS[p](JD) for p in PLANET_ORDER}
 
 
@@ -393,6 +410,10 @@ def is_retrograde(planet_name, JD):
     """True if planet is moving retrograde at JD (ecliptic longitude decreasing)."""
     if planet_name not in RETROGRADE_BODIES:
         return False
+    if _SE_OK:
+        r = _se.calc_body(JD, planet_name)
+        if r is not None:
+            return r["retrograde"]
     f = PLANET_FUNCS.get(planet_name)
     if not f: return False
     lon1 = f(JD); lon2 = f(JD + 0.5)

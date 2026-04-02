@@ -604,11 +604,22 @@ function EphemeridesView({ result, theme }: { result: AnyResult; theme: typeof c
   ];
 
   if (!rows.length) return null;
+  const eng = result.engine ? String(result.engine) : '';
+  const engineBadge = eng ? (
+    <span className={`ml-3 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+      eng === 'swiss_ephemeris' ? 'bg-green-900/50 text-green-300'
+      : eng === 'moshier' ? 'bg-yellow-900/50 text-yellow-300'
+      : 'bg-zinc-800 text-zinc-400'
+    }`}>
+      {eng === 'swiss_ephemeris' ? '✓ Swiss Ephemeris' : eng === 'moshier' ? '~ Moshier' : 'VSOP87'}
+    </span>
+  ) : null;
   return (
     <div className={`rounded-xl border ${theme.card} p-3`}> 
       <div className={`text-xs ${theme.text} mb-2`}>
         <span className={theme.accent}>Start:</span> {String(result.start_date)} {String(result.time_utc)} UTC ·
         <span className="ml-2">Days: {String(result.days)}</span>
+        {engineBadge}
       </div>
       <div className="overflow-auto max-h-[520px] rounded-lg border border-white/10">
         <table className="w-full text-xs">

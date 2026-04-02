@@ -44,6 +44,15 @@ export async function getEphemerides(startDate: string, days = 30, timeUtc = '12
   });
 }
 
+export async function getEphemerisStatus(): Promise<{
+  available: boolean; using_se_files: boolean; ephe_dir?: string;
+  files?: Record<string, { exists: boolean; bytes: number }>;
+}> {
+  const res = await fetch(`${API_URL}/ephemeris/status`);
+  if (!res.ok) return { available: false, using_se_files: false };
+  return res.json();
+}
+
 export async function getSecondaryProgressions(b: BirthInput, targetDate: string) {
   return post('/predictive/secondary', {
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,

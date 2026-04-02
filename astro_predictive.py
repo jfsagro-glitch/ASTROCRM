@@ -25,6 +25,14 @@ from astro_engine import (
     parse_date_arg, parse_time_arg, ASPECT_DEFS, _angle_diff,
 )
 
+# Swiss Ephemeris bridge for high-accuracy ephemerides
+try:
+    import astro_se as _se
+    _SE_OK = _se.is_available()
+except Exception:
+    _se = None   # type: ignore
+    _SE_OK = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -486,6 +494,8 @@ def transits(natal_jd_utc, target_date_str, target_time_str="12:00", lat=0, lon=
 def ephemerides_table(start_date_str, days=30, time_str="12:00"):
     """
     Build daily ephemerides for core planets.
+    Uses Swiss Ephemeris when available (sub-arcsecond accuracy + exact speeds).
+    Falls back to VSOP87/Meeus with finite-difference speeds.
     Returns rows with longitude, sign, position in sign, speed and retrograde flag.
     """
     days = max(1, min(int(days), 120))
@@ -504,26 +514,52 @@ def ephemerides_table(start_date_str, days=30, time_str="12:00"):
     rows = []
     for i in range(days):
         cur_jd = start_jd + i
-        cur = calc_planets(cur_jd)
-        prev = calc_planets(cur_jd - 1.0)
-        nxt = calc_planets(cur_jd + 1.0)
-
-        cur["true_node"] = true_node(cur_jd)
-        prev["true_node"] = true_node(cur_jd - 1.0)
-        nxt["true_node"] = true_node(cur_jd + 1.0)
 
         planets = {}
-        for p in eph_order:
-            lon = cur[p]
-            speed = signed_delta(nxt[p], prev[p]) / 2.0  # deg/day
-            d = deg_in_sign(lon)
-            planets[p] = {
-                "lon": round(lon, 6),
-                "sign": sign_name(lon),
-                "deg_min": f"{int(d)}°{int((d % 1) * 60):02d}'",
-                "speed_deg_day": round(speed, 6),
-                "retrograde": speed < 0,
-            }
+
+        if _SE_OK:
+            # Swiss Ephemeris path: calc_body returns lon + exact speed in one call
+            for p in eph_order:
+                r = _se.calc_body(cur_jd, p)
+                if r is None:
+                    # Fallback for this body
+                    lon = true_node(cur_jd) if p == "true_node" else calc_planets(cur_jd).get(p, 0.0)
+                    d = deg_in_sign(lon)
+                    planets[p] = {
+                        "lon": round(lon, 6),
+                        "sign": sign_name(lon),
+                        "deg_min": f"{int(d)}°{int((d % 1) * 60):02d}'",
+                        "speed_deg_day": 0.0,
+                        "retrograde": False,
+                    }
+                else:
+                    d = deg_in_sign(r["lon"])
+                    planets[p] = {
+                        "lon": r["lon"],
+                        "sign": r["sign"],
+                        "deg_min": r["deg_min"],
+                        "speed_deg_day": round(r["speed"], 6),
+                        "retrograde": r["retrograde"],
+                    }
+        else:
+            # Legacy path: finite-difference speed approximation
+            cur = calc_planets(cur_jd)
+            prev = calc_planets(cur_jd - 1.0)
+            nxt = calc_planets(cur_jd + 1.0)
+            cur["true_node"] = true_node(cur_jd)
+            prev["true_node"] = true_node(cur_jd - 1.0)
+            nxt["true_node"] = true_node(cur_jd + 1.0)
+            for p in eph_order:
+                lon = cur[p]
+                speed = signed_delta(nxt[p], prev[p]) / 2.0
+                d = deg_in_sign(lon)
+                planets[p] = {
+                    "lon": round(lon, 6),
+                    "sign": sign_name(lon),
+                    "deg_min": f"{int(d)}°{int((d % 1) * 60):02d}'",
+                    "speed_deg_day": round(speed, 6),
+                    "retrograde": speed < 0,
+                }
 
         rows.append({
             "index": i,
@@ -1270,13 +1306,17 @@ def main():
             print(f" {ec['date_str']}  {ec['type'].upper()} ({ec['eclipse_class']})  "
                   f"dist_node={ec['dist_node']:.1f}\u00b0")
         print("═"*60)
-        return
-
-    if args.cmd == 'stations':
-        result = find_stations(args.planet, args.from_date, args.to_date)
-        print("═"*60)
-        print(f" STATIONS: {args.planet}  {args.from_date} to {args.to_date}")
-        print("═"*60)
+        engine = "swiss_ephemeris" if _SE_OK and _se is not None and _se.is_using_se_files() else (
+            "moshier" if _SE_OK else "vsop87"
+        )
+        return {
+            "type": "ephemerides",
+            "start_date": start_date_str,
+            "time_utc": f"{hh:02d}:{mi:02d}:{sc:02d}",
+            "days": days,
+            "engine": engine,
+            "rows": rows,
+        }
         for st in result:
             print(f" {st['date_str']}  {st['type']:<22}  "
                   f"{st['lon']:.4f}\u00b0  {st['sign']}")
