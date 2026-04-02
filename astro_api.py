@@ -23,7 +23,7 @@ from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
     profections, transits, tertiary_progressions, converse_progressions,
     ingress_chart, find_eclipses, find_stations, prenatal_syzygy,
-    transit_exact_dates,
+    transit_exact_dates, ephemerides_table,
 )
 from astro_synastry import (
     synastry_aspects, composite_chart, davison_chart, synastry_score,
@@ -106,9 +106,16 @@ class PredictiveRequest(BaseModel):
     date:         str;  time:        str
     lat:          float; lon:         float; utc: float
     target_date:  str                    # YYYY-MM-DD
+    target_time:  Optional[str] = None   # HH:MM[:SS], defaults to 12:00
     target_lat:   Optional[float] = None # for returns & relocations
     target_lon:   Optional[float] = None
     houses:       str = "placidus"
+
+
+class EphemeridesRequest(BaseModel):
+    start_date: str
+    days: int = 30
+    time_utc: Optional[str] = None
 
 
 class RelocateRequest(BaseModel):
@@ -192,9 +199,19 @@ def natal(req: BirthData):
 def calc_transits(req: PredictiveRequest):
     try:
         natal_jd = _to_jd(req.date, req.time, req.utc)
-        result = transits(natal_jd, req.target_date,
+        result = transits(natal_jd, req.target_date, req.target_time or "12:00",
                           lat=req.lat, lon=req.lon)
         return _safe(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/predictive/ephemerides")
+def calc_ephemerides(req: EphemeridesRequest):
+    try:
+        return _safe(ephemerides_table(req.start_date, req.days, req.time_utc or "12:00"))
     except HTTPException:
         raise
     except Exception as e:

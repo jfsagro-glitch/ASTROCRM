@@ -422,14 +422,13 @@ def profections(natal_jd_utc, target_date_str, houses_system="placidus",
 # TRANSITS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def transits(natal_jd_utc, target_date_str, lat=0, lon=0,
+def transits(natal_jd_utc, target_date_str, target_time_str="12:00", lat=0, lon=0,
              transit_orb_major=1.0, transit_orb_minor=0.5):
     """
     Compute transiting planets on target_date and their aspects to natal chart.
     """
     natal_planets = calc_planets(natal_jd_utc)
-    yr, mo, dy = parse_date_arg(target_date_str)
-    transit_jd   = jd(yr, mo, dy, 12, 0, 0)  # noon UTC
+    transit_jd   = _parse_target_datetime(target_date_str, target_time_str)
     transit_planets = calc_planets(transit_jd)
 
     # Transits to natal planets
@@ -475,10 +474,61 @@ def transits(natal_jd_utc, target_date_str, lat=0, lon=0,
     return {
         "type": "transits",
         "target_date": target_date_str,
+        "target_time": target_time_str,
         "transit_jd": round(transit_jd, 4),
         "transit_planets": fmt(transit_planets),
         "natal_planets": fmt(natal_planets),
         "aspects": asp_list,
+    }
+
+
+def ephemerides_table(start_date_str, days=30, time_str="12:00"):
+    """
+    Build daily ephemerides for core planets.
+    Returns rows with longitude, sign, position in sign, speed and retrograde flag.
+    """
+    days = max(1, min(int(days), 120))
+    hh, mi, sc = parse_time_arg(time_str)
+    yr, mo, dy = parse_date_arg(start_date_str)
+    start_jd = jd(yr, mo, dy, hh, mi, sc)
+
+    def signed_delta(a, b):
+        return ((a - b + 540.0) % 360.0) - 180.0
+
+    rows = []
+    for i in range(days):
+        cur_jd = start_jd + i
+        cur = calc_planets(cur_jd)
+        prev = calc_planets(cur_jd - 1.0)
+        nxt = calc_planets(cur_jd + 1.0)
+
+        planets = {}
+        for p in PLANET_ORDER:
+            lon = cur[p]
+            speed = signed_delta(nxt[p], prev[p]) / 2.0  # deg/day
+            d = deg_in_sign(lon)
+            planets[p] = {
+                "lon": round(lon, 6),
+                "sign": sign_name(lon),
+                "deg_min": f"{int(d)}°{int((d % 1) * 60):02d}'",
+                "speed_deg_day": round(speed, 6),
+                "retrograde": speed < 0,
+            }
+
+        rows.append({
+            "index": i,
+            "jd": round(cur_jd, 6),
+            "date": _jd_to_date_str(cur_jd),
+            "time_utc": f"{hh:02d}:{mi:02d}:{sc:02d}",
+            "planets": planets,
+        })
+
+    return {
+        "type": "ephemerides",
+        "start_date": start_date_str,
+        "time_utc": f"{hh:02d}:{mi:02d}:{sc:02d}",
+        "days": days,
+        "rows": rows,
     }
 
 
@@ -609,6 +659,13 @@ def _parse_target_date(s):
     """Parse YYYY-MM-DD string and return Julian Day."""
     yr, mo, dy = parse_date_arg(s)
     return jd(yr, mo, dy)
+
+
+def _parse_target_datetime(date_str, time_str="12:00"):
+    """Parse YYYY-MM-DD + HH:MM[:SS] and return Julian Day."""
+    yr, mo, dy = parse_date_arg(date_str)
+    hh, mi, sc = parse_time_arg(time_str)
+    return jd(yr, mo, dy, hh, mi, sc)
 
 
 def prenatal_syzygy(natal_jd):

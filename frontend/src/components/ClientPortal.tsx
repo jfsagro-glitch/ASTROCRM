@@ -26,7 +26,7 @@ import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
   getConverseProgressions, getSynastry, getCompositeChart, getDavisonChart,
-  getRelocatedChart, geocodeCity,
+  getRelocatedChart, getEphemerides, geocodeCity,
 } from '../services/astrologyService';
 import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
@@ -594,11 +594,63 @@ function ProfectionView({ result, theme }: { result: AnyResult; theme: typeof ch
   );
 }
 
+function EphemeridesView({ result, theme }: { result: AnyResult; theme: typeof chartThemes[ThemeKey] }) {
+  const { tr } = useLang();
+  const rows = (result.rows as Array<Record<string, unknown>>) ?? [];
+  const pname = (k: string) => tr.planets[k] ?? k;
+  const planetOrder = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
+
+  if (!rows.length) return null;
+  return (
+    <div className={`rounded-xl border ${theme.card} p-3`}> 
+      <div className={`text-xs ${theme.text} mb-2`}>
+        <span className={theme.accent}>Start:</span> {String(result.start_date)} {String(result.time_utc)} UTC ·
+        <span className="ml-2">Days: {String(result.days)}</span>
+      </div>
+      <div className="overflow-auto max-h-[520px] rounded-lg border border-white/10">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-black/60 backdrop-blur-sm">
+            <tr className={`${theme.accent}`}>
+              <th className="px-2 py-1 text-left">Date</th>
+              {planetOrder.map(p => (
+                <th key={p} className="px-2 py-1 text-left">{pname(p)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const planets = (row.planets as Record<string, Record<string, unknown>>) ?? {};
+              return (
+                <tr key={i} className="border-t border-white/10 align-top">
+                  <td className={`px-2 py-1.5 whitespace-nowrap ${theme.text}`}>{String(row.date)}</td>
+                  {planetOrder.map(p => {
+                    const pv = planets[p] ?? {};
+                    return (
+                      <td key={p} className={`px-2 py-1.5 ${theme.text}`}>
+                        <div className="whitespace-nowrap">{String(pv.sign ?? '')} {String(pv.deg_min ?? '')}</div>
+                        <div className="opacity-60 font-mono">
+                          {typeof pv.speed_deg_day === 'number' ? (pv.speed_deg_day as number).toFixed(3) : ''}°/d
+                          {pv.retrograde ? ' R' : ''}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Predictive Panel ─────────────────────────────────────────────────────────
 function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey] }) {
   const { tr } = useLang();
-  const [tab, setTab] = useState<'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'>('transits');
+  const [tab, setTab] = useState<'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'ephemerides'>('transits');
   const [targetDate, setTargetDate] = useState(new Date().toISOString().slice(0, 10));
+  const [targetTime, setTargetTime] = useState('12:00');
   const [returnYear, setReturnYear] = useState(new Date().getFullYear());
   const [result, setResult] = useState<AnyResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -609,7 +661,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
     try {
       let data;
       switch (tab) {
-        case 'transits':      data = await getTransits(birth, targetDate); break;
+        case 'transits':      data = await getTransits(birth, targetDate, targetTime); break;
         case 'secondary':     data = await getSecondaryProgressions(birth, targetDate); break;
         case 'solar-arc':     data = await getSolarArc(birth, targetDate); break;
         case 'solar-return':  data = await getSolarReturn(birth, returnYear); break;
@@ -617,17 +669,19 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
         case 'profections':   data = await getProfections(birth, targetDate); break;
         case 'tertiary':      data = await getTertiaryProgressions(birth, targetDate); break;
         case 'converse':      data = await getConverseProgressions(birth, targetDate); break;
+        case 'ephemerides':   data = await getEphemerides(targetDate, 30, targetTime); break;
       }
       setResult(data as AnyResult);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
-  }, [tab, birth, targetDate, returnYear]);
+  }, [tab, birth, targetDate, targetTime, returnYear]);
 
   const tabs: [string, string][] = [
     ['transits', tr.transits], ['secondary', tr.secondary],
     ['solar-arc', tr.solarArc], ['solar-return', tr.solarReturn],
     ['lunar-return', tr.lunarReturn], ['profections', tr.profections],
     ['tertiary', tr.tertiary], ['converse', tr.converse],
+    ['ephemerides', 'Эфемериды'],
   ];
 
   const renderResult = () => {
@@ -640,6 +694,8 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
       return <ReturnView result={result} theme={theme} />;
     if (type === 'profections')
       return <ProfectionView result={result} theme={theme} />;
+    if (type === 'ephemerides')
+      return <EphemeridesView result={result} theme={theme} />;
     // Fallback
     return (
       <pre className={`text-xs ${theme.text} overflow-auto max-h-96 p-3 rounded-xl border ${theme.card}`}>
@@ -666,11 +722,18 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
               className={`px-3 py-2 rounded-lg border text-sm w-28 ${theme.card}`} />
           </div>
         ) : (
-          <div>
-            <label className={`text-xs ${theme.text} mb-1 block`}>{tr.targetDate}</label>
-            <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
-              className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
-          </div>
+          <>
+            <div>
+              <label className={`text-xs ${theme.text} mb-1 block`}>{tr.targetDate}</label>
+              <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+                className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
+            </div>
+            <div>
+              <label className={`text-xs ${theme.text} mb-1 block`}>UTC Time</label>
+              <input type="time" value={targetTime} onChange={e => setTargetTime(e.target.value || '12:00')}
+                className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
+            </div>
+          </>
         )}
         <button onClick={run} disabled={loading}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${theme.btn}`}>

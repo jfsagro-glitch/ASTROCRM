@@ -28,10 +28,19 @@ export async function getNatalChart(b: BirthInput, houses = 'placidus'): Promise
 }
 
 // ─── Predictive ──────────────────────────────────────────────────────────────
-export async function getTransits(b: BirthInput, targetDate: string) {
+export async function getTransits(b: BirthInput, targetDate: string, targetTime = '12:00') {
   return post('/predictive/transits', {
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
     target_date: targetDate,
+    target_time: targetTime,
+  });
+}
+
+export async function getEphemerides(startDate: string, days = 30, timeUtc = '12:00') {
+  return post('/predictive/ephemerides', {
+    start_date: startDate,
+    days,
+    time_utc: timeUtc,
   });
 }
 
