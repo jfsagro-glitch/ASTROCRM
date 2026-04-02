@@ -289,6 +289,30 @@ def node(JD):
     t = T(JD)
     return n360(125.04452 - 1934.136261*t + 2.0708e-3*t*t + t*t*t/450000)
 
+
+def true_node(JD):
+    """
+    True lunar ascending node (mean node + short-period terms), degrees.
+    Uses standard low-order periodic correction suitable for ephemerides display.
+    """
+    t = T(JD)
+    Om = node(JD)
+
+    D = n360(297.8501921 + 445267.1114034*t - 0.0018819*t*t + (t*t*t)/545868.0 - (t*t*t*t)/113065000.0)
+    M = n360(357.5291092 + 35999.0502909*t - 0.0001536*t*t + (t*t*t)/24490000.0)
+    Mp = n360(134.9633964 + 477198.8675055*t + 0.0087414*t*t + (t*t*t)/69699.0 - (t*t*t*t)/14712000.0)
+    F = n360(93.2720950 + 483202.0175233*t - 0.0036539*t*t - (t*t*t)/3526000.0 + (t*t*t*t)/863310000.0)
+
+    corr = (
+        -1.4979 * math.sin(rad(2 * (D - F)))
+        -0.1500 * math.sin(rad(M))
+        -0.1226 * math.sin(rad(2 * D))
+        +0.1176 * math.sin(rad(2 * F))
+        -0.0801 * math.sin(rad(2 * (Mp - F)))
+    )
+
+    return n360(Om + corr)
+
 def lilith(JD):
     t = T(JD)
     return n360(83.3532 + 4069.0137*t - 0.01032*t*t - t*t*t/80053 + 180)

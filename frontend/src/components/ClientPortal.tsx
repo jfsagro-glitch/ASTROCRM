@@ -598,7 +598,10 @@ function EphemeridesView({ result, theme }: { result: AnyResult; theme: typeof c
   const { tr } = useLang();
   const rows = (result.rows as Array<Record<string, unknown>>) ?? [];
   const pname = (k: string) => tr.planets[k] ?? k;
-  const planetOrder = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
+  const planetOrder = [
+    'sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn',
+    'uranus', 'neptune', 'pluto', 'true_node', 'node', 'lilith', 'chiron',
+  ];
 
   if (!rows.length) return null;
   return (

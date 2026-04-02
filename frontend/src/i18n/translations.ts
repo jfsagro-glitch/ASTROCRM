@@ -84,7 +84,7 @@ export const translations = {
     planets: {
       sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus',
       mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn', uranus: 'Uranus',
-      neptune: 'Neptune', pluto: 'Pluto', node: 'N.Node', chiron: 'Chiron', lilith: 'Lilith',
+      neptune: 'Neptune', pluto: 'Pluto', true_node: 'True Node', node: 'Mean Node', chiron: 'Chiron', lilith: 'Lilith',
     } as Record<string, string>,
     // Sign names
     signs: {
@@ -199,7 +199,7 @@ export const translations = {
     planets: {
       sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
       mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
-      neptune: 'Нептун', pluto: 'Плутон', node: 'С.Узел', chiron: 'Хирон', lilith: 'Лилит',
+      neptune: 'Нептун', pluto: 'Плутон', true_node: 'Истинный узел', node: 'Средний узел', chiron: 'Хирон', lilith: 'Лилит',
     } as Record<string, string>,
     // Sign names
     signs: {

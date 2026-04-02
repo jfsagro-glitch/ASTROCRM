@@ -19,6 +19,7 @@ import sys, argparse, json, math
 
 from astro_engine import (
     jd, n360, rad, deg, T, sun, moon, node,
+    true_node,
     calc_planets, calc_houses, calc_aspects, calc_chart,
     PLANET_ORDER, SIGN_NAMES, sign_name, sign_glyph, deg_in_sign,
     parse_date_arg, parse_time_arg, ASPECT_DEFS, _angle_diff,
@@ -495,6 +496,11 @@ def ephemerides_table(start_date_str, days=30, time_str="12:00"):
     def signed_delta(a, b):
         return ((a - b + 540.0) % 360.0) - 180.0
 
+    eph_order = [
+        "sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn",
+        "uranus", "neptune", "pluto", "true_node", "node", "lilith", "chiron",
+    ]
+
     rows = []
     for i in range(days):
         cur_jd = start_jd + i
@@ -502,8 +508,12 @@ def ephemerides_table(start_date_str, days=30, time_str="12:00"):
         prev = calc_planets(cur_jd - 1.0)
         nxt = calc_planets(cur_jd + 1.0)
 
+        cur["true_node"] = true_node(cur_jd)
+        prev["true_node"] = true_node(cur_jd - 1.0)
+        nxt["true_node"] = true_node(cur_jd + 1.0)
+
         planets = {}
-        for p in PLANET_ORDER:
+        for p in eph_order:
             lon = cur[p]
             speed = signed_delta(nxt[p], prev[p]) / 2.0  # deg/day
             d = deg_in_sign(lon)
