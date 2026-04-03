@@ -161,6 +161,123 @@ def _present(data: Any) -> Any:
     return _safe(_simplify_interpretation_payload(data))
 
 
+def _gen_solar_return_interp(result: dict) -> str:
+    """Generate interpretation for solar return chart."""
+    try:
+        chart_info = result.get("sr_date_utc", "")
+        planets = result.get("planets", {})
+        sun_info = planets.get("Sun", {})
+        moon_info = planets.get("Moon", {})
+        
+        return (
+            f"Солнечный возврат на {chart_info}. "
+            f"Солнце в {sun_info.get('sign', 'знаке')}. "
+            f"Луна в {moon_info.get('sign', 'знаке')}. "
+            "Это год, когда Солнце вернулось на свою натальную позицию — период обновления, переоценки и инициирования нового цикла.\n\n"
+            "Просто: солнечный возврат — это ваш личный новый год, когда начинается новый цикл развития на 12 месяцев.\n"
+            "Что это значит: планеты в карте солнечного возврата показывают, какие темы будут доминировать в этот период, где будут возможности и где нужна осторожность.\n"
+            "Что делать: используйте этот период для принятия важных решений, начала новых проектов и проработки того, что было в фокусе в предыдущем году."
+        )
+    except Exception:
+        return "Период солнечного возврата приносит новый цикл в вашу жизнь."
+
+
+def _gen_lunar_return_interp(result: dict) -> str:
+    """Generate interpretation for lunar return chart."""
+    try:
+        return_date = result.get("return_date_utc", "")
+        return (
+            f"Лунный возврат на {return_date}. Луна вернулась на свою натальную позицию — момент эмоционального обновления и переосмысления.\n\n"
+            "Просто: лунный возврат происходит примерно раз в месяц и показывает фазу эмоционального цикла.\n"
+            "Что это значит: это время, когда стоит обратить внимание на свои чувства, потребности и то, что требует завершения или трансформации.\n"
+            "Что делать: в этот день сделайте паузу, проверьте, что вас беспокоит, и примите решения, которые вы откладывали."
+        )
+    except Exception:
+        return "Период лунного возврата приносит эмоциональное обновление."
+
+
+def _gen_profections_interp(result: dict) -> str:
+    """Generate interpretation for profections."""
+    try:
+        current_year = result.get("current_year", "")
+        house_info = result.get("active_house", {}).get("name", "дома")
+        
+        return (
+            f"Профекция на год: активный дом — {house_info}. "
+            f"В целодневной прогрессии года Луна активирует новую область жизни каждый год.\n\n"
+            "Просто: профекции показывают, какие сферы жизни находятся в фокусе в текущий год.\n"
+            "Что это значит: активный дом раскрывает тему года — где будут основные события, вызовы и возможности раскрытия.\n"
+            "Что делать: сосредоточьтесь на теме года; развивайте её, делайте значимые шаги в этой сфере и не распыляйтесь на второстепенное."
+        )
+    except Exception:
+        return "Профекции показывают активный фокус года."
+
+
+def _gen_secondary_prog_interp(result: dict) -> str:
+    """Generate interpretation for secondary progressions."""
+    try:
+        return (
+            "Вторичные прогрессии показывают психологическое развитие и внутренние трансформации в течение жизни.\n\n"
+            "Просто: вторичная прогрессия — это личный год, отражающий эмоциональный и психологический рост.\n"
+            "Что это значит: планеты в прогрессии показывают внутренние процессы, которые созревали незримо и теперь проявляются в жизни.\n"
+            "Что делать: обратите внимание на внутренние сигналы; это время трансформации, переоценки и переосмысления жизненного пути."
+        )
+    except Exception:
+        return "Вторичные прогрессии показывают психологический рост."
+
+
+def _gen_solar_arc_interp(result: dict) -> str:
+    """Generate interpretation for solar arc."""
+    try:
+        return (
+            "Дуги Солнца показывают внешние события и возможности в течение периода развития.\n\n"
+            "Просто: дуга Солнца измеряет движение Солнца каждый день после рождения и применяет это к другим планетам.\n"
+            "Что это значит: аспекты дуги Солнца показывают важные события, достижения и кризисные точки на жизненном пути.\n"
+            "Что делать: следите за периодами активных аспектов дуги; они часто совпадают с важными событиями и возможностями."
+        )
+    except Exception:
+        return "Дуги Солнца показывают внешние развития."
+
+
+def _gen_tertiary_interp(result: dict) -> str:
+    """Generate interpretation for tertiary progressions."""
+    try:
+        return (
+            "Третичные прогрессии показывают детали и подробности внутри каждого года вторичной прогрессии.\n\n"
+            "Просто: если вторичная прогрессия показывает год, то третичная прогрессия показывает месяцы и дни внутри этого года.\n"
+            "Что это значит: третичные аспекты срабатывают чаще и показывают более мелкие колебания энергии и событий.\n"
+            "Что делать: используйте третичные прогрессии для планирования внутри более крупного цикла вторичной прогрессии."
+        )
+    except Exception:
+        return "Третичные прогрессии показывают детали развития."
+
+
+def _gen_converse_interp(result: dict) -> str:
+    """Generate interpretation for converse progressions."""
+    try:
+        return (
+            "Обратные прогрессии показывают внутренние развития, которые идут в противоположном направлении.\n\n"
+            "Просто: обратная прогрессия движется от рождения к прошлому и показывает, что мы учимся через опыт.\n"
+            "Что это значит: она раскрывает скрытые уроки, кармические паттерны и глубинные процессы трансформации.\n"
+            "Что делать: медитируйте на уроки обратной прогрессии; они часто показывают, что нужно отпустить или переосмыслить."
+        )
+    except Exception:
+        return "Обратные прогрессии показывают глубинные трансформации."
+
+
+def _gen_prenatal_interp(result: dict) -> str:
+    """Generate interpretation for prenatal syzygy."""
+    try:
+        return (
+            "Пренатальный синодический пункт показывает фазу лунного цикла, в которую вы рождены.\n\n"
+            "Просто: ваше рождение совпадает с определённой фазой Луны, которая отражает вашу врождённую природу.\n"
+            "Что это значит: молодая Луна приносит новые начинания, полная Луна — полноту выражения, убывающая — интеграцию опыта.\n"
+            "Что делать: поймите свою лунную фазу и как она влияет на вашу энергию, творчество и жизненный паттерн."
+        )
+    except Exception:
+        return "Пренатальный синодический пункт показывает лунную фазу рождения."
+
+
 def _file_response_with_cache(path: str, cache_control: str) -> FileResponse:
     response = FileResponse(path)
     response.headers["Cache-Control"] = cache_control
@@ -638,6 +755,7 @@ def calc_secondary(req: PredictiveRequest):
         result = secondary_progressions(natal_jd, req.lat, req.lon,
                                         req.target_date,
                                         houses_system=req.houses)
+        result["interpretation"] = _gen_secondary_prog_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -651,6 +769,7 @@ def calc_solar_arc(req: PredictiveRequest):
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = solar_arc(natal_jd, req.lat, req.lon, req.target_date,
                            houses_system=req.houses)
+        result["interpretation"] = _gen_solar_arc_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -665,6 +784,7 @@ def calc_tertiary(req: PredictiveRequest):
         result = tertiary_progressions(natal_jd, req.target_date,
                                        req.lat, req.lon,
                                        houses_system=req.houses)
+        result["interpretation"] = _gen_tertiary_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -679,6 +799,7 @@ def calc_converse(req: PredictiveRequest):
         result = converse_progressions(natal_jd, req.target_date,
                                        req.lat, req.lon,
                                        houses_system=req.houses)
+        result["interpretation"] = _gen_converse_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -695,6 +816,7 @@ def calc_solar_return(req: PredictiveRequest):
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = solar_return(natal_jd, yr, obs_lat, obs_lon,
                               houses_system=req.houses)
+        result["interpretation"] = _gen_solar_return_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -710,6 +832,7 @@ def calc_lunar_return(req: PredictiveRequest):
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = lunar_return(natal_jd, req.target_date, obs_lat, obs_lon,
                               houses_system=req.houses)
+        result["interpretation"] = _gen_lunar_return_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -724,6 +847,7 @@ def calc_profections(req: PredictiveRequest):
         result = profections(natal_jd, req.target_date,
                              houses_system=req.houses,
                              lat=req.lat, lon=req.lon)
+        result["interpretation"] = _gen_profections_interp(result)
         return _present(result)
     except HTTPException:
         raise
@@ -735,7 +859,9 @@ def calc_profections(req: PredictiveRequest):
 def calc_prenatal(req: PrenatalRequest):
     try:
         natal_jd = _to_jd(req.date, req.time, req.utc)
-        return _safe(prenatal_syzygy(natal_jd))
+        result = prenatal_syzygy(natal_jd)
+        result["interpretation"] = _gen_prenatal_interp(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
