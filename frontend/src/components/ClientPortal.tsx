@@ -1667,6 +1667,234 @@ function LangToggle({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
   );
 }
 
+function AstroSummaryBlock({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [mode, setMode] = useState<'day'|'week'|'quarter'|'year'>('day');
+  const [date, setDate] = useState(today);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
+  const [selectedWeekDay, setSelectedWeekDay] = useState(0);
+
+  const scoreHour = useCallback((d: Date, hour: number) => {
+    const weekday = d.getDay();
+    const h = hour;
+    const circadian = Math.sin(((h - 7) / 24) * Math.PI * 2) * 18;
+    const focusPeak = Math.exp(-((h - 10.5) ** 2) / 18) * 28;
+    const socialPeak = Math.exp(-((h - 16.5) ** 2) / 26) * 20;
+    const nightDrop = h >= 22 || h <= 5 ? -22 : 0;
+    const weekBias = [4, 7, 10, 8, 5, -2, 0][weekday] ?? 0;
+    const jitter = Math.sin((weekday + 1) * (h + 2)) * 4;
+    return Math.max(0, Math.min(100, Math.round(44 + circadian + focusPeak + socialPeak + nightDrop + weekBias + jitter)));
+  }, []);
+
+  const localGeneral = useCallback((m: 'day'|'week'|'quarter'|'year', dstr: string) => {
+    const d = new Date(`${dstr}T12:00:00`);
+    const weekday = d.getDay();
+    const energies = ['переменный', 'благоприятный', 'благоприятный', 'напряженный', 'благоприятный', 'легкий', 'созерцательный'];
+    const energy = energies[weekday] ?? 'переменный';
+    const focuses = [
+      'обновление личной стратегии и приоритетов',
+      'структурирование задач и финансовых решений',
+      'коммуникации, переговоры и образовательные активности',
+      'глубинные решения и отказ от неэффективных паттернов',
+      'публичные шаги и закрепление достигнутого',
+      'восстановление ресурса и гибкая настройка ритма',
+      'интуитивная калибровка и мягкое планирование',
+    ];
+    const focus = focuses[(weekday + (m === 'year' ? 2 : m === 'quarter' ? 1 : 0)) % focuses.length];
+    const narrative =
+      `Общий фон ${m === 'day' ? 'дня' : m === 'week' ? 'недели' : m === 'quarter' ? 'квартала' : 'года'}: ${energy}. ` +
+      `В центре внимания — ${focus}. ` +
+      'Хороший результат дают действия с понятной целью, аккуратной коммуникацией и резервом времени на корректировку курса.';
+    return { energy, focus, narrative };
+  }, []);
+
+  const weekData = useMemo(() => {
+    const start = new Date(`${date}T00:00:00`);
+    const day = start.getDay();
+    const diffToMonday = (day + 6) % 7;
+    start.setDate(start.getDate() - diffToMonday);
+    return Array.from({ length: 7 }, (_, di) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + di);
+      const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, score: scoreHour(d, h) }));
+      const avg = Math.round(hours.reduce((s, x) => s + x.score, 0) / 24);
+      return {
+        date: d.toISOString().slice(0, 10),
+        label: d.toLocaleDateString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+        avg,
+        hours,
+      };
+    });
+  }, [date, scoreHour]);
+
+  const currentDayHours = weekData[selectedWeekDay]?.hours ?? [];
+  const bestWindows = useMemo(() => {
+    const sorted = [...currentDayHours].sort((a, b) => b.score - a.score);
+    return sorted.slice(0, 3).map(x => ({
+      start: `${String(x.hour).padStart(2, '0')}:00`,
+      end: `${String((x.hour + 1) % 24).padStart(2, '0')}:00`,
+      score: x.score,
+    }));
+  }, [currentDayHours]);
+  const postponeWindows = useMemo(() => {
+    const sorted = [...currentDayHours].sort((a, b) => a.score - b.score);
+    return sorted.slice(0, 2).map(x => ({
+      start: `${String(x.hour).padStart(2, '0')}:00`,
+      end: `${String((x.hour + 1) % 24).padStart(2, '0')}:00`,
+      score: x.score,
+    }));
+  }, [currentDayHours]);
+
+  const run = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const data = await getAstroSummary(date, '12:00') as Record<string, unknown>;
+      setSummary(data);
+    } catch {
+      setSummary(null);
+      setError('Серверная сводка недоступна, используется локальный аналитический режим.');
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
+
+  const general = localGeneral(mode, date);
+
+  return (
+    <div className="space-y-4">
+      <div className={`rounded-xl border ${theme.card} p-4`}>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className={`text-xs ${theme.text} mb-1 block`}>База даты</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
+          </div>
+          <div className="flex gap-1.5">
+            {([
+              ['day', 'День'],
+              ['week', 'Неделя'],
+              ['quarter', 'Квартал'],
+              ['year', 'Год'],
+            ] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setMode(k)}
+                className={`px-3 py-2 text-xs rounded-lg border ${mode === k ? theme.tabActive : theme.tabInactive}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={run}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${theme.btn}`}>
+            {loading ? <><Spin />Обновляю...</> : 'Обновить сводку'}
+          </button>
+        </div>
+      </div>
+
+      {error && <Err msg={error} />}
+
+      <div className={`rounded-xl border ${theme.card} p-4`}>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className={`font-semibold ${theme.header}`}>Общая характеристика {mode === 'day' ? 'дня' : mode === 'week' ? 'недели' : mode === 'quarter' ? 'квартала' : 'года'}</h3>
+          <span className={`text-xs px-2 py-1 rounded border ${theme.tabActive}`}>{general.energy}</span>
+        </div>
+        <p className={`text-sm ${theme.text} leading-relaxed`}>{general.narrative}</p>
+        <p className={`text-sm ${theme.text} mt-2`}><span className={theme.accent}>Фокус:</span> {general.focus}</p>
+      </div>
+
+      {(mode === 'day' || mode === 'week') && (
+        <>
+          <div className={`rounded-xl border ${theme.card} p-4`}>
+            <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Рекомендации по времени в течение дня</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className={`text-xs ${theme.accent} mb-1`}>Лучше делать</p>
+                <div className="space-y-1">
+                  {bestWindows.map((w, i) => (
+                    <div key={i} className={`text-xs ${theme.text}`}>{w.start}–{w.end} · эффективность {w.score}%</div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className={`text-xs ${theme.accent} mb-1`}>Лучше отложить</p>
+                <div className="space-y-1">
+                  {postponeWindows.map((w, i) => (
+                    <div key={i} className={`text-xs ${theme.text}`}>{w.start}–{w.end} · фон {w.score}%</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-xl border ${theme.card} p-4`}>
+            <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Интерактивный график недели (по дням и часам)</h4>
+            <div className="space-y-2">
+              {weekData.map((d, di) => (
+                <button key={d.date} onClick={() => setSelectedWeekDay(di)}
+                  className={`w-full text-left p-2 rounded border ${selectedWeekDay === di ? theme.tabActive : theme.tabInactive}`}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{d.label}</span>
+                    <span>средний индекс {d.avg}%</span>
+                  </div>
+                  <div className="mt-1 grid grid-cols-24 gap-[2px]">
+                    {d.hours.map((h) => (
+                      <div key={h.hour} title={`${String(h.hour).padStart(2, '0')}:00 — ${h.score}%`}
+                        className="h-2 rounded"
+                        style={{ background: `rgba(251,191,36,${0.15 + h.score / 140})` }} />
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3">
+              <p className={`text-xs ${theme.accent} mb-1`}>Выбранный день: {weekData[selectedWeekDay]?.label}</p>
+              <div className="grid grid-cols-12 md:grid-cols-24 gap-1">
+                {currentDayHours.map(h => (
+                  <div key={h.hour} className="flex flex-col items-center">
+                    <div className="w-full rounded-t" style={{ height: `${Math.max(8, Math.round(h.score * 0.6))}px`, background: 'rgba(56,189,248,0.55)' }} />
+                    <span className={`text-[9px] ${theme.text} opacity-70`}>{h.hour}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {(mode === 'quarter' || mode === 'year') && (
+        <div className={`rounded-xl border ${theme.card} p-4`}>
+          <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Стратегическая сводка</h4>
+          <p className={`text-sm ${theme.text} leading-relaxed`}>
+            {mode === 'quarter'
+              ? 'Квартал лучше проживать спринтами по 2-3 недели: запуск, фиксация результатов, пересборка процессов. Наиболее сильная стратегия — убирать лишнее, усиливать работающие связки и еженедельно пересматривать нагрузку.'
+              : 'Годовой цикл: первые месяцы — настройка фундамента, середина — масштабирование, финальная часть — консолидация и переоценка долгосрочных решений. Подход «меньше хаоса, больше системы» даст максимальную отдачу.'}
+          </p>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={`rounded-lg border ${theme.card} p-3`}>
+              <p className={`text-xs ${theme.accent} mb-1`}>Что делать</p>
+              <p className={`text-xs ${theme.text}`}>Планирование блоками, приоритизация 2-3 ключевых целей, регулярная ревизия календаря и ресурсного баланса.</p>
+            </div>
+            <div className={`rounded-lg border ${theme.card} p-3`}>
+              <p className={`text-xs ${theme.accent} mb-1`}>Что отложить</p>
+              <p className={`text-xs ${theme.text}`}>Импульсивные решения без данных, перегрузку параллельными задачами, неструктурированные финансовые риски.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!!summary?.periods && mode === 'day' && (
+        <div className={`rounded-xl border ${theme.card} p-4`}>
+          <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Серверная интерпретация дня</h4>
+          <p className={`text-sm ${theme.text} leading-relaxed`}>
+            {String(((summary.periods as Record<string, unknown>).day as Record<string, unknown>)?.interpretation ?? '')}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface ClientPortalProps {
   initialParams?: URLSearchParams;
@@ -1685,7 +1913,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'predictive'|'synastry'|'relocation'|'interpretation'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'>('natal');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1703,12 +1931,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     setIsExporting(true);
     const savedTab = activeTab;
     const titles: Record<string, string> = {
-      natal: tr.natalChart, predictive: tr.predictive, synastry: tr.synastry,
+      natal: tr.natalChart, astrosummary: 'Астросводка', predictive: tr.predictive, synastry: tr.synastry,
       relocation: tr.relocation, interpretation: tr.interpretation,
     };
     try {
       await downloadTabsPDF(
-        (['natal', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
+        (['natal', 'astrosummary', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
           k => ({ id: `pdf-section-${k}`, title: titles[k] }),
         ),
         async (id) => {
@@ -1727,6 +1955,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
   const tabs = [
     { key: 'natal',          icon: Star,      label: tr.natalChart },
+    { key: 'astrosummary',   icon: Sun,       label: 'Астросводка' },
     { key: 'predictive',     icon: Clock,     label: tr.predictive },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
@@ -1835,6 +2064,10 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
                 </div>
             }
+          </div>
+
+          <div id="pdf-section-astrosummary" className={activeTab === 'astrosummary' ? 'block' : 'hidden'}>
+            <AstroSummaryBlock theme={theme} />
           </div>
 
           <div id="pdf-section-synastry" className={activeTab === 'synastry' ? 'block' : 'hidden'}>
