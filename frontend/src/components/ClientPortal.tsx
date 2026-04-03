@@ -1310,13 +1310,8 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
               </div>
 
               {/* Selected sphere detail */}
-              <AnimatePresence mode="wait">
               {selectedSS && (
-                <motion.div
-                  key={selectedSS.sphere.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
+                <div
                   className={`rounded-xl border ${theme.card} p-5 space-y-5`}
                 >
                   <div className="flex items-start gap-3">
@@ -1393,9 +1388,8 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                       ))}
                     </div>
                   </div>
-                </motion.div>
+                </div>
               )}
-              </AnimatePresence>
             </div>
           )}
 
@@ -1618,14 +1612,12 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                     </div>
 
                     {/* Selected sphere forecast */}
-                    <AnimatePresence mode="wait">
                     {forecastSphere && (() => {
                       const sf = forecast.sphereForecasts.find(s => s.sphereId === forecastSphere);
                       const ss = sphereScores.find(s => s.sphere.id === forecastSphere);
                       if (!sf || !ss) return null;
                       return (
-                        <motion.div key={forecastSphere} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="space-y-4">
+                        <div className="space-y-4">
                           {/* Best dates */}
                           {sf.bestDates.length > 0 && (
                             <div>
@@ -1716,10 +1708,9 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                               ))}
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       );
                     })()}
-                    </AnimatePresence>
 
                     {!forecastSphere && (
                       <p className={`text-xs ${theme.text} opacity-50 text-center py-4`}>
