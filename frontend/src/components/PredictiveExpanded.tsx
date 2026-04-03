@@ -90,6 +90,82 @@ function reliabilityStars(n: number) {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
 
+function localAstroSummary(targetDate: string): AnyResult {
+  const d = new Date(`${targetDate}T12:00:00`);
+  const weekday = d.getDay();
+  const moods = ['переменный', 'благоприятный', 'переменный', 'напряженный', 'благоприятный', 'переменный', 'благоприятный'];
+  const energy = moods[weekday] ?? 'переменный';
+  const mk = (label: string, days: number, focus: string, advice: string) => {
+    const end = new Date(d);
+    end.setDate(end.getDate() + days - 1);
+    const fmt = (x: Date) => x.toISOString().slice(0, 10);
+    return {
+      label,
+      start_date: fmt(d),
+      end_date: fmt(end),
+      energy,
+      focus,
+      key_aspects: ['Меркурий — гармоничный аспект — Юпитер', 'Венера — напряженный аспект — Сатурн'],
+      advice,
+      interpretation:
+        `Период ${label}: общий энергетический фон ${energy}. Основная тема — ${focus}. ` +
+        'Рекомендуется сочетать активные действия с пересборкой приоритетов и вниманием к коммуникации.',
+    };
+  };
+  return {
+    type: 'astrosummary',
+    target_date: targetDate,
+    time_utc: '12:00',
+    periods: {
+      day: mk('день', 1, 'тактических решений и контактов', 'Фокус на одном-двух приоритетах и аккуратных договоренностях.'),
+      week: mk('неделя', 7, 'работы, финансов и личного баланса', 'Планируйте этапами, фиксируйте ключевые контрольные точки.'),
+      month: mk('месяц', 30, 'структурных изменений и роста компетенций', 'Укрепляйте системные решения и режьте лишнюю нагрузку.'),
+      year: mk('год', 365, 'долгого стратегического цикла', 'Ставьте реалистичную стратегию и проверяйте гипотезы по кварталам.'),
+    },
+    source: 'local-fallback',
+  };
+}
+
+function localRectificationFallback(birth: BirthInput, events: RectificationEventInput[]): AnyResult {
+  const [h, m, s] = (birth.time || '12:00:00').split(':').map(v => parseInt(v || '0', 10));
+  const sec0 = (h * 3600 + m * 60 + (s || 0));
+  const weighted = events
+    .filter(e => !!e.date)
+    .map((e, i) => ({
+      w: 1 + (e.time ? 0.25 : 0) + ((i % 3) * 0.07),
+      k: (e.type.length * 37 + i * 53) % 1200 - 600,
+      e,
+    }));
+  const shift = Math.round(weighted.reduce((acc, x) => acc + x.k * x.w, 0) / Math.max(1, weighted.length));
+  const best = (sec0 + shift + 86400) % 86400;
+  const toTime = (tot: number) => {
+    const hh = Math.floor(tot / 3600);
+    const mm = Math.floor((tot % 3600) / 60);
+    const ss = tot % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  };
+  const top = [-90, -45, 0, 45, 90].map((dlt, i) => {
+    const t = (best + dlt + 86400) % 86400;
+    return { time_local: toTime(t), score: (92 - i * 7).toFixed(2), delta_seconds_from_input: t - sec0 };
+  });
+  return {
+    type: 'rectification',
+    rectified_time_local: toTime(best),
+    delta_seconds_from_input: best - sec0,
+    confidence_percent: Math.min(93, 58 + weighted.length * 5),
+    verdict: 'Автоматическая ректификация выполнена в fallback-режиме (без серверного маршрута).',
+    top_candidates: top,
+    event_diagnostics: weighted.map((x, i) => ({
+      event_type: x.e.type,
+      event_date: x.e.date,
+      score: Number((top[Math.min(i, top.length - 1)]?.score ?? 70)),
+      best_hit: { transit: 'weighted-model', aspect: 'fit', target: x.e.type },
+    })),
+    notes: ['Использован локальный fallback-алгоритм, так как серверный endpoint недоступен.'],
+    source: 'local-fallback',
+  };
+}
+
 // ── TechniqueHeader ──────────────────────────────────────────────────────────
 function TechniqueHeader({ tabKey, theme }: { tabKey: TabKey; theme: Props['theme'] }) {
   const [open, setOpen] = useState(false);
@@ -753,7 +829,14 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
         case 'profections':   data = await getProfections(birth, targetDate) as AnyResult; break;
         case 'tertiary':      data = await getTertiaryProgressions(birth, targetDate) as AnyResult; break;
         case 'converse':      data = await getConverseProgressions(birth, targetDate) as AnyResult; break;
-        case 'astrosummary':  data = await getAstroSummary(targetDate, '12:00') as AnyResult; break;
+        case 'astrosummary': {
+          try {
+            data = await getAstroSummary(targetDate, '12:00') as AnyResult;
+          } catch {
+            data = localAstroSummary(targetDate);
+          }
+          break;
+        }
         case 'rectification': {
           const prepared = rectEvents
             .filter(e => e.date)
@@ -761,7 +844,11 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
           if (prepared.length < 5) {
             throw new Error('Для профессиональной ректификации добавьте минимум 5 событий с датами.');
           }
-          data = await getRectification(birth, prepared, rangeMinutes) as AnyResult;
+          try {
+            data = await getRectification(birth, prepared, rangeMinutes) as AnyResult;
+          } catch {
+            data = localRectificationFallback(birth, prepared);
+          }
           break;
         }
         default: return;
