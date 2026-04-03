@@ -10,6 +10,8 @@ from typing import Optional, List, Dict, Any
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
     from pydantic import BaseModel, field_validator
 except ImportError:
     sys.exit("pip install fastapi uvicorn pydantic")
@@ -41,6 +43,11 @@ except Exception:
 # APP
 # ═════════════════════════════════════════════════════════════════════════════
 app = FastAPI(title="HOLO Astrology API", version="2.0")
+
+BASE_DIR = os.path.dirname(__file__)
+FRONTEND_DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
+FRONTEND_INDEX_FILE = os.path.join(FRONTEND_DIST_DIR, "index.html")
+HAS_FRONTEND_BUILD = os.path.exists(FRONTEND_INDEX_FILE)
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,6 +207,8 @@ class PerfectionsRequest(BaseModel):
 
 @app.get("/")
 def root():
+    if HAS_FRONTEND_BUILD:
+        return FileResponse(FRONTEND_INDEX_FILE)
     return {"status": "HOLO Astrology API v2.0", "docs": "/docs"}
 
 
@@ -578,6 +587,19 @@ def get_timezone(lat: float, lon: float):
         return {"timezone": tz_name, "utc_offset": offset}
     except Exception:
         return {"timezone": "UTC", "utc_offset": 0.0}
+
+
+if HAS_FRONTEND_BUILD:
+    assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        requested_path = os.path.join(FRONTEND_DIST_DIR, full_path)
+        if full_path and os.path.isfile(requested_path):
+            return FileResponse(requested_path)
+        return FileResponse(FRONTEND_INDEX_FILE)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
