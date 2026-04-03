@@ -6,6 +6,26 @@ import type { NatalChart, SynastryResult, BirthInput } from '../types/astro';
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 6000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getTimezoneApiCandidates(): string[] {
+  const out: string[] = [];
+  if (API_URL) out.push(API_URL.replace(/\/$/, ''));
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const sameOrigin = window.location.origin.replace(/\/$/, '');
+    if (!out.includes(sameOrigin)) out.push(sameOrigin);
+  }
+  return out;
+}
+
 async function post<T>(endpoint: string, body: object): Promise<T> {
   const res = await fetch(`${API_URL}${endpoint}`, {
     method: 'POST',
@@ -227,13 +247,21 @@ export async function geocodeCity(cityName: string): Promise<{
 
   // Resolve UTC offset via our own backend (no CORS issues)
   let utc = 0;
-  try {
-    const tzRes = await fetch(`${API_URL}/timezone?lat=${lat}&lon=${lon}`);
-    if (tzRes.ok) {
+  const timezoneApis = getTimezoneApiCandidates();
+  for (const baseUrl of timezoneApis) {
+    try {
+      const tzRes = await fetchJsonWithTimeout(`${baseUrl}/timezone?lat=${lat}&lon=${lon}`);
+      if (!tzRes.ok) continue;
       const tzData = await tzRes.json();
-      utc = typeof tzData.utc_offset === 'number' ? tzData.utc_offset : 0;
+      const parsed = Number(tzData.utc_offset);
+      if (Number.isFinite(parsed)) {
+        utc = parsed;
+        break;
+      }
+    } catch {
+      // Try next candidate URL.
     }
-  } catch { /* fall back to 0 */ }
+  }
 
   return {
     lat: Math.round(lat * 10000) / 10000,
