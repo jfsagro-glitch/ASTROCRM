@@ -175,7 +175,7 @@ export default function HumanDesignBlock({
             </div>
           </div>
           <button
-            onClick={calculate}
+            onClick={() => calculate()}
             disabled={loading}
             className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all ${theme.btn}`}
           >
