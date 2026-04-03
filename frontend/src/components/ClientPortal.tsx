@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,
   AlertCircle, Loader2, Search, BookOpen, ChevronRight, Lightbulb,
+  LogOut, UserCircle, Trash2,
 } from 'lucide-react';
 import {
   scoreSpheres, getPairInterp, getAspectCategory, getAspectInterpText,
@@ -32,6 +33,9 @@ import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
 import { downloadTabsPDF } from '../lib/pdfUtils';
 import { useLang } from '../i18n/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import type { SavedPerson } from '../services/peopleService';
+import { subscribePeople, addPerson, deletePerson } from '../services/peopleService';
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const chartThemes = {
@@ -140,19 +144,89 @@ function CityField({
 
 // ─── Birth Form ───────────────────────────────────────────────────────────────
 function BirthForm({
-  value, onChange, label, theme,
+  value, onChange, label, theme, people, onSave, onDelete,
 }: {
   value: BirthInput & { name?: string };
   onChange: (v: BirthInput & { name?: string }) => void;
   label: string;
   theme: typeof chartThemes[ThemeKey];
+  people?: SavedPerson[];
+  onSave?: (p: Omit<SavedPerson, 'id'>) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
 }) {
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (!value.name || !onSave) return;
+    setSaveLoading(true); setSaveMsg(null);
+    try {
+      await onSave({ name: value.name, date: value.date, time: value.time, lat: value.lat, lon: value.lon, utc: value.utc });
+      setSaveMsg('Профиль сохранён ✓');
+      setTimeout(() => setSaveMsg(null), 2500);
+    } catch { setSaveMsg('Ошибка сохранения'); }
+    finally { setSaveLoading(false); }
+  }, [value, onSave]);
   const { tr } = useLang();
   const inp = `w-full px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`;
 
   return (
     <div className={`p-4 rounded-xl border ${theme.card} space-y-3`}>
-      <h3 className={`font-semibold text-sm ${theme.header}`}>{label}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className={`font-semibold text-sm ${theme.header}`}>{label}</h3>
+        {onSave && (
+          <div className="flex items-center gap-2">
+            {saveMsg && <span className={`text-xs ${saveMsg.includes('✓') ? 'text-green-400' : 'text-red-400'}`}>{saveMsg}</span>}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saveLoading || !value.name}
+              className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border transition-colors ${theme.tabInactive} disabled:opacity-40`}
+              title="Сохранить текущий профиль в списке"
+            >
+              💾 {saveLoading ? '…' : 'Сохранить'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* People picker — only if saved profiles exist */}
+      {people && people.length > 0 && (
+        <div className="space-y-1">
+          <label className={`text-xs ${theme.text} block`}>Загрузить сохранённый профиль</label>
+          <div className="flex gap-2">
+            <select
+              defaultValue=""
+              key={people.map(p => p.id).join()}
+              onChange={e => {
+                const p = people.find(x => x.id === e.target.value);
+                if (p) onChange({ name: p.name, date: p.date, time: p.time, lat: p.lat, lon: p.lon, utc: p.utc });
+              }}
+              className={`flex-1 px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+            >
+              <option value="">— выбрать профиль —</option>
+              {people.map(p => (
+                <option key={p.id} value={p.id}>{p.name}{p.location ? ` · ${p.location}` : ''}</option>
+              ))}
+            </select>
+            {onDelete && (
+              <button
+                type="button"
+                title="Удалить выбранный профиль"
+                onClick={() => {
+                  // Find selected id from select element
+                  const sel = document.querySelector(`select[data-people-id]`) as HTMLSelectElement | null;
+                  const id = sel?.value;
+                  if (id) onDelete(id);
+                }}
+                className={`px-2.5 py-2 rounded-lg border text-xs transition-colors text-red-400 border-red-400/30 hover:border-red-400/60`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Row 1: Name + Date picker */}
       <div className="grid grid-cols-2 gap-2">
@@ -820,7 +894,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
 // ─── Synastry Panel ───────────────────────────────────────────────────────────
 type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'composite'|'davison';
 
-function SynastryPanel({ birth, theme }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey] }) {
+function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey]; people?: SavedPerson[] }) {
   const { tr } = useLang();
   const pname = (k: string) => tr.planets[k] ?? k;
   const [tab, setTab] = useState<SynTab>('compat');
@@ -889,7 +963,7 @@ function SynastryPanel({ birth, theme }: { birth: BirthInput; theme: typeof char
   return (
     <div className="space-y-4">
       {/* Partner form */}
-      <BirthForm value={partner} onChange={setPartner} label={tr.partnerData} theme={theme} />
+      <BirthForm value={partner} onChange={setPartner} label={tr.partnerData} theme={theme} people={people} />
       <button onClick={run} disabled={loading}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${theme.btn}`}>
         {loading ? <><Spin />Рассчитываю все карты…</> : '✨ Рассчитать синастрию'}
@@ -1905,6 +1979,24 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   const [themeKey, setThemeKey] = useState<ThemeKey>('cosmic');
   const theme = chartThemes[themeKey];
 
+  // ─── Auth & people list ───────────────────────────────────────────────────
+  const { user, signOut: authSignOut, configured } = useAuth();
+  const [people, setPeople] = useState<SavedPerson[]>([]);
+  useEffect(() => {
+    if (!user || !configured) return;
+    return subscribePeople(user.uid, setPeople);
+  }, [user, configured]);
+
+  const handleSavePerson = useCallback(async (p: Omit<SavedPerson, 'id'>) => {
+    if (!user) return;
+    await addPerson(user.uid, p);
+  }, [user]);
+
+  const handleDeletePerson = useCallback(async (id: string) => {
+    if (!user) return;
+    await deletePerson(user.uid, id);
+  }, [user]);
+
   const [birth, setBirth] = useState<BirthInput & { name?: string }>(() => ({
     name:  initialParams?.get('name') || '',
     date:  initialParams?.get('date') || '',
@@ -1991,12 +2083,35 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             <Link to="/crm" className={`text-sm ${theme.accent} hover:underline`}>
               {tr.crmLink}
             </Link>
+            {/* User menu */}
+            {configured && user && (
+              <div className="flex items-center gap-2 pl-2 border-l" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                <UserCircle className={`h-4 w-4 ${theme.text} opacity-50`} />
+                <span className={`text-xs ${theme.text} opacity-60 max-w-[120px] truncate hidden sm:block`}>{user.email}</span>
+                <button
+                  onClick={authSignOut}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs border transition-colors ${theme.tabInactive}`}
+                  title="Выйти"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Выйти</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <BirthForm value={birth} onChange={setBirth} label={tr.birthData} theme={theme} />
+        <BirthForm
+          value={birth}
+          onChange={setBirth}
+          label={tr.birthData}
+          theme={theme}
+          people={people}
+          onSave={user ? handleSavePerson : undefined}
+          onDelete={user ? handleDeletePerson : undefined}
+        />
 
         <div className="flex gap-3 flex-wrap">
           <button onClick={calcNatal} disabled={loading}
@@ -2072,7 +2187,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
           <div id="pdf-section-synastry" className={activeTab === 'synastry' ? 'block' : 'hidden'}>
             {natalChart
-              ? <SynastryPanel birth={birth} theme={theme} />
+              ? <SynastryPanel birth={birth} theme={theme} people={people} />
               : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>

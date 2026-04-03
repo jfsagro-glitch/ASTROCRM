@@ -1,5 +1,8 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, Auth } from 'firebase/auth';
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, Auth,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+} from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
@@ -29,5 +32,7 @@ export const db   = _db!;
 export const auth = _auth!;
 export const googleProvider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => _auth ? signInWithPopup(_auth, googleProvider) : Promise.reject('Firebase not configured');
-export const logout          = () => _auth ? signOut(_auth) : Promise.resolve();
+export const loginWithGoogle  = () => _auth ? signInWithPopup(_auth, googleProvider) : Promise.reject('Firebase not configured');
+export const logout           = () => _auth ? signOut(_auth) : Promise.resolve();
+export const loginWithEmail   = (email: string, pw: string) => _auth ? signInWithEmailAndPassword(_auth, email, pw) : Promise.reject('Firebase not configured');
+export const registerWithEmail = (email: string, pw: string) => _auth ? createUserWithEmailAndPassword(_auth, email, pw) : Promise.reject('Firebase not configured');
