@@ -33,6 +33,7 @@ from astro_synastry import (
 from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
+from human_design_engine import calc_human_design
 try:
     import astro_se as _se_module
 except Exception:
@@ -230,6 +231,17 @@ def natal(req: BirthData):
             include_dispositors=True,
         )
         return _safe(chart)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/human-design")
+def human_design(req: BirthData):
+    """Professional Human Design calculation block kept separate from astrology tabs."""
+    try:
+        return _safe(calc_human_design(req.date, req.time, req.lat, req.lon, req.utc))
     except HTTPException:
         raise
     except Exception as e:

@@ -20,6 +20,7 @@ import type { RelationshipForecast } from '../data/forecastData';
 import { Link } from 'react-router-dom';
 
 import ChartWheel from './ChartWheel';
+import HumanDesignBlock from './HumanDesignBlock';
 import SynastryForecast from './SynastryForecast';
 import PredictiveExpanded from './PredictiveExpanded';
 import InterpretationPanel from './InterpretationPanel';
@@ -1987,7 +1988,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'>('natal');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2005,12 +2006,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     setIsExporting(true);
     const savedTab = activeTab;
     const titles: Record<string, string> = {
-      natal: tr.natalChart, astrosummary: 'Астросводка', predictive: tr.predictive, synastry: tr.synastry,
+      natal: tr.natalChart, 'human-design': 'Human Design', astrosummary: 'Астросводка', predictive: tr.predictive, synastry: tr.synastry,
       relocation: tr.relocation, interpretation: tr.interpretation,
     };
     try {
       await downloadTabsPDF(
-        (['natal', 'astrosummary', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
+        (['natal', 'human-design', 'astrosummary', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
           k => ({ id: `pdf-section-${k}`, title: titles[k] }),
         ),
         async (id) => {
@@ -2027,8 +2028,27 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     }
   }, [activeTab, birth.name, tr]);
 
+  const handleExportHumanDesign = useCallback(async () => {
+    setIsExporting(true);
+    const savedTab = activeTab;
+    try {
+      await downloadTabsPDF(
+        [{ id: 'pdf-section-human-design', title: 'Human Design' }],
+        async () => {
+          setActiveTab('human-design');
+          await new Promise(r => setTimeout(r, 220));
+        },
+        `${birth.name ? birth.name.replace(/\s+/g, '-') : 'holo'}-human-design.pdf`,
+      );
+    } finally {
+      setIsExporting(false);
+      setActiveTab(savedTab);
+    }
+  }, [activeTab, birth.name]);
+
   const tabs = [
     { key: 'natal',          icon: Star,      label: tr.natalChart },
+    { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'astrosummary',   icon: Sun,       label: 'Астросводка' },
     { key: 'predictive',     icon: Clock,     label: tr.predictive },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
@@ -2108,6 +2128,14 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 : <><Download className="h-4 w-4 inline mr-1.5" />{tr.exportPdf}</>}
             </button>
           )}
+          {activeTab === 'human-design' && (
+            <button onClick={handleExportHumanDesign} disabled={isExporting}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
+              {isExporting
+                ? <><Spin />PDF Human Design…</>
+                : <><Download className="h-4 w-4 inline mr-1.5" />PDF Human Design</>}
+            </button>
+          )}
         </div>
 
         {error && <Err msg={error} />}
@@ -2151,6 +2179,10 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
               </div>
             )}
+          </div>
+
+          <div id="pdf-section-human-design" className={activeTab === 'human-design' ? 'block' : 'hidden'}>
+            <HumanDesignBlock birth={birth} theme={theme} />
           </div>
 
           <div id="pdf-section-predictive" className={activeTab === 'predictive' ? 'block' : 'hidden'}>
