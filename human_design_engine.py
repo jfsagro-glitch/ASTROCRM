@@ -661,29 +661,41 @@ def _person_summary(overview: Dict[str, Any], centers: List[Dict[str, Any]], cha
     top_gates = gates[:5]
 
     identity = (
-        f"Type {overview['type']} with profile {overview['profile_name']} and {overview['definition']}. "
-        f"Core stable circuitry: {', '.join(defined) if defined else 'none'}; adaptive openness: {', '.join(open_centers) if open_centers else 'none'}."
+        f"Ваш базовый тип: {overview['type']}. Профиль: {overview['profile_name']}. Формат определения: {overview['definition']}. "
+        f"Стабильные центры (ваша опора): {', '.join(defined) if defined else 'нет ярко фиксированных центров'}. "
+        f"Открытые центры (где вы считываете других): {', '.join(open_centers) if open_centers else 'минимально выражены'}. "
+        "Просто: вы лучше всего раскрываетесь, когда опираетесь на свою стратегию и не принимаете чужое давление за свой внутренний голос."
     )
     decision = (
-        f"Primary strategy is '{overview['strategy']}'. Authority is {overview['authority']}: {overview['authority_description']} "
-        f"Key operational marker: signature '{overview['signature']}', not-self marker '{overview['not_self']}'."
+        f"Главная стратегия: {overview['strategy']}. Ваш внутренний авторитет: {overview['authority']}. "
+        f"Как это работает: {overview['authority_description']} "
+        f"Маркер верного курса: состояние «{overview['signature']}». "
+        f"Маркер сбоя: состояние «{overview['not_self']}». "
+        "Что делать: перед важным решением дайте себе паузу, проверьте сигнал тела и только потом действуйте."
     )
     strengths = (
-        "Top deterministic competencies are carried by channels: "
-        + (", ".join(f"{c['label']} {c['name']}" for c in top_channels) if top_channels else "none")
-        + ". Dominant gate themes: "
-        + (", ".join(f"{g['gate']} {g['name']}" for g in top_gates) if top_gates else "none")
-        + "."
+        "Ваши самые сильные, устойчивые качества идут через каналы: "
+        + (", ".join(f"{c['label']} {c['name']}" for c in top_channels) if top_channels else "данных пока недостаточно")
+        + ". "
+        + "Ключевые темы ворот сейчас: "
+        + (", ".join(f"{g['gate']} {g['name']}" for g in top_gates) if top_gates else "пока не выделены")
+        + ". "
+        + "Просто: именно в этих темах у вас легче всего получаются результаты и стабильный прогресс."
     )
     risks = (
-        "Primary risk pattern is de-alignment from strategy/authority under external pressure, especially through open centers: "
-        + (", ".join(open_centers) if open_centers else "minimal open-center distortion")
-        + ". Corrective action is pacing decisions and validating body signal before commitment."
+        "Главный риск: принимать решения под внешним давлением и уходить с собственной стратегии. "
+        "Чаще всего это проявляется через открытые центры: "
+        + (", ".join(open_centers) if open_centers else "существенных зон перегруза мало")
+        + ". "
+        + "Что это значит: в стрессе можно торопиться, обещать лишнее и уставать быстрее, чем нужно. "
+        + "Что делать: уменьшайте темп, проверяйте внутренний отклик и подтверждайте обязательства только после ясности."
     )
     recommendations = (
-        "1) Decide only via authority protocol, 2) Track weekly energy quality vs signature/not-self states, "
-        "3) Prioritize environments and collaborations that support defined-center strengths, "
-        "4) Build monthly review of recurring gate/channel themes in behavior and outcomes."
+        "1) Принимайте ключевые решения только через ваш авторитет. "
+        "2) Раз в неделю отмечайте: где было состояние «подписи», а где включалось «не-свое». "
+        "3) Выбирайте окружение и задачи, где востребованы ваши сильные центры и каналы. "
+        "4) Раз в месяц делайте обзор: какие темы ворот повторялись, что дало лучший результат, что стоит убрать. "
+        "5) В кризисных периодах сначала стабилизируйте режим (сон, питание, нагрузка), потом принимайте решения."
     )
     return {
         "identity": identity,

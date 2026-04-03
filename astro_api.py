@@ -107,6 +107,75 @@ def _safe(data: Any) -> Any:
     return data
 
 
+_INTERP_KEY_TOKENS = (
+    "interpret", "summary", "advice", "description", "meaning",
+    "recommend", "risk", "strength", "challenge", "dharma",
+    "career", "health", "relationship", "focus", "guidance",
+)
+
+
+def _to_plain_ru(text: str) -> str:
+    raw = re.sub(r"\s+", " ", text or "").strip()
+    if not raw:
+        return raw
+    if len(raw) < 120 or "Просто:" in raw:
+        return raw
+
+    replacements = {
+        "акцентирует": "подсвечивает",
+        "детерминирован": "устойчив",
+        "дез-алайнмент": "сбивка с курса",
+        "коррективное действие": "практический шаг",
+        "масштабирование": "расширение",
+        "итерациями": "небольшими шагами",
+        "самореализация": "раскрытие себя",
+        "дхарма": "жизненная задача",
+    }
+    simple = raw
+    for src, dst in replacements.items():
+        simple = simple.replace(src, dst)
+
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", simple) if p.strip()]
+    if not parts:
+        return simple
+    core = parts[0]
+    detail = parts[1] if len(parts) > 1 else parts[0]
+    action = parts[2] if len(parts) > 2 else "Действуйте спокойно, по шагам, и фиксируйте договоренности."
+    return f"{simple}\n\nПросто: {core}\nЧто это значит: {detail}\nЧто делать: {action}"
+
+
+def _simplify_interpretation_payload(data: Any, parent_key: str = "") -> Any:
+    if isinstance(data, dict):
+        return {k: _simplify_interpretation_payload(v, k) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_simplify_interpretation_payload(v, parent_key) for v in data]
+    if isinstance(data, str):
+        key = (parent_key or "").lower()
+        if any(tok in key for tok in _INTERP_KEY_TOKENS):
+            return _to_plain_ru(data)
+    return data
+
+
+def _present(data: Any) -> Any:
+    """Return safe JSON with plain-language interpretation fields."""
+    return _safe(_simplify_interpretation_payload(data))
+
+
+def _file_response_with_cache(path: str, cache_control: str) -> FileResponse:
+    response = FileResponse(path)
+    response.headers["Cache-Control"] = cache_control
+    return response
+
+
+class FrontendAssetsStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            # Hashed Vite assets are content-addressed and safe for long-lived caching.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # MODELS
 # ═════════════════════════════════════════════════════════════════════════════
@@ -234,7 +303,7 @@ def jyotish(req: BirthData):
         raise HTTPException(503, "Jyotish engine not available")
     try:
         result = _calc_jyotish(req.date, req.time, req.lat, req.lon, req.utc)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -258,7 +327,7 @@ def natal(req: BirthData):
             include_fixed_stars=True, include_sect=True,
             include_dispositors=True,
         )
-        return _safe(chart)
+        return _present(chart)
     except HTTPException:
         raise
     except Exception as e:
@@ -272,7 +341,7 @@ def human_design(
 ):
     """Professional Human Design bodygraph calculation (§11.1)."""
     try:
-        return _safe(calc_human_design(
+        return _present(calc_human_design(
             req.date, req.time, req.lat, req.lon, req.utc,
             timezone_name=req.timezone_name,
             mode=mode,
@@ -336,7 +405,7 @@ def human_design_transits(
         natal_hanging_partners = {hg["partner_gate"] for hg in natal.get("hanging_gates", []) if hg.get("partner_gate")}
         resonant = [act for act in transit_activations if act["gate"] in natal_hanging_partners]
 
-        return _safe({
+        return _present({
             "natal_summary": {
                 "type": natal["overview"]["type"],
                 "authority": natal["overview"]["authority"],
@@ -442,7 +511,7 @@ def human_design_synastry(
                     "direction": "B_hanging_completed_by_A",
                 })
 
-        return _safe({
+        return _present({
             "person_a": {"type": a["overview"]["type"], "authority": a["overview"]["authority"], "profile": a["overview"]["profile"]},
             "person_b": {"type": b["overview"]["type"], "authority": b["overview"]["authority"], "profile": b["overview"]["profile"]},
             "electromagnetic": electromagnetic,
@@ -515,7 +584,7 @@ def calc_transits(req: PredictiveRequest):
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = transits(natal_jd, req.target_date, req.target_time or "12:00",
                           lat=req.lat, lon=req.lon)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -535,7 +604,7 @@ def calc_ephemerides(req: EphemeridesRequest):
 @app.post("/predictive/astrosummary")
 def calc_astrosummary(req: AstroSummaryRequest):
     try:
-        return _safe(astro_summary(req.target_date, req.time_utc or "12:00"))
+        return _present(astro_summary(req.target_date, req.time_utc or "12:00"))
     except HTTPException:
         raise
     except Exception as e:
@@ -569,7 +638,7 @@ def calc_secondary(req: PredictiveRequest):
         result = secondary_progressions(natal_jd, req.lat, req.lon,
                                         req.target_date,
                                         houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -582,7 +651,7 @@ def calc_solar_arc(req: PredictiveRequest):
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = solar_arc(natal_jd, req.lat, req.lon, req.target_date,
                            houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -596,7 +665,7 @@ def calc_tertiary(req: PredictiveRequest):
         result = tertiary_progressions(natal_jd, req.target_date,
                                        req.lat, req.lon,
                                        houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -610,7 +679,7 @@ def calc_converse(req: PredictiveRequest):
         result = converse_progressions(natal_jd, req.target_date,
                                        req.lat, req.lon,
                                        houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -626,7 +695,7 @@ def calc_solar_return(req: PredictiveRequest):
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = solar_return(natal_jd, yr, obs_lat, obs_lon,
                               houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -641,7 +710,7 @@ def calc_lunar_return(req: PredictiveRequest):
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = lunar_return(natal_jd, req.target_date, obs_lat, obs_lon,
                               houses_system=req.houses)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -655,7 +724,7 @@ def calc_profections(req: PredictiveRequest):
         result = profections(natal_jd, req.target_date,
                              houses_system=req.houses,
                              lat=req.lat, lon=req.lon)
-        return _safe(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -730,7 +799,7 @@ def calc_synastry_aspects(req: PersonPair):
                         houses_system=req.houses)
         aspects = synastry_aspects(c1, c2)
         score   = synastry_score(aspects)
-        return _safe({"chart1": c1, "chart2": c2, "aspects": aspects, "score": score})
+        return _present({"chart1": c1, "chart2": c2, "aspects": aspects, "score": score})
     except HTTPException:
         raise
     except Exception as e:
@@ -864,14 +933,15 @@ def get_timezone(lat: float, lon: float):
 if HAS_FRONTEND_BUILD:
     assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
     if os.path.isdir(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+        app.mount("/assets", FrontendAssetsStaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/{full_path:path}")
     def spa_fallback(full_path: str):
         requested_path = os.path.join(FRONTEND_DIST_DIR, full_path)
         if full_path and os.path.isfile(requested_path):
-            return FileResponse(requested_path)
-        return FileResponse(FRONTEND_INDEX_FILE)
+            return _file_response_with_cache(requested_path, "public, max-age=3600")
+        # Always revalidate index.html so clients pick up the latest asset hashes.
+        return _file_response_with_cache(FRONTEND_INDEX_FILE, "no-cache, no-store, must-revalidate")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
