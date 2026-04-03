@@ -388,6 +388,8 @@ CHANNEL_ENCYCLOPEDIA: Dict[str, str] = {
 # Optional JSON data layer: if registry files exist, they override in-code defaults.
 _REGISTRY_DIR = Path(__file__).resolve().parent / "hd_registry"
 CROSS_CATALOG: List[Dict[str, Any]] = []
+_CROSS_REGISTRY_META: Dict[str, Any] = {}
+SUPPORTED_HD_MODES = {"reader", "analyst", "practitioner"}
 
 
 def _load_json_registry(filename: str) -> Any:
@@ -399,7 +401,7 @@ def _load_json_registry(filename: str) -> Any:
 
 
 def _load_catalogs_from_registry() -> None:
-    global START_DEG, GATE_ORDER, CENTER_DATA, GATE_DATA, CHANNEL_DATA, CROSS_CATALOG
+    global START_DEG, GATE_ORDER, CENTER_DATA, GATE_DATA, CHANNEL_DATA, CROSS_CATALOG, _CROSS_REGISTRY_META
 
     mandala = _load_json_registry("mandala_order.json")
     if mandala:
@@ -430,6 +432,7 @@ def _load_catalogs_from_registry() -> None:
 
     crosses = _load_json_registry("incarnation_crosses.json")
     if isinstance(crosses, dict):
+        _CROSS_REGISTRY_META = dict(crosses)
         items = crosses.get("items", [])
         if isinstance(items, list):
             CROSS_CATALOG = items
@@ -793,6 +796,41 @@ def _cross_from_catalog(p_sun: int, p_earth: int, d_sun: int, d_earth: int) -> O
     return None
 
 
+def _normalize_hd_mode(mode: Optional[str]) -> str:
+    normalized = (mode or "analyst").strip().lower()
+    return normalized if normalized in SUPPORTED_HD_MODES else "analyst"
+
+
+def _cross_primary_text(cross: Dict[str, Any], mode: str, profile_code: str) -> Dict[str, Any]:
+    selected_mode = _normalize_hd_mode(mode)
+    primary_key = {
+        "reader": "reader_mode_ru",
+        "analyst": "analyst_mode_ru",
+        "practitioner": "practitioner_mode_ru",
+    }[selected_mode]
+
+    profile_library = _CROSS_REGISTRY_META.get("ru_template_library", {}).get("profile_templates", {})
+    profile_context_ru = profile_library.get(profile_code)
+
+    primary_text = cross.get(primary_key)
+    if not primary_text:
+        primary_text = cross.get("interpretation_short_ru") or cross.get("description")
+
+    enriched = dict(cross)
+    enriched["primary_mode"] = selected_mode
+    enriched["primary_language"] = "ru"
+    enriched["primary_title"] = cross.get("cross_name_ru") or cross.get("name")
+    enriched["primary_text"] = primary_text
+    enriched["profile_context_ru"] = profile_context_ru
+    enriched["available_modes"] = sorted(SUPPORTED_HD_MODES)
+    return enriched
+
+
+def present_cross_catalog(mode: str = "analyst") -> List[Dict[str, Any]]:
+    selected_mode = _normalize_hd_mode(mode)
+    return [_cross_primary_text(item, selected_mode, str(item.get("profile_constraints") or "")) for item in CROSS_CATALOG]
+
+
 def _build_active_gates(personality: List[Dict[str, Any]], design: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     active: Dict[int, Dict[str, Any]] = {}
     for activation in personality + design:
@@ -1031,7 +1069,7 @@ def _profile(personality_sun: Dict[str, Any], design_sun: Dict[str, Any]) -> Dic
     }
 
 
-def _cross(personality_sun: Dict[str, Any], personality_earth: Dict[str, Any], design_sun: Dict[str, Any], design_earth: Dict[str, Any], profile_data: Dict[str, str]) -> Dict[str, Any]:
+def _cross(personality_sun: Dict[str, Any], personality_earth: Dict[str, Any], design_sun: Dict[str, Any], design_earth: Dict[str, Any], profile_data: Dict[str, str], mode: str = "analyst") -> Dict[str, Any]:
     angle = profile_data["angle"]
     cross_name = f"{angle} Cross of {personality_sun['name']} and {design_sun['name']}"
     gates = [
@@ -1053,15 +1091,31 @@ def _cross(personality_sun: Dict[str, Any], personality_earth: Dict[str, Any], d
         int(design_earth["gate"]),
     )
 
-    return {
+    result = {
         "name": catalog_match.get("cross_name", cross_name) if catalog_match else cross_name,
         "canonical_name": catalog_match.get("cross_name", cross_name) if catalog_match else cross_name,
+        "cross_name_ru": catalog_match.get("cross_name_ru") if catalog_match else None,
         "angle": catalog_match.get("angle_type", angle) if catalog_match else angle,
         "code": catalog_match.get("cross_code", "dynamic") if catalog_match else "dynamic",
         "gates": gates,
         "description": catalog_match.get("interpretation_short", description) if catalog_match else description,
         "catalog_match": bool(catalog_match),
     }
+    if catalog_match:
+        for key in (
+            "interpretation_short_ru",
+            "interpretation_long_ru",
+            "life_theme_ru",
+            "career_theme_ru",
+            "relationship_theme_ru",
+            "shadow_theme_ru",
+            "reader_mode_ru",
+            "analyst_mode_ru",
+            "practitioner_mode_ru",
+        ):
+            if key in catalog_match:
+                result[key] = catalog_match[key]
+    return _cross_primary_text(result, mode, profile_data["profile"])
 
 
 def calc_human_design(
@@ -1071,6 +1125,7 @@ def calc_human_design(
     lon: float,
     utc: float,
     timezone_name: Optional[str] = None,
+    mode: str = "analyst",
 ) -> Dict[str, Any]:
     """Calculate a full Human Design bodygraph.
 
@@ -1083,6 +1138,7 @@ def calc_human_design(
         timezone_name: IANA timezone string (e.g. "Europe/Chisinau").
             When supplied the UTC offset is derived precisely including DST.
     """
+    selected_mode = _normalize_hd_mode(mode)
     resolved_tz: Optional[str] = timezone_name
     timezone_trace: Dict[str, Any]
     if timezone_name:
@@ -1119,6 +1175,7 @@ def calc_human_design(
         personality_map["sun"], personality_map["earth"],
         design_map["sun"], design_map["earth"],
         profile_data,
+        selected_mode,
     )
     quality = _verification_report(birth_jd, design_jd, personality, design)
     today = datetime.utcnow().date()
@@ -1132,9 +1189,10 @@ def calc_human_design(
     return {
         "meta": {
             "engine_version": ENGINE_VERSION,
-            "language": "en",
+            "language": "ru",
             "zodiac": "tropical",
             "ephemeris_source": "Swiss Ephemeris",
+            "mode": selected_mode,
             "calculated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
         "input": {

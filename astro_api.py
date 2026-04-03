@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
 try:
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Query
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
@@ -35,6 +35,7 @@ from astro_relocation import (
 )
 from human_design_engine import (
     calc_human_design,
+    present_cross_catalog,
     CHANNEL_DATA, CENTER_DATA, TYPE_DATA, AUTHORITY_DATA, LINE_DATA, GATE_DATA,
     GATE_ENCYCLOPEDIA, CHANNEL_ENCYCLOPEDIA, CROSS_CATALOG,
 )
@@ -243,12 +244,16 @@ def natal(req: BirthData):
 
 
 @app.post("/human-design")
-def human_design(req: BirthData):
+def human_design(
+    req: BirthData,
+    mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
+):
     """Professional Human Design bodygraph calculation (§11.1)."""
     try:
         return _safe(calc_human_design(
             req.date, req.time, req.lat, req.lon, req.utc,
             timezone_name=req.timezone_name,
+            mode=mode,
         ))
     except HTTPException:
         raise
@@ -269,7 +274,10 @@ class HDTransitRequest(BaseModel):
 
 
 @app.post("/human-design/transits")
-def human_design_transits(req: HDTransitRequest):
+def human_design_transits(
+    req: HDTransitRequest,
+    mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
+):
     """Compare natal HD gates with transit positions on *transit_date* (§11.2).
 
     Returns natal summary + transit activations + temporary channels formed by
@@ -287,6 +295,7 @@ def human_design_transits(req: HDTransitRequest):
         natal = calc_human_design(
             req.date, req.time, req.lat, req.lon, req.utc,
             timezone_name=req.timezone_name,
+            mode=mode,
         )
 
         # Transit activations at transit_date noon UTC
@@ -335,7 +344,10 @@ class HDSynastryRequest(BaseModel):
 
 
 @app.post("/human-design/synastry")
-def human_design_synastry(req: HDSynastryRequest):
+def human_design_synastry(
+    req: HDSynastryRequest,
+    mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
+):
     """Human Design relationship analysis (§11.3).
 
     Computes electromagnetic, companionship, compromise, dominance, and
@@ -344,8 +356,8 @@ def human_design_synastry(req: HDSynastryRequest):
     try:
         from human_design_engine import CHANNEL_DATA as _CHANNEL_DATA
 
-        a = calc_human_design(req.date1, req.time1, req.lat1, req.lon1, req.utc1, timezone_name=req.timezone_name1)
-        b = calc_human_design(req.date2, req.time2, req.lat2, req.lon2, req.utc2, timezone_name=req.timezone_name2)
+        a = calc_human_design(req.date1, req.time1, req.lat1, req.lon1, req.utc1, timezone_name=req.timezone_name1, mode=mode)
+        b = calc_human_design(req.date2, req.time2, req.lat2, req.lon2, req.utc2, timezone_name=req.timezone_name2, mode=mode)
 
         gates_a = {g["gate"] for g in a["gates"]}
         gates_b = {g["gate"] for g in b["gates"]}
@@ -468,8 +480,10 @@ def hd_ref_centers():
 
 
 @app.get("/human-design/reference/crosses")
-def hd_ref_crosses():
-    return _safe(CROSS_CATALOG)
+def hd_ref_crosses(
+    mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
+):
+    return _safe(present_cross_catalog(mode))
 
 
 # ── PREDICTIVE ────────────────────────────────────────────────────────────────
