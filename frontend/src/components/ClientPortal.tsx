@@ -2162,11 +2162,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           ))}
         </div>
 
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-        >
+        <div>
           <div id="pdf-section-natal" className={`space-y-4 ${activeTab === 'natal' ? 'block' : 'hidden'}`}>
             {natalChart ? (
               <>
@@ -2254,7 +2250,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 </div>
             }
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
