@@ -90,6 +90,14 @@ const HD_MODE_LABELS: Record<HumanDesignContentMode, string> = {
   practitioner: 'Practitioner',
 };
 
+// ─── Planet avg daily motion (degrees) — used for 14-day orb projection ───────
+const DAILY_MOTION: Record<string, number> = {
+  moon: 13.2, sun: 1.0, mercury: 1.4, venus: 1.2, mars: 0.52,
+  jupiter: 0.083, saturn: 0.033, uranus: 0.012, neptune: 0.006,
+  pluto: 0.004, chiron: 0.018, north_node: 0.053, south_node: 0.053,
+  mean_node: 0.053, true_node: 0.053,
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const Spin = () => <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />;
 const Err = ({ msg }: { msg: string }) => (
@@ -916,6 +924,7 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
   const [advancedError, setAdvancedError] = useState<string | null>(null);
   const [advancedSelfTransits, setAdvancedSelfTransits] = useState<AnyResult | null>(null);
   const [advancedPartnerTransits, setAdvancedPartnerTransits] = useState<AnyResult | null>(null);
+  const [windowDayIndex, setWindowDayIndex] = useState<number | null>(null);
 
   const run = useCallback(async () => {
     if (!partner.date) { setError('Введите дату рождения партнёра'); return; }
@@ -1010,6 +1019,38 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
     const strongestSphere = sphereScores[0];
     const weakSphere = [...sphereScores].sort((a, b) => a.score - b.score)[0];
 
+    // ── 14-day window strip (client-side orb projection) ──────────────────────
+    const baseMs = new Date(advancedDate || new Date().toISOString().slice(0, 10)).getTime();
+    const MAX_ORB_W = 6.0;
+    type WinAspect = { transit: string; natal: string; aspect: string; orb: number; tone: 'green' | 'orange' | 'neutral' };
+    type WinDay = { dateLabel: string; score: number; tone: 'green' | 'orange' | 'neutral'; aspects: WinAspect[] };
+    const windowStrip: WinDay[] = Array.from({ length: 14 }, (_, d) => {
+      const dayDate = new Date(baseMs + d * 86_400_000);
+      const dateLabel = dayDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+      let dayScore = 0;
+      const aspects: WinAspect[] = [];
+      for (const raw of all) {
+        const tPlanet = String(raw.transit_planet || '');
+        const nPlanet = String(raw.natal_planet || '');
+        const asp = String(raw.aspect || '');
+        const curOrb = typeof raw.orb === 'number' ? (raw.orb as number) : 3;
+        const isApplying = !!(raw.applying);
+        const dailyMot = DAILY_MOTION[tPlanet.toLowerCase()] ?? 0.5;
+        const delta = dailyMot * d;
+        const projOrb = isApplying
+          ? (delta <= curOrb ? curOrb - delta : delta - curOrb)
+          : curOrb + delta;
+        if (projOrb > MAX_ORB_W) continue;
+        const projIntensity = Math.max(0.05, 1 - projOrb / MAX_ORB_W);
+        const tone: 'green' | 'orange' | 'neutral' = positive.has(asp) ? 'green' : challenging.has(asp) ? 'orange' : 'neutral';
+        if (positive.has(asp)) dayScore += projIntensity;
+        if (challenging.has(asp)) dayScore -= projIntensity;
+        aspects.push({ transit: tPlanet, natal: nPlanet, aspect: asp, orb: projOrb, tone });
+      }
+      const daytone: 'green' | 'orange' | 'neutral' = dayScore >= 0.35 ? 'green' : dayScore <= -0.35 ? 'orange' : 'neutral';
+      return { dateLabel, score: dayScore, tone: daytone, aspects };
+    });
+
     return {
       totalAspects: all.length,
       supportive: Math.round(supportive * 100) / 100,
@@ -1019,8 +1060,9 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
       top,
       strongestSphere,
       weakSphere,
+      windowStrip,
     };
-  }, [advancedSelfTransits, advancedPartnerTransits, sphereScores]);
+  }, [advancedSelfTransits, advancedPartnerTransits, sphereScores, advancedDate]);
 
   const TABS: Array<[SynTab, string]> = [
     ['compat',       '⭐ Совместимость'],
@@ -1793,6 +1835,72 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <h5 className={`text-sm font-semibold ${theme.accent} mb-1`}>📅 Окна 14 дней</h5>
+                    <p className={`text-xs ${theme.text} opacity-60 mb-3`}>
+                      Прогноз транзитного фона пары по дням — на основе текущих аспектов и средней скорости планет.
+                      Зелёный = хорошо обсуждать важное. Оранжевый = лучше не эскалировать.
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {advancedSummary.windowStrip.map((day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setWindowDayIndex(windowDayIndex === idx ? null : idx)}
+                          className={`
+                            flex-shrink-0 w-12 rounded-lg border text-center py-1.5 transition-all
+                            ${windowDayIndex === idx ? 'ring-2 ring-white/40 scale-105' : 'opacity-80 hover:opacity-100'}
+                            ${day.tone === 'green'
+                              ? 'bg-green-500/20 border-green-500/50 text-green-300'
+                              : day.tone === 'orange'
+                              ? 'bg-orange-500/20 border-orange-500/50 text-orange-300'
+                              : 'bg-white/5 border-white/15 ' + theme.text}
+                          `}
+                        >
+                          <div className="text-xs font-bold leading-tight">{day.dateLabel.split(' ')[0]}</div>
+                          <div className="text-[10px] leading-tight opacity-80">{day.dateLabel.split(' ')[1] ?? ''}</div>
+                          <div className="mt-0.5 text-[10px]">
+                            {day.tone === 'green' ? '✓' : day.tone === 'orange' ? '!' : '·'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 mt-2 text-[10px] opacity-60">
+                      <span className="text-green-400">■ благоприятно</span>
+                      <span className="text-orange-400">■ напряжённо</span>
+                      <span className={theme.text}>■ нейтрально</span>
+                    </div>
+                    {windowDayIndex !== null && advancedSummary.windowStrip[windowDayIndex] && (
+                      <div className={`mt-3 rounded-lg border p-3 ${theme.card}`}>
+                        <div className={`text-xs font-semibold ${theme.header} mb-2`}>
+                          {advancedSummary.windowStrip[windowDayIndex].dateLabel} —{' '}
+                          {advancedSummary.windowStrip[windowDayIndex].tone === 'green'
+                            ? '🟢 Хороший день для диалога'
+                            : advancedSummary.windowStrip[windowDayIndex].tone === 'orange'
+                            ? '🟠 Лучше не эскалировать'
+                            : '⚪ Нейтральный фон'}
+                        </div>
+                        {advancedSummary.windowStrip[windowDayIndex].aspects.length > 0 ? (
+                          <div className="space-y-1">
+                            {advancedSummary.windowStrip[windowDayIndex].aspects
+                              .sort((a, b) => a.orb - b.orb)
+                              .slice(0, 6)
+                              .map((asp, i) => (
+                                <div key={i} className={`flex items-center gap-1.5 text-[11px] ${theme.text}`}>
+                                  <span className={asp.tone === 'green' ? 'text-green-400' : asp.tone === 'orange' ? 'text-orange-400' : 'opacity-60'}>
+                                    {asp.tone === 'green' ? '▲' : asp.tone === 'orange' ? '▼' : '●'}
+                                  </span>
+                                  <span>{pname(asp.transit)} {ASPECT_SYMBOLS[asp.aspect] || asp.aspect} {pname(asp.natal)}</span>
+                                  <span className="opacity-50 ml-auto">{asp.orb.toFixed(1)}°</span>
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <p className={`text-xs ${theme.text} opacity-50`}>В этот день крупных аспектов нет.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className={`rounded-xl border ${theme.card} p-4`}>
