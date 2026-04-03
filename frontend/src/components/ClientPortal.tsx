@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,
@@ -1185,11 +1185,13 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
               </div>
 
               {/* Selected sphere detail */}
+              <AnimatePresence mode="wait">
               {selectedSS && (
                 <motion.div
                   key={selectedSS.sphere.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
                   className={`rounded-xl border ${theme.card} p-5 space-y-5`}
                 >
                   <div className="flex items-start gap-3">
@@ -1268,6 +1270,7 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                   </div>
                 </motion.div>
               )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -1490,12 +1493,13 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                     </div>
 
                     {/* Selected sphere forecast */}
+                    <AnimatePresence mode="wait">
                     {forecastSphere && (() => {
                       const sf = forecast.sphereForecasts.find(s => s.sphereId === forecastSphere);
                       const ss = sphereScores.find(s => s.sphere.id === forecastSphere);
                       if (!sf || !ss) return null;
                       return (
-                        <motion.div key={forecastSphere} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        <motion.div key={forecastSphere} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="space-y-4">
                           {/* Best dates */}
                           {sf.bestDates.length > 0 && (
@@ -1590,6 +1594,7 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                         </motion.div>
                       );
                     })()}
+                    </AnimatePresence>
 
                     {!forecastSphere && (
                       <p className={`text-xs ${theme.text} opacity-50 text-center py-4`}>
