@@ -44,6 +44,13 @@ try:
 except Exception:
     _se_module = None   # type: ignore
 
+try:
+    from jyotish_engine import calc_jyotish as _calc_jyotish
+    _JYOTISH_OK = True
+except Exception:
+    _JYOTISH_OK = False
+    _calc_jyotish = None  # type: ignore
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # APP
@@ -217,6 +224,21 @@ def root():
     if HAS_FRONTEND_BUILD:
         return FileResponse(FRONTEND_INDEX_FILE)
     return {"status": "HOLO Astrology API v2.0", "docs": "/docs"}
+
+
+# ── JYOTISH (VEDIC ASTROLOGY) ────────────────────────────────────────────────
+@app.post("/jyotish")
+def jyotish(req: BirthData):
+    """Full Jyotish (Vedic astrology) chart with Lahiri sidereal, nakshatras, dashas, yogas."""
+    if not _JYOTISH_OK:
+        raise HTTPException(503, "Jyotish engine not available")
+    try:
+        result = _calc_jyotish(req.date, req.time, req.lat, req.lon, req.utc)
+        return _safe(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 # ── NATAL CHART ───────────────────────────────────────────────────────────────

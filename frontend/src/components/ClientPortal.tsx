@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 
 import ChartWheel from './ChartWheel';
 import HumanDesignBlock from './HumanDesignBlock';
+import JyotishBlock from './JyotishBlock';
 import SynastryForecast from './SynastryForecast';
 import PredictiveExpanded from './PredictiveExpanded';
 import InterpretationPanel from './InterpretationPanel';
@@ -2295,7 +2296,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2362,6 +2363,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
     { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
+    { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
   ] as const;
 
   return (
@@ -2492,6 +2494,23 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               contentMode={humanDesignMode}
               onContentModeChange={setHumanDesignMode}
             />
+          </div>
+
+          <div id="pdf-section-jyotish" className={activeTab === 'jyotish' ? 'block' : 'hidden'}>
+            {birth.date && birth.time ? (
+              <div className={`rounded-xl border ${theme.card} p-4 md:p-6`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">✦</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Джйотиш — Ведическая астрология</h2>
+                </div>
+                <JyotishBlock birthData={birth} />
+              </div>
+            ) : (
+              <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
+              </div>
+            )}
           </div>
 
           <div id="pdf-section-predictive" className={activeTab === 'predictive' ? 'block' : 'hidden'}>

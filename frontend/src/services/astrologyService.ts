@@ -318,3 +318,10 @@ export async function geocodeCity(cityName: string): Promise<{
     displayName,
   };
 }
+
+// ─── Jyotish (Vedic Astrology) ────────────────────────────────────────────────
+export async function getJyotish(b: BirthInput): Promise<Record<string, unknown>> {
+  return post('/jyotish', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+  });
+}
