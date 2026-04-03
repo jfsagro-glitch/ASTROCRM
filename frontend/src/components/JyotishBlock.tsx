@@ -112,6 +112,29 @@ interface JyotishResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function isObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function hasMinimalJyotishContract(v: unknown): v is JyotishResult {
+  if (!isObj(v)) return false;
+
+  const meta = v.meta;
+  const lagna = v.lagna;
+  const grahas = v.grahas;
+  const dashas = v.dashas;
+  const yogas = v.yogas;
+  const sav = v.sav;
+  const summary = v.summary;
+
+  if (!isObj(meta) || !isObj(lagna) || !isObj(grahas) || !isObj(summary)) return false;
+  if (!Array.isArray(dashas) || !Array.isArray(yogas) || !Array.isArray(sav)) return false;
+
+  const requiredGrahas = ['sun','moon','mars','mercury','jupiter','venus','saturn','rahu','ketu'];
+  const grahaKeys = Object.keys(grahas);
+  return requiredGrahas.every(g => grahaKeys.includes(g));
+}
+
 const DIGNITY_COLORS: Record<string, string> = {
   uccha:        'text-amber-300',
   neecha:       'text-red-400',
@@ -754,7 +777,10 @@ export default function JyotishBlock({ birthData }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const result = await getJyotish(birthData) as unknown as JyotishResult;
+      const result = await getJyotish(birthData);
+      if (!hasMinimalJyotishContract(result)) {
+        throw new Error('Неполный ответ /jyotish: не хватает обязательных данных для рендера');
+      }
       setData(result);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -794,6 +820,20 @@ export default function JyotishBlock({ birthData }: Props) {
   }
 
   if (!data) return null;
+
+  if (!hasMinimalJyotishContract(data)) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-red-400 text-sm mb-2">Неполный ответ Джйотиш. Рендер прерван для защиты от падения UI.</p>
+        <button
+          onClick={load}
+          className="text-xs bg-slate-700 text-slate-200 px-3 py-1.5 rounded hover:bg-slate-600"
+        >
+          Повторить
+        </button>
+      </div>
+    );
+  }
 
   const lagnaRasi = data.lagna.rasi;
 

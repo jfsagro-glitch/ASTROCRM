@@ -12,7 +12,17 @@ def _has_swisseph() -> bool:
 HAS_SWE = _has_swisseph()
 
 
-@unittest.skipUnless(HAS_SWE, "swisseph is required for Jyotish tests")
+def _has_astro_api() -> bool:
+    try:
+        import astro_api  # noqa: F401
+        return True
+    except BaseException:
+        return False
+
+
+HAS_ASTRO_API = _has_astro_api()
+
+
 class TestJyotishEngine(unittest.TestCase):
     def setUp(self) -> None:
         self.birth = {
@@ -23,6 +33,7 @@ class TestJyotishEngine(unittest.TestCase):
             "utc": 3.0,
         }
 
+    @unittest.skipUnless(HAS_SWE, "swisseph is required for Jyotish engine smoke test")
     def test_calc_jyotish_structure_smoke(self):
         from jyotish_engine import calc_jyotish
 
@@ -57,6 +68,7 @@ class TestJyotishEngine(unittest.TestCase):
         active_count = sum(1 for d in result["dashas"] if d.get("active"))
         self.assertGreaterEqual(active_count, 1)
 
+    @unittest.skipUnless(HAS_SWE and HAS_ASTRO_API, "swisseph + astro_api are required for /jyotish smoke test")
     def test_api_jyotish_endpoint_smoke(self):
         from astro_api import BirthData, jyotish
 
@@ -67,6 +79,45 @@ class TestJyotishEngine(unittest.TestCase):
         self.assertIn("grahas", payload)
         self.assertIn("dashas", payload)
         self.assertIn("summary", payload)
+
+    @unittest.skipUnless(HAS_SWE and HAS_ASTRO_API, "swisseph + astro_api are required for invalid date test")
+    def test_api_jyotish_invalid_date_raises_http_error(self):
+        from fastapi import HTTPException
+        from astro_api import BirthData, jyotish
+
+        bad = dict(self.birth)
+        bad["date"] = "1979-99-99"
+
+        with self.assertRaises(HTTPException) as cm:
+            jyotish(BirthData(**bad))
+        self.assertEqual(cm.exception.status_code, 500)
+
+    @unittest.skipUnless(HAS_SWE and HAS_ASTRO_API, "swisseph + astro_api are required for invalid time test")
+    def test_api_jyotish_invalid_time_raises_http_error(self):
+        from fastapi import HTTPException
+        from astro_api import BirthData, jyotish
+
+        bad = dict(self.birth)
+        bad["time"] = "25:99:99"
+
+        with self.assertRaises(HTTPException) as cm:
+            jyotish(BirthData(**bad))
+        self.assertEqual(cm.exception.status_code, 500)
+
+    @unittest.skipUnless(HAS_ASTRO_API, "astro_api is required for BirthData validation test")
+    def test_birthdata_rejects_invalid_coordinate_types(self):
+        from pydantic import ValidationError
+        from astro_api import BirthData
+
+        bad_lat = dict(self.birth)
+        bad_lat["lat"] = "north"
+        with self.assertRaises(ValidationError):
+            BirthData(**bad_lat)
+
+        bad_lon = dict(self.birth)
+        bad_lon["lon"] = "east"
+        with self.assertRaises(ValidationError):
+            BirthData(**bad_lon)
 
 
 if __name__ == "__main__":
