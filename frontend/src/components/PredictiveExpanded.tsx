@@ -12,13 +12,14 @@ import {
   getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections,
   getTertiaryProgressions, getConverseProgressions,
+  getAstroSummary,
 } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-type TabKey = 'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse';
+type TabKey = 'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'astrosummary';
 type AnyResult = Record<string, unknown>;
 
 interface Props {
@@ -38,6 +39,7 @@ const TABS: { key: TabKey; icon: string; label: string }[] = [
   { key: 'profections',   icon: '🏠', label: 'Профекции' },
   { key: 'tertiary',      icon: '🌒', label: 'Третичные' },
   { key: 'converse',      icon: '🔄', label: 'Конверсионные' },
+  { key: 'astrosummary',  icon: '🧭', label: 'Астросводка' },
 ];
 
 const ASPECT_CATEGORY: Record<string, string> = {
@@ -593,6 +595,61 @@ function ProfectionView({ result, theme }: { result: AnyResult; theme: Props['th
   );
 }
 
+function AstroSummaryView({ result, theme }: { result: AnyResult; theme: Props['theme'] }) {
+  const periods = (result.periods as Record<string, Record<string, unknown>>) ?? {};
+  const order: Array<[string, string]> = [
+    ['day', 'Астросводка дня'],
+    ['week', 'Астросводка недели'],
+    ['month', 'Астросводка месяца'],
+    ['year', 'Астросводка года'],
+  ];
+  const isDark = theme.wheelTheme === 'dark';
+
+  return (
+    <div className="space-y-3">
+      {order.map(([k, title]) => {
+        const p = periods[k] ?? {};
+        const energy = String(p.energy ?? 'переменный');
+        const aspects = (p.key_aspects as string[]) ?? [];
+        const energyClass = energy === 'благоприятный'
+          ? (isDark ? 'bg-green-500/15 text-green-300 border-green-500/30' : 'bg-green-50 text-green-700 border-green-200')
+          : energy === 'напряженный'
+          ? (isDark ? 'bg-red-500/15 text-red-300 border-red-500/30' : 'bg-rose-50 text-rose-700 border-rose-200')
+          : (isDark ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' : 'bg-amber-50 text-amber-700 border-amber-200');
+
+        return (
+          <div key={k} className={`rounded-xl border ${theme.card} p-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h4 className={`font-semibold ${theme.header}`}>{title}</h4>
+              <div className={`px-2 py-1 rounded-md border text-xs ${energyClass}`}>{energy}</div>
+            </div>
+            <div className={`text-xs ${theme.text} opacity-70 mb-3`}>
+              Период: {String(p.start_date ?? '')} — {String(p.end_date ?? '')}
+            </div>
+            <div className={`text-sm ${theme.text} leading-relaxed mb-2`}>
+              {String(p.interpretation ?? '')}
+            </div>
+            <div className={`text-sm ${theme.text} mb-2`}>
+              <span className={theme.accent}>Фокус:</span> {String(p.focus ?? '')}
+            </div>
+            {!!aspects.length && (
+              <div className={`text-xs ${theme.text} mb-2`}>
+                <span className={theme.accent}>Ключевые аспекты:</span>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  {aspects.map((a, idx) => <li key={idx}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+            <div className={`text-sm ${theme.text}`}>
+              <span className={theme.accent}>Рекомендация:</span> {String(p.advice ?? '')}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function PredictiveExpanded({ birth, theme }: Props) {
   const [tab, setTab] = useState<TabKey>('transits');
@@ -624,6 +681,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
         case 'profections':   data = await getProfections(birth, targetDate) as AnyResult; break;
         case 'tertiary':      data = await getTertiaryProgressions(birth, targetDate) as AnyResult; break;
         case 'converse':      data = await getConverseProgressions(birth, targetDate) as AnyResult; break;
+        case 'astrosummary':  data = await getAstroSummary(targetDate, '12:00') as AnyResult; break;
         default: return;
       }
       setResult(data);
@@ -665,6 +723,8 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
       return <ReturnView result={result} theme={theme} />;
     if (type === 'profections')
       return <ProfectionView result={result} theme={theme} />;
+    if (type === 'astrosummary')
+      return <AstroSummaryView result={result} theme={theme} />;
     return (
       <pre className={`text-xs ${theme.text} overflow-auto max-h-60 p-3 rounded-xl border ${theme.card}`}>
         {JSON.stringify(result, null, 2)}
