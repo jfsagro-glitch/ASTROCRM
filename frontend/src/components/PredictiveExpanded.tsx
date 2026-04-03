@@ -32,6 +32,7 @@ interface Props {
 
 const TABS: { key: TabKey; icon: string; label: string }[] = [
   { key: 'transits',      icon: '🌍', label: 'Транзиты' },
+  { key: 'astrosummary',  icon: '🧭', label: 'Астросводка' },
   { key: 'secondary',     icon: '🌿', label: 'Вторичные прогр.' },
   { key: 'solar-arc',     icon: '☀️', label: 'Солярная дуга' },
   { key: 'solar-return',  icon: '🌞', label: 'Соляр' },
@@ -39,7 +40,6 @@ const TABS: { key: TabKey; icon: string; label: string }[] = [
   { key: 'profections',   icon: '🏠', label: 'Профекции' },
   { key: 'tertiary',      icon: '🌒', label: 'Третичные' },
   { key: 'converse',      icon: '🔄', label: 'Конверсионные' },
-  { key: 'astrosummary',  icon: '🧭', label: 'Астросводка' },
 ];
 
 const ASPECT_CATEGORY: Record<string, string> = {
