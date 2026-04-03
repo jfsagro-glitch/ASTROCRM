@@ -173,6 +173,17 @@ function BirthForm({
 }) {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [selectedPersonId, setSelectedPersonId] = useState('');
+
+  useEffect(() => {
+    if (!people?.length) {
+      if (selectedPersonId) setSelectedPersonId('');
+      return;
+    }
+    if (selectedPersonId && !people.some(p => p.id === selectedPersonId)) {
+      setSelectedPersonId('');
+    }
+  }, [people, selectedPersonId]);
 
   const handleSave = useCallback(async () => {
     if (!value.name || !onSave) return;
@@ -213,12 +224,13 @@ function BirthForm({
           <label className={`text-xs ${theme.text} block`}>Загрузить сохранённый профиль</label>
           <div className="flex gap-2">
             <select
-              defaultValue=""
-              key={people.map(p => p.id).join()}
+              value={selectedPersonId}
               onChange={e => {
+                setSelectedPersonId(e.target.value);
                 const p = people.find(x => x.id === e.target.value);
                 if (p) onChange({ name: p.name, date: p.date, time: p.time, lat: p.lat, lon: p.lon, utc: p.utc });
               }}
+              data-people-id
               className={`flex-1 px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
             >
               <option value="">— выбрать профиль —</option>
@@ -231,11 +243,9 @@ function BirthForm({
                 type="button"
                 title="Удалить выбранный профиль"
                 onClick={() => {
-                  // Find selected id from select element
-                  const sel = document.querySelector(`select[data-people-id]`) as HTMLSelectElement | null;
-                  const id = sel?.value;
-                  if (id) onDelete(id);
+                  if (selectedPersonId) onDelete(selectedPersonId);
                 }}
+                disabled={!selectedPersonId}
                 className={`px-2.5 py-2 rounded-lg border text-xs transition-colors text-red-400 border-red-400/30 hover:border-red-400/60`}
               >
                 <Trash2 className="h-4 w-4" />
@@ -2459,110 +2469,126 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         </div>
 
         <div>
-          <div id="pdf-section-natal" className={`space-y-4 ${activeTab === 'natal' ? 'block' : 'hidden'}`}>
-            {natalChart ? (
-              <>
-                <div className={`rounded-xl border ${theme.card} p-3 text-xs ${theme.text}`}>
-                  <span className={theme.accent}>{tr.chart}: </span>
-                  {natalChart.metadata.date} {natalChart.metadata.time} · Lat {natalChart.metadata.lat} / Lon {natalChart.metadata.lon} · UTC {natalChart.metadata.utc > 0 ? '+' : ''}{natalChart.metadata.utc} · {natalChart.metadata.houses_system}
-                </div>
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex justify-center lg:justify-start shrink-0">
-                    <ChartWheel chart={natalChart} size={480} theme={theme.wheelTheme} />
+          {activeTab === 'natal' && (
+            <div id="pdf-section-natal" className="space-y-4">
+              {natalChart ? (
+                <>
+                  <div className={`rounded-xl border ${theme.card} p-3 text-xs ${theme.text}`}>
+                    <span className={theme.accent}>{tr.chart}: </span>
+                    {natalChart.metadata.date} {natalChart.metadata.time} · Lat {natalChart.metadata.lat} / Lon {natalChart.metadata.lon} · UTC {natalChart.metadata.utc > 0 ? '+' : ''}{natalChart.metadata.utc} · {natalChart.metadata.houses_system}
                   </div>
-                  <div className="flex-1 space-y-3">
-                    <PlanetTable chart={natalChart} theme={theme} />
-                    <HouseTable chart={natalChart} theme={theme} />
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex justify-center lg:justify-start shrink-0">
+                      <ChartWheel chart={natalChart} size={480} theme={theme.wheelTheme} />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <PlanetTable chart={natalChart} theme={theme} />
+                      <HouseTable chart={natalChart} theme={theme} />
+                    </div>
                   </div>
+                  <AspectList aspects={natalChart.aspects} theme={theme} />
+                  <ExtraInfo chart={natalChart} theme={theme} />
+                </>
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
                 </div>
-                <AspectList aspects={natalChart.aspects} theme={theme} />
-                <ExtraInfo chart={natalChart} theme={theme} />
-              </>
-            ) : (
-              <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          <div id="pdf-section-human-design" className={activeTab === 'human-design' ? 'block' : 'hidden'}>
-            <HumanDesignBlock
-              birth={birth}
-              theme={theme}
-              contentMode={humanDesignMode}
-              onContentModeChange={setHumanDesignMode}
-            />
-          </div>
+          {activeTab === 'human-design' && (
+            <div id="pdf-section-human-design">
+              <HumanDesignBlock
+                birth={birth}
+                theme={theme}
+                contentMode={humanDesignMode}
+                onContentModeChange={setHumanDesignMode}
+              />
+            </div>
+          )}
 
-          <div id="pdf-section-jyotish" className={activeTab === 'jyotish' ? 'block' : 'hidden'}>
-            {birth.date && birth.time ? (
-              <div className={`rounded-xl border ${theme.card} p-4 md:p-6`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-lg">✦</span>
-                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Джйотиш — Ведическая астрология</h2>
+          {activeTab === 'jyotish' && (
+            <div id="pdf-section-jyotish">
+              {birth.date && birth.time ? (
+                <div className={`rounded-xl border ${theme.card} p-4 md:p-6`}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-lg">✦</span>
+                    <h2 className={`text-base font-bold font-serif ${theme.header}`}>Джйотиш — Ведическая астрология</h2>
+                  </div>
+                  <JyotishBlock birthData={birth} />
                 </div>
-                <JyotishBlock birthData={birth} />
-              </div>
-            ) : (
-              <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
-              </div>
-            )}
-          </div>
-
-          <div id="pdf-section-predictive" className={activeTab === 'predictive' ? 'block' : 'hidden'}>
-            {natalChart
-              ? <PredictiveExpanded birth={birth} theme={theme} />
-              : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
                 </div>
-            }
-          </div>
+              )}
+            </div>
+          )}
 
-          <div id="pdf-section-astrosummary" className={activeTab === 'astrosummary' ? 'block' : 'hidden'}>
-            <AstroSummaryBlock theme={theme} />
-          </div>
+          {activeTab === 'predictive' && (
+            <div id="pdf-section-predictive">
+              {natalChart
+                ? <PredictiveExpanded birth={birth} theme={theme} />
+                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                  </div>
+              }
+            </div>
+          )}
 
-          <div id="pdf-section-synastry" className={activeTab === 'synastry' ? 'block' : 'hidden'}>
-            {natalChart
-              ? <SynastryPanel birth={birth} theme={theme} people={people} />
-              : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                </div>
-            }
-          </div>
+          {activeTab === 'astrosummary' && (
+            <div id="pdf-section-astrosummary">
+              <AstroSummaryBlock theme={theme} />
+            </div>
+          )}
 
-          <div id="pdf-section-relocation" className={activeTab === 'relocation' ? 'block' : 'hidden'}>
-            {natalChart
-              ? <RelocationPanel birth={birth} theme={theme} />
-              : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                </div>
-            }
-          </div>
+          {activeTab === 'synastry' && (
+            <div id="pdf-section-synastry">
+              {natalChart
+                ? <SynastryPanel birth={birth} theme={theme} people={people} />
+                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                  </div>
+              }
+            </div>
+          )}
 
-          <div id="pdf-section-interpretation" className={activeTab === 'interpretation' ? 'block' : 'hidden'}>
-            {natalChart
-              ? (
-                <div className={`rounded-xl border ${theme.card} p-4`}>
-                  <InterpretationPanel
-                    chart={natalChart}
-                    name={birth.name}
-                    theme={theme.wheelTheme}
-                  />
-                </div>
-              )
-              : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <BookOpen className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                </div>
-            }
-          </div>
+          {activeTab === 'relocation' && (
+            <div id="pdf-section-relocation">
+              {natalChart
+                ? <RelocationPanel birth={birth} theme={theme} />
+                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                  </div>
+              }
+            </div>
+          )}
+
+          {activeTab === 'interpretation' && (
+            <div id="pdf-section-interpretation">
+              {natalChart
+                ? (
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <InterpretationPanel
+                      chart={natalChart}
+                      name={birth.name}
+                      theme={theme.wheelTheme}
+                    />
+                  </div>
+                )
+                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <BookOpen className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                  </div>
+              }
+            </div>
+          )}
         </div>
       </div>
     </div>
