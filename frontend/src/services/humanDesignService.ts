@@ -1,10 +1,14 @@
 import type { BirthInput } from '../types/astro';
-import type { HumanDesignResult } from '../types/humanDesign';
+import type { HumanDesignContentMode, HumanDesignResult } from '../types/humanDesign';
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
 
-export async function getHumanDesign(birth: BirthInput): Promise<HumanDesignResult> {
-  const response = await fetch(`${API_URL}/human-design`, {
+export async function getHumanDesign(
+  birth: BirthInput,
+  mode: HumanDesignContentMode = 'analyst',
+): Promise<HumanDesignResult> {
+  const query = new URLSearchParams({ mode });
+  const response = await fetch(`${API_URL}/human-design?${query.toString()}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

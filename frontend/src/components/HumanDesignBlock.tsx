@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Aperture, Cpu, Fingerprint, GitBranch, Sparkles } from 'lucide-react';
 import type { BirthInput } from '../types/astro';
-import type { HumanDesignResult } from '../types/humanDesign';
+import type { HumanDesignContentMode, HumanDesignResult } from '../types/humanDesign';
 import { getHumanDesign } from '../services/humanDesignService';
 
 type ThemeLike = {
@@ -14,6 +14,12 @@ type ThemeLike = {
   tabInactive: string;
   symbol: string;
 };
+
+const HD_MODE_OPTIONS: Array<{ key: HumanDesignContentMode; label: string; subtitle: string }> = [
+  { key: 'reader', label: 'Reader', subtitle: 'Коротко и ясно' },
+  { key: 'analyst', label: 'Analyst', subtitle: 'Структурный разбор' },
+  { key: 'practitioner', label: 'Practitioner', subtitle: 'Прикладной фокус' },
+];
 
 function StatCard({ title, value, subtitle, theme }: { title: string; value: string; subtitle?: string; theme: ThemeLike }) {
   return (
@@ -63,7 +69,17 @@ function ActivationTable({
   );
 }
 
-export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput & { name?: string }; theme: ThemeLike }) {
+export default function HumanDesignBlock({
+  birth,
+  theme,
+  contentMode,
+  onContentModeChange,
+}: {
+  birth: BirthInput & { name?: string };
+  theme: ThemeLike;
+  contentMode: HumanDesignContentMode;
+  onContentModeChange: (mode: HumanDesignContentMode) => void;
+}) {
   const [result, setResult] = useState<HumanDesignResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,13 +99,18 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
     setLoading(true);
     setError(null);
     try {
-      setResult(await getHumanDesign(birth));
+      setResult(await getHumanDesign(birth, contentMode));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось рассчитать Human Design');
     } finally {
       setLoading(false);
     }
-  }, [birth, canCalculate]);
+  }, [birth, canCalculate, contentMode]);
+
+  useEffect(() => {
+    if (!result || result.meta.mode === contentMode) return;
+    void calculate();
+  }, [calculate, contentMode, result]);
 
   const centerGroups = useMemo(() => {
     if (!result) return [];
@@ -98,6 +119,12 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
       badgeClass: center.defined ? theme.tabActive : theme.tabInactive,
     }));
   }, [result, theme.tabActive, theme.tabInactive]);
+
+  const selectedModeOption = HD_MODE_OPTIONS.find(option => option.key === contentMode) ?? HD_MODE_OPTIONS[1];
+
+  const crossTitle = result?.incarnation_cross.primary_title || result?.incarnation_cross.cross_name_ru || result?.incarnation_cross.name;
+  const crossText = result?.incarnation_cross.primary_text || result?.incarnation_cross.description;
+  const profileContext = result?.incarnation_cross.profile_context_ru;
 
   return (
     <div className="space-y-4">
@@ -110,6 +137,31 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
               Отдельный расчётный блок: тип, стратегия, внутренний авторитет, профиль, определённости центров,
               каналы, активные ворота и инкарнационный крест. Не зависит от натальной интерпретации и считается отдельно.
             </p>
+            <div className={`mt-4 rounded-xl border ${theme.card} p-3`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-[11px] uppercase tracking-[0.18em] ${theme.text}`}>Режим текста для экрана и PDF</span>
+                <span className={`rounded-full border px-2 py-1 text-[11px] uppercase tracking-[0.16em] ${theme.tabActive}`}>
+                  {selectedModeOption.label}
+                </span>
+              </div>
+              <p className={`mt-2 text-sm ${theme.text}`}>
+                {selectedModeOption.subtitle}. В отчёт экспортируется этот же серверный формат интерпретации Human Design.
+              </p>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {HD_MODE_OPTIONS.map(option => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => onContentModeChange(option.key)}
+                  disabled={loading}
+                  className={`rounded-full border px-3 py-2 text-left text-xs transition-all ${contentMode === option.key ? theme.tabActive : theme.tabInactive} ${loading ? 'opacity-70' : ''}`}
+                >
+                  <span className="block font-semibold">{option.label}</span>
+                  <span className={`mt-0.5 block ${theme.text}`}>{option.subtitle}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <button
             onClick={calculate}
@@ -182,8 +234,14 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
               <GitBranch className={`h-5 w-5 ${theme.symbol}`} />
               <h3 className={`text-lg font-semibold ${theme.header}`}>Incarnation Cross</h3>
             </div>
-            <div className={`mt-3 text-base font-medium ${theme.accent}`}>{result.incarnation_cross.name}</div>
-            <p className={`mt-2 text-sm ${theme.text}`}>{result.incarnation_cross.description}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className={`text-base font-medium ${theme.accent}`}>{crossTitle}</div>
+              <span className={`rounded-full border px-2 py-1 text-[11px] uppercase tracking-[0.16em] ${theme.tabActive}`}>
+                {result.meta.mode}
+              </span>
+            </div>
+            <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{crossText}</p>
+            {profileContext ? <p className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{profileContext}</p> : null}
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {result.incarnation_cross.gates.map(item => (
                 <div key={`${item.role}-${item.gate}`} className={`rounded-xl border ${theme.card} p-3`}>

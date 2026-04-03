@@ -69,6 +69,8 @@ export interface HumanDesignGateSummary {
   }>;
 }
 
+export type HumanDesignContentMode = 'reader' | 'analyst' | 'practitioner';
+
 export interface HumanDesignResult {
   meta: {
     engine_version: string;
@@ -76,6 +78,7 @@ export interface HumanDesignResult {
     zodiac: string;
     ephemeris_source: string;
     calculated_at: string;
+    mode: HumanDesignContentMode;
   };
   input: {
     birth_datetime_local: string;
@@ -119,6 +122,13 @@ export interface HumanDesignResult {
     name: string;
     angle: string;
     description: string;
+    cross_name_ru?: string;
+    primary_mode?: HumanDesignContentMode;
+    primary_language?: string;
+    primary_title?: string;
+    primary_text?: string;
+    profile_context_ru?: string;
+    available_modes?: HumanDesignContentMode[];
     gates: Array<{
       role: string;
       gate: number;
