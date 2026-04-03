@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,

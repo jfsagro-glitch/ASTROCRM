@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import ClientPortal from './components/ClientPortal';
 import CRM from './components/CRM';
 import AuthPage from './components/AuthPage';
@@ -34,21 +33,12 @@ function AnimatedRoutes() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="relative z-10"
-      >
-        <Routes location={location}>
-          <Route path="/" element={<ClientPortalWrapper />} />
-          <Route path="/crm" element={<CRM />} />
-        </Routes>
-      </motion.div>
-    </AnimatePresence>
+    <div className="relative z-10">
+      <Routes location={location}>
+        <Route path="/" element={<ClientPortalWrapper />} />
+        <Route path="/crm" element={<CRM />} />
+      </Routes>
+    </div>
   );
 }
 
