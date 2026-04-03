@@ -218,6 +218,73 @@ GATE_DATA: Dict[int, Dict[str, str]] = {
     64: {"name": "Confusion", "keynote": "pressure before clarity", "description": "Carries abstract pressure that resolves into perspective over time."},
 }
 
+GATE_ENCYCLOPEDIA: Dict[int, str] = {
+    1: "Original creation and authentic style. Psychologically this gate matures when self-expression is lived as discipline rather than performance.",
+    2: "Receptive inner direction and orientation. Practical strength appears when direction is allowed to emerge from response, place, and timing.",
+    3: "Mutation through early disorder and adaptive restructuring. Its mastery is patience with chaotic starts until living order forms.",
+    4: "Conceptual answers and mental formulation. The healthy expression tests ideas in reality before claiming certainty.",
+    5: "Rhythm, routine, and energetic cadence. This gate stabilizes life through repeatable patterns and protected recovery cycles.",
+    6: "Emotional boundary management and relational threshold control. Intimacy becomes healthy when contact is paced and explicitly negotiated.",
+    7: "Strategic leadership for the collective. Influence is strongest when service to group direction replaces egoic control.",
+    8: "Individual contribution with visible social relevance. Practical power comes from making unique talent concretely useful.",
+    9: "Concentration on critical detail. This gate excels through narrowed focus and completion of small essential steps.",
+    10: "Behavior aligned with personal integrity. It regulates self-respect, embodied ethics, and consistent decision conduct.",
+    11: "High-volume idea generation and conceptual imagery. Maturity requires curation: fewer ideas executed deeply.",
+    12: "Social timing and emotionally correct expression. Silence is strategic when timing is not yet ripe for impact.",
+    13: "Witnessing memory and narrative listening. This gate turns lived stories into pattern wisdom when emotional load is bounded.",
+    14: "Resource power and meaningful productivity. It channels workforce energy toward direction that creates durable value.",
+    15: "Humanity through rhythmic extremes. Psychological growth comes from honoring variability without collapsing consistency.",
+    16: "Skill acquisition through repetition and enthusiasm. Mastery is procedural: deliberate practice, feedback, refinement.",
+    17: "Logical opinion and pattern framing. Its practical excellence is structured thinking with intellectual humility.",
+    18: "Corrective instinct and system improvement. Constructive diagnosis must accompany critique for this gate to stay healthy.",
+    19: "Sensitivity to needs, support, and belonging. Clear agreements around reciprocity prevent emotional depletion.",
+    20: "Present-moment articulation and manifestation. Spontaneity becomes precise when anchored in authority.",
+    21: "Resource control, boundaries, and executive stewardship. It works best under explicit responsibility and accountability.",
+    22: "Emotional grace and social openness. Contact quality depends on mood timing and emotional congruence.",
+    23: "Assimilation and clear translation of insight. The practical gift is simplifying complexity without losing essence.",
+    24: "Mental return and integration loops. Reflection becomes productive when it moves from rumination to application.",
+    25: "Universal love and principled innocence. Its mature expression is open-hearted discernment rather than naive exposure.",
+    26: "Persuasion, memory, and strategic influence. Ethical framing determines whether impact becomes service or manipulation.",
+    27: "Nourishment, care, and protective responsibility. Sustainability requires boundaries so caregiving remains regenerative.",
+    28: "Purpose through meaningful struggle. This gate thrives when life force is invested only in worthy battles.",
+    29: "The sacred yes and deep commitment. Practical growth requires selective commitment to avoid overextension.",
+    30: "Desire intensity and emotional appetite for experience. Maturity is full feeling with lower attachment to outcomes.",
+    31: "Recognized influence and representative leadership. Authority is most effective when entrusted by the collective.",
+    32: "Instinct for continuity and viability. It detects what can endure and where strategic investment should go.",
+    33: "Retreat, privacy, and reflective distillation. Wisdom becomes transferable only after protected integration cycles.",
+    34: "Pure life-force power and rapid embodiment. Correct use depends on response alignment before force deployment.",
+    35: "Change through experiential progression. Completion of one cycle before seeking another is the core discipline.",
+    36: "Crisis navigation and emotional adaptation. Turbulence becomes intelligence when processed instead of dramatized.",
+    37: "Tribal bonding, agreements, and mutual support. Healthy loyalty requires explicit reciprocity and relational contracts.",
+    38: "Purposeful opposition and selective resistance. Power grows when conflict is reserved for meaningful stakes.",
+    39: "Provocative pressure that awakens emotional truth. Conscious provocation can catalyze depth rather than chaos.",
+    40: "Work-service balance with restorative solitude. Contract clarity protects both contribution and personal recovery.",
+    41: "Cycle initiation through desire and imagination. It selects which fantasy becomes lived narrative investment.",
+    42: "Completion energy and developmental closure. This gate converts process endings into integrated growth.",
+    43: "Breakthrough insight preceding consensus. Impact depends on timing and contextual framing of disruptive knowing.",
+    44: "Pattern memory and social opportunity detection. It reads recurring dynamics and chooses strategic alliances.",
+    45: "Stewardship of shared resources and tribal voice. Mature expression is transparent governance and fair distribution.",
+    46: "Embodiment, place, and timing through the body. Somatic alignment becomes a practical navigation system.",
+    47: "Mental alchemy from confusion to realization. Clarity matures through pressure, sequencing, and reflective patience.",
+    48: "Depth of solution and competence pressure. Skill confidence grows through applied practice, not endless preparation.",
+    49: "Values revolution and boundary reset. It reforms agreements when core principles are structurally violated.",
+    50: "Custodianship, ethics, and continuity standards. This gate protects long-cycle wellbeing in families and systems.",
+    51: "Initiation through shock and courageous disruption. It awakens dormant potential by breaking comfort patterns.",
+    52: "Stillness that enables sustained concentration. Holding energy in place unlocks high-quality deep work.",
+    53: "Beginning force for developmental cycles. Structural follow-through is required so starts become outcomes.",
+    54: "Ambition and strategic ascent in material life. The mature form ties growth goals to values and discipline.",
+    55: "Spirit and emotional atmosphere of freedom. Mood literacy is the practical key to stable expression.",
+    56: "Narrative stimulation and idea storytelling. Communication works best when stories transmit actionable meaning.",
+    57: "Immediate intuitive clarity and survival sensing. Trust sharpens when instinct is validated against context.",
+    58: "Vital pressure to improve life quality. Constructive channeling prevents perfectionism and over-correction.",
+    59: "Barrier dissolution and intimate bonding force. Selective openness with boundaries preserves relational health.",
+    60: "Limitation as container for mutation. Real innovation appears when constraints are accepted and utilized.",
+    61: "Mystery pressure and search for inner truth. This gate matures through inquiry without rigid dogma.",
+    62: "Precision, detail, and operational language. It builds trust by naming specifics clearly and consistently.",
+    63: "Doubt that stress-tests logic. Its gift is verification and error prevention in decision systems.",
+    64: "Abstract pressure before narrative coherence. Insight forms nonlinearly and should not be forced prematurely.",
+}
+
 CHANNEL_DATA = [
     {"gates": (64, 47), "name": "Abstraction", "centers": ("head", "ajna"), "summary": "Transforms past experience into realized understanding."},
     {"gates": (61, 24), "name": "Awareness", "centers": ("head", "ajna"), "summary": "Seeks inner truth and rationalizes mystery into insight."},
@@ -256,6 +323,45 @@ CHANNEL_DATA = [
     {"gates": (41, 30), "name": "Recognition of Feelings", "centers": ("root", "solar"), "summary": "Begins emotional experience through desire and imagination."},
     {"gates": (34, 20), "name": "Charisma", "centers": ("sacral", "throat"), "summary": "Turns sacral power directly into visible action in the moment."},
 ]
+
+CHANNEL_ENCYCLOPEDIA: Dict[str, str] = {
+    "64-47": "Transforms abstract confusion into coherent realization through retrospective processing and mental synthesis.",
+    "61-24": "Cycles mystery pressure into inner certainty through repeated contemplation and conceptual integration.",
+    "63-4": "Tests patterns with doubt and converts uncertainty into structured, testable answers.",
+    "17-62": "Organizes opinions into precise language; ideal for documentation, specification, and logical communication.",
+    "43-23": "Converts disruptive insight into transmissible form; timing determines whether it is rejected or transformative.",
+    "11-56": "Animates ideas through stories and conceptual movement, creating social learning through narrative.",
+    "31-7": "Represents collective direction through recognized influence and role-based leadership.",
+    "8-1": "Expresses unique identity as practical contribution, influencing culture through visible originality.",
+    "33-13": "Processes collective memory through retreat and later storytelling, turning experience into usable wisdom.",
+    "10-20": "Expresses authentic behavior in real time; alignment and immediacy become one channel of action.",
+    "20-57": "Voices intuitive truth in the present moment with rapid situational sensing.",
+    "16-48": "Converts depth into practiced mastery through repetition, competence pressure, and refinement.",
+    "12-22": "Channels emotional mood into social expression; communication quality depends on emotional timing.",
+    "35-36": "Drives growth through emotionally charged experience and adaptive transitions.",
+    "45-21": "Manages material resources through executive control, stewardship, and boundary authority.",
+    "25-51": "Initiates awakening through shock, courage, and high-voltage transformative pressure.",
+    "46-29": "Discovers truth through embodied commitment and full participation in life experience.",
+    "15-5": "Regulates life rhythm across extremes, supporting long-cycle sustainability and energetic coherence.",
+    "2-14": "Aligns resource power with inner direction, creating purpose-driven productivity.",
+    "10-57": "Embodies intuitive correctness in behavior, merging somatic truth and personal conduct.",
+    "10-34": "Channels autonomous empowerment through direct sacral movement and self-directed action.",
+    "26-44": "Combines instinctive memory with persuasive influence; ethical intent determines quality of impact.",
+    "37-40": "Builds community through agreements, reciprocity, and mature tribal exchange structures.",
+    "27-50": "Protects continuity through responsible care, nourishment, and value-based support systems.",
+    "34-57": "Unites primal power with immediate instinct for fast, high-stakes decision capacity.",
+    "59-6": "Creates intimacy by dissolving barriers while negotiating emotional boundary sensitivity.",
+    "42-53": "Carries developmental cycles from initiation to completion, integrating growth through closure.",
+    "3-60": "Mutates under limitation, producing innovation through structured constraints.",
+    "9-52": "Focuses concentrated energy into precise execution and durable deep work.",
+    "18-58": "Improves systems through corrective vitality, turning critique into practical uplift.",
+    "28-38": "Finds meaning through purposeful struggle and selective confrontation with adversity.",
+    "32-54": "Transforms ambition through instinctive timing and strategic material evolution.",
+    "19-49": "Reconfigures bonds and norms through need sensitivity and principled boundary resets.",
+    "39-55": "Provokes emotional spirit and depth, revealing authenticity through mood dynamics.",
+    "41-30": "Initiates experiential arcs through desire and emotional imagination.",
+    "34-20": "Manifests sacral life force directly into visible present-moment action.",
+}
 
 
 def _norm(lon: float) -> float:
@@ -397,13 +503,8 @@ def _build_active_gates(personality: List[Dict[str, Any]], design: List[Dict[str
 
 
 def _gate_encyclopedic_text(gate_num: int, gate_name: str, keynote: str, description: str, personality_count: int, design_count: int) -> str:
-    emphasis = "balanced expression" if personality_count and design_count else ("conscious expression" if personality_count else "somatic/unconscious expression")
-    return (
-        f"Gate {gate_num} ({gate_name}) belongs to the frequency of {keynote}. "
-        f"In classical Human Design analysis, this gate describes a recurring life motif that shapes cognition, relational patterns, and decision pressure. "
-        f"{description} In this chart it is activated as {emphasis} (personality activations: {personality_count}, design activations: {design_count}), "
-        f"which means this theme is both a developmental challenge and a strategic strength when aligned with type and authority."
-    )
+    _ = (gate_name, keynote, description, personality_count, design_count)
+    return GATE_ENCYCLOPEDIA.get(gate_num, GATE_DATA[gate_num]["description"])
 
 
 def _center_encyclopedic_text(center_key: str, defined: bool, active_gates: List[int], channels: List[str]) -> str:
@@ -421,14 +522,9 @@ def _center_encyclopedic_text(center_key: str, defined: bool, active_gates: List
 
 
 def _channel_encyclopedic_text(channel: Dict[str, Any], active_gates: Dict[int, Dict[str, Any]]) -> str:
+    _ = active_gates
     gate_a, gate_b = channel["gates"]
-    ga = active_gates[gate_a]
-    gb = active_gates[gate_b]
-    return (
-        f"Channel {gate_a}-{gate_b} ({channel['name']}) links {channel['centers'][0]} and {channel['centers'][1]}. "
-        f"It operates as a stable conduit where Gate {gate_a} ({ga['name']}) and Gate {gate_b} ({gb['name']}) combine into a repeatable behavioral mechanism. "
-        f"Core function: {channel['summary']} In advanced interpretation this channel is read as a long-cycle specialization that influences work style, bonding, timing, and stress-response depending on authority alignment."
-    )
+    return CHANNEL_ENCYCLOPEDIA.get(f"{gate_a}-{gate_b}", channel["summary"])
 
 
 def _gate_to_centers() -> Dict[int, List[str]]:
