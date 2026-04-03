@@ -21,6 +21,14 @@ const HD_MODE_OPTIONS: Array<{ key: HumanDesignContentMode; label: string; subti
   { key: 'practitioner', label: 'Practitioner', subtitle: 'Прикладной фокус' },
 ];
 
+type ReaderSphere = {
+  key: string;
+  title: string;
+  potential: string;
+  risks: string;
+  compensation: string;
+};
+
 function StatCard({ title, value, subtitle, theme }: { title: string; value: string; subtitle?: string; theme: ThemeLike }) {
   return (
     <div className={`rounded-xl border ${theme.card} p-4`}>
@@ -132,10 +140,117 @@ export default function HumanDesignBlock({
   }, [result, theme.tabActive, theme.tabInactive]);
 
   const selectedModeOption = HD_MODE_OPTIONS.find(option => option.key === contentMode) ?? HD_MODE_OPTIONS[1];
+  const isReaderMode = contentMode === 'reader';
 
   const crossTitle = result?.incarnation_cross.primary_title || result?.incarnation_cross.cross_name_ru || result?.incarnation_cross.name;
   const crossText = result?.incarnation_cross.primary_text || result?.incarnation_cross.description;
   const profileContext = result?.incarnation_cross.profile_context_ru;
+
+  const definedCenters = useMemo(() => result?.centers.filter(center => center.defined) ?? [], [result]);
+  const openCenters = useMemo(() => result?.centers.filter(center => !center.defined) ?? [], [result]);
+  const topGateNames = useMemo(() => (result?.gates ?? []).slice(0, 4).map(g => `${g.gate} ${g.name}`), [result]);
+
+  const readerNutrition = useMemo(() => {
+    if (!result) return '';
+    const hasDefinedSacral = definedCenters.some(c => c.key === 'sacral');
+    const hasOpenSolar = openCenters.some(c => c.key === 'solar');
+    const hasOpenRoot = openCenters.some(c => c.key === 'root');
+    const base = hasDefinedSacral
+      ? 'Вашему телу лучше подходит ритмичное питание: 3-4 понятных приёма пищи, стабильный сон и регулярная физическая нагрузка средней интенсивности.'
+      : 'Вашему телу важнее гибкий режим: небольшие порции, паузы на восстановление, меньше перегрузок и больше наблюдения за реакцией организма.';
+    const emotional = hasOpenSolar
+      ? 'При сильных эмоциях не принимайте решения о питании «сгоряча»: сначала вода, пауза, затем простой тёплый приём пищи.'
+      : 'Эмоциональные волны могут влиять на аппетит, поэтому держите базовый «антикризисный» набор продуктов и стабильные окна питания.';
+    const stress = hasOpenRoot
+      ? 'Стресс может толкать в переедание или пропуск еды: ставьте напоминания на еду и короткие паузы дыхания каждые 2-3 часа.'
+      : 'Высокий темп лучше поддерживать сочетанием белка, сложных углеводов и воды, чтобы не проваливаться по энергии к вечеру.';
+    return `${base} ${emotional} ${stress}`;
+  }, [result, definedCenters, openCenters]);
+
+  const readerLocation = useMemo(() => {
+    if (!result) return '';
+    const hasOpenG = openCenters.some(c => c.key === 'g');
+    const hasDefinedSpleen = definedCenters.some(c => c.key === 'spleen');
+    const placeAdvice = hasOpenG
+      ? 'Для вас место критически важно: выбирайте локации, где телу спокойно, есть "свои" люди и понятный ритм. В токсичной среде мотивация и самоощущение быстро падают.'
+      : 'Вам подходят локации, где можно удерживать свой вектор и долгие проекты: стабильная инфраструктура, рабочий фокус и минимум хаоса.';
+    const bodyAdvice = hasDefinedSpleen
+      ? 'Ориентируйтесь на телесный сигнал безопасности: если пространство «не ваше», вы это чувствуете сразу.'
+      : 'Проверяйте место не по идее, а по факту: 2-3 дня теста ритма (сон, аппетит, продуктивность, настроение) дают честный ответ.';
+    return `${placeAdvice} ${bodyAdvice}`;
+  }, [result, definedCenters, openCenters]);
+
+  const readerRelationships = useMemo(() => {
+    if (!result) return '';
+    const hasOpenEgo = openCenters.some(c => c.key === 'ego');
+    const hasOpenSolar = openCenters.some(c => c.key === 'solar');
+    const base = 'В отношениях ключ — не доказывать ценность, а строить ясные договорённости: ритм общения, ожидания, личные границы и зоны ответственности.';
+    const egoAdvice = hasOpenEgo
+      ? 'Не обещайте из желания понравиться: сначала проверка ресурсом, потом обязательство.'
+      : 'Ваше слово весомо, поэтому важно обещать меньше, а выполнять стабильно.';
+    const emoAdvice = hasOpenSolar
+      ? 'Чужие эмоции вы можете усиливать: полезны паузы перед сложными разговорами и «правило 24 часов» для конфликтных решений.'
+      : 'Ваши эмоции проживаются волнами: обсуждать важное лучше после эмоционального выравнивания.';
+    return `${base} ${egoAdvice} ${emoAdvice}`;
+  }, [result, openCenters]);
+
+  const readerSpheres = useMemo<ReaderSphere[]>(() => {
+    if (!result) return [];
+    return [
+      {
+        key: 'work',
+        title: 'Работа и реализация',
+        potential: `Сильная зона: ${result.person_summary.strengths}`,
+        risks: `Риск: ${result.person_summary.risk_patterns}`,
+        compensation: 'Компенсаторика: делите задачи на 2 горизонта (быстрые/долгие), принимайте ключевые решения только по стратегии и авторитету, раз в неделю фиксируйте, что дало состояние сигнатуры.',
+      },
+      {
+        key: 'money',
+        title: 'Деньги и ресурсы',
+        potential: `Ресурсный потенциал усиливается через темы ворот: ${topGateNames.join(', ') || 'ваши активные ворота'}.`,
+        risks: 'Риск потерь обычно возникает в решениях под давлением, спешке и попытке соответствовать чужим ожиданиям.',
+        compensation: 'Компенсаторика: правило 2 шагов для денег — сначала проверка телесного отклика, потом финансовое действие; лимиты риска, прозрачный бюджет, отказ от импульсивных обязательств.',
+      },
+      {
+        key: 'relationships',
+        title: 'Личные отношения',
+        potential: readerRelationships || 'Ваш потенциал раскрывается через честный диалог, эмоциональную зрелость и уважение к разным ритмам близости.',
+        risks: 'Риск: эмоциональные качели, спасательство, обещания выше ресурса, замалчивание границ.',
+        compensation: 'Компенсаторика: еженедельная сверка ожиданий, язык фактов вместо обвинений, отдельные личные восстановительные окна для каждого партнёра.',
+      },
+      {
+        key: 'health',
+        title: 'Энергия и здоровье',
+        potential: 'Потенциал: при правильном ритме тело быстро возвращает ясность, устойчивость и продуктивность.',
+        risks: 'Риск: накопление усталости, тревожность из-за перегруза, несвоевременные решения на фоне эмоционального/стрессового пика.',
+        compensation: `Компенсаторика: ${readerNutrition || 'стабильный режим сна, питания и движения.'}`,
+      },
+      {
+        key: 'place',
+        title: 'Место жизни и окружение',
+        potential: 'Потенциал: правильно выбранная локация ускоряет реализацию, улучшает отношения и снижает внутренний шум.',
+        risks: 'Риск: «не своё» окружение вызывает постоянные сомнения, утомление и потерю направления.',
+        compensation: `Компенсаторика: ${readerLocation || 'тестируйте места и выбирайте то, где есть устойчивость и внутреннее спокойствие.'}`,
+      },
+    ];
+  }, [result, topGateNames, readerNutrition, readerLocation, readerRelationships]);
+
+  const [selectedSphereKey, setSelectedSphereKey] = useState('work');
+  const selectedSphere = useMemo(
+    () => readerSpheres.find(s => s.key === selectedSphereKey) ?? readerSpheres[0],
+    [readerSpheres, selectedSphereKey],
+  );
+
+  const [selectedSunPeriodIndex, setSelectedSunPeriodIndex] = useState(0);
+  const [selectedMoonWindowIndex, setSelectedMoonWindowIndex] = useState(0);
+  const selectedSunPeriod = result?.forecast.sun_gate_periods_90d[selectedSunPeriodIndex] ?? null;
+  const selectedMoonWindow = result?.forecast.moon_gate_windows_14d[selectedMoonWindowIndex] ?? null;
+
+  useEffect(() => {
+    setSelectedSphereKey('work');
+    setSelectedSunPeriodIndex(0);
+    setSelectedMoonWindowIndex(0);
+  }, [result?.meta.calculated_at]);
 
   return (
     <div className="space-y-4">
@@ -205,16 +320,6 @@ export default function HumanDesignBlock({
           </div>
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
-            <h3 className={`text-lg font-semibold ${theme.header}`}>Calculation Quality & Verification</h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Quality" value={result.calculation_quality.quality_level} subtitle={`Verified: ${result.calculation_quality.verification_passed ? 'yes' : 'no'}`} theme={theme} />
-              <StatCard title="Ephemeris" value={result.calculation_quality.ephemeris_primary} subtitle={`Fallback: ${result.calculation_quality.ephemeris_fallback}`} theme={theme} />
-              <StatCard title="Max Delta" value={`${result.calculation_quality.max_longitude_delta_deg.toFixed(6)}°`} subtitle="SWIEPH vs MOSEPH" theme={theme} />
-              <StatCard title="Design Error" value={`${result.calculation_quality.design_offset_error_deg.toFixed(6)}°`} subtitle="88° offset precision" theme={theme} />
-            </div>
-          </div>
-
-          <div className={`rounded-2xl border ${theme.card} p-5`}>
             <h3 className={`text-lg font-semibold ${theme.header}`}>Detailed Human Design Synthesis</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className={`rounded-xl border ${theme.card} p-3`}>
@@ -240,6 +345,75 @@ export default function HumanDesignBlock({
             </div>
           </div>
 
+          {isReaderMode ? (
+            <div className={`rounded-2xl border ${theme.card} p-5`}>
+              <h3 className={`text-lg font-semibold ${theme.header}`}>Подробно и простым языком: как вам жить свой дизайн</h3>
+              <p className={`mt-1 text-sm ${theme.text}`}>
+                Ниже практичный разбор: кто вы, где ваши сильные стороны, где риски, как их снизить и как выйти в стабильную реализацию.
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Кто вы по системе</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                    Вы — {result.overview.type}, профиль {result.overview.profile_name}. Ваша стратегия: {result.overview.strategy}. Внутренний авторитет: {result.overview.authority}.
+                  </div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Что дает ваш дизайн</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.strengths}</div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Где могут быть проблемы</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.risk_patterns}</div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Как исправить и избежать</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.recommendations}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Как питаться и держать энергию</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{readerNutrition}</div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Какие локации выбирать</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{readerLocation}</div>
+                </div>
+              </div>
+
+              <div className={`mt-3 rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Личные отношения</div>
+                <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{readerRelationships}</div>
+              </div>
+
+              <div className="mt-4">
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Потенциал и риски по сферам жизни</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {readerSpheres.map(sphere => (
+                    <button
+                      key={sphere.key}
+                      type="button"
+                      onClick={() => setSelectedSphereKey(sphere.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-all ${selectedSphere?.key === sphere.key ? theme.tabActive : theme.tabInactive}`}
+                    >
+                      {sphere.title}
+                    </button>
+                  ))}
+                </div>
+                {selectedSphere ? (
+                  <div className={`mt-3 rounded-xl border ${theme.card} p-3`}>
+                    <div className={`text-sm font-semibold ${theme.header}`}>{selectedSphere.title}</div>
+                    <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}><b>Потенциал:</b> {selectedSphere.potential}</div>
+                    <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}><b>Риски:</b> {selectedSphere.risks}</div>
+                    <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}><b>Компенсаторика:</b> {selectedSphere.compensation}</div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className={`rounded-2xl border ${theme.card} p-5`}>
             <div className="flex items-center gap-2">
               <GitBranch className={`h-5 w-5 ${theme.symbol}`} />
@@ -253,6 +427,26 @@ export default function HumanDesignBlock({
             </div>
             <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{crossText}</p>
             {profileContext ? <p className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{profileContext}</p> : null}
+            {isReaderMode ? (
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Суть креста</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{crossText}</div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Что дает и какой потенциал</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                    Потенциал креста раскрывается, когда вы живете по стратегии и авторитету, а ключевые ворота проявляете через конкретные действия, а не через спешку.
+                  </div>
+                </div>
+                <div className={`rounded-xl border ${theme.card} p-3`}>
+                  <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Что требует и как реализовать</div>
+                  <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                    Крест требует дисциплины выбора: меньше импульсивных решений, больше повторяемых шагов, регулярная сверка с тем, что дает состояние {result.overview.signature.toLowerCase()} вместо {result.overview.not_self.toLowerCase()}.
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {result.incarnation_cross.gates.map(item => (
                 <div key={`${item.role}-${item.gate}`} className={`rounded-xl border ${theme.card} p-3`}>
@@ -264,6 +458,7 @@ export default function HumanDesignBlock({
             </div>
           </div>
 
+          {!isReaderMode ? (
           <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
             <div className={`rounded-2xl border ${theme.card} p-5`}>
               <div className="flex items-center gap-2">
@@ -309,69 +504,123 @@ export default function HumanDesignBlock({
               </div>
             </div>
           </div>
+          ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <ActivationTable title="Personality Activations" items={result.activations.personality} theme={theme} />
-            <ActivationTable title="Design Activations" items={result.activations.design} theme={theme} />
-          </div>
+          {!isReaderMode ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <ActivationTable title="Personality Activations" items={result.activations.personality} theme={theme} />
+              <ActivationTable title="Design Activations" items={result.activations.design} theme={theme} />
+            </div>
+          ) : null}
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
             <h3 className={`text-lg font-semibold ${theme.header}`}>Forecast by Periods</h3>
             <p className={`mt-1 text-sm ${theme.text}`}>
-              Transit-based Human Design periods for tactical planning: Sun-gate cycles (90 days) and Moon-gate windows (14 days).
+              {isReaderMode
+                ? 'Простой и подробный прогноз: что делать по периодам, где возможности, где риски и как мягко корректировать курс.'
+                : 'Transit-based Human Design periods for tactical planning: Sun-gate cycles (90 days) and Moon-gate windows (14 days).'}
             </p>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr,1.1fr]">
               <div className={`rounded-xl border ${theme.card} p-3`}>
                 <div className={`text-sm font-semibold ${theme.header}`}>Sun Gate Periods (90d)</div>
                 <div className="mt-3 space-y-2 max-h-80 overflow-auto pr-1">
                   {result.forecast.sun_gate_periods_90d.map((p, idx) => (
-                    <div key={`${p.start_date}-${p.gate}-${idx}`} className={`rounded-lg border ${theme.card} p-2`}>
+                    <button
+                      key={`${p.start_date}-${p.gate}-${idx}`}
+                      type="button"
+                      onClick={() => setSelectedSunPeriodIndex(idx)}
+                      className={`w-full rounded-lg border p-2 text-left transition-all ${selectedSunPeriodIndex === idx ? theme.tabActive : theme.card}`}
+                    >
                       <div className={`text-xs ${theme.text}`}>{p.start_date} - {p.end_date}</div>
                       <div className={`text-sm ${theme.header}`}>Gate {p.gate} · {p.focus}</div>
                       <div className={`text-xs ${theme.text}`}>
                         Resonance: {p.resonates_with_natal ? 'matches natal activation' : 'background transit'}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-sm font-semibold ${theme.header}`}>Moon Gate Windows (14d)</div>
-                <div className="mt-3 space-y-2 max-h-80 overflow-auto pr-1">
-                  {result.forecast.moon_gate_windows_14d.map((m, idx) => (
-                    <div key={`${m.date}-${m.gate}-${idx}`} className={`rounded-lg border ${theme.card} p-2`}>
-                      <div className={`text-xs ${theme.text}`}>{m.date}</div>
-                      <div className={`text-sm ${theme.header}`}>Gate {m.gate} · {m.focus}</div>
-                      <div className={`text-xs ${theme.text}`}>
-                        Resonance: {m.resonates_with_natal ? 'natal gate amplified' : 'transit-only emphasis'}
-                      </div>
+                <div className={`text-sm font-semibold ${theme.header}`}>Разбор выбранного солнечного периода</div>
+                {selectedSunPeriod ? (
+                  <div className="mt-3 space-y-2">
+                    <div className={`rounded-lg border ${theme.card} p-3`}>
+                      <div className={`text-xs ${theme.text}`}>{selectedSunPeriod.start_date} - {selectedSunPeriod.end_date}</div>
+                      <div className={`mt-1 text-base font-semibold ${theme.header}`}>Gate {selectedSunPeriod.gate} · {selectedSunPeriod.focus}</div>
+                      <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                        {selectedSunPeriod.resonates_with_natal
+                          ? 'Это резонансный период: ваша врождённая тема усиливается, легче выйти в ощутимый результат при последовательных действиях.'
+                          : 'Это фоновый обучающий период: хорошо тестировать новые подходы без жестких ожиданий и собирать обратную связь.'}
+                      </p>
+                      <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                        Возможность: сфокусировать 1-2 ключевые задачи на тему ворот {selectedSunPeriod.gate}. Риск: распыление и импульсивные решения.
+                      </p>
+                      <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                        Как избегать проблем: ежедневный короткий план, приоритет по энергии тела, вечерняя ревизия "что сработало" и "что убрать".
+                      </p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : null}
               </div>
+            </div>
+
+            <div className={`mt-4 rounded-xl border ${theme.card} p-3`}>
+              <div className={`text-sm font-semibold ${theme.header}`}>Moon Gate Windows (14d) — быстрые тактические окна</div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {result.forecast.moon_gate_windows_14d.map((m, idx) => (
+                  <button
+                    key={`${m.date}-${m.gate}-${idx}`}
+                    type="button"
+                    onClick={() => setSelectedMoonWindowIndex(idx)}
+                    className={`rounded-lg border px-3 py-2 text-left text-xs transition-all ${selectedMoonWindowIndex === idx ? theme.tabActive : theme.tabInactive}`}
+                  >
+                    <div className={theme.text}>{m.date}</div>
+                    <div className={`mt-1 font-semibold ${theme.header}`}>Gate {m.gate}</div>
+                    <div className={`${m.resonates_with_natal ? 'text-green-400' : theme.text}`}>
+                      {m.resonates_with_natal ? 'Усиление вашей темы' : 'Фоновая тема дня'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {selectedMoonWindow ? (
+                <div className={`mt-3 rounded-lg border ${theme.card} p-3`}>
+                  <div className={`text-sm font-semibold ${theme.header}`}>{selectedMoonWindow.date} · Gate {selectedMoonWindow.gate} · {selectedMoonWindow.focus}</div>
+                  <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                    {selectedMoonWindow.resonates_with_natal
+                      ? 'День усиления: хороший момент для переговоров, презентаций, запуска коротких задач и закрепления привычек.'
+                      : 'День наблюдения: тестируйте гипотезы маленькими шагами, не перегружайте расписание и оставьте время на корректировку.'}
+                  </p>
+                  <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>
+                    Практика дня: 1 главная задача, 1 поддерживающее действие для отношений, 1 действие для здоровья/восстановления.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <div className={`rounded-2xl border ${theme.card} p-5`}>
-            <div className="flex items-center gap-2">
-              <Cpu className={`h-5 w-5 ${theme.symbol}`} />
-              <h3 className={`text-lg font-semibold ${theme.header}`}>Active Gates</h3>
+          {!isReaderMode ? (
+            <div className={`rounded-2xl border ${theme.card} p-5`}>
+              <div className="flex items-center gap-2">
+                <Cpu className={`h-5 w-5 ${theme.symbol}`} />
+                <h3 className={`text-lg font-semibold ${theme.header}`}>Active Gates</h3>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {result.gates.map(gate => (
+                  <div key={gate.gate} className={`rounded-xl border ${theme.card} p-3`}>
+                    <div className={`font-semibold ${theme.header}`}>Gate {gate.gate} · {gate.name}</div>
+                    <div className={`mt-1 text-sm ${theme.text}`}>{gate.keynote}</div>
+                    <div className={`mt-2 text-xs ${theme.text}`}>{gate.description}</div>
+                    <div className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{gate.encyclopedic}</div>
+                    <div className={`mt-3 text-xs ${theme.text}`}>Personality: {gate.personality.length ? gate.personality.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
+                    <div className={`mt-1 text-xs ${theme.text}`}>Design: {gate.design.length ? gate.design.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {result.gates.map(gate => (
-                <div key={gate.gate} className={`rounded-xl border ${theme.card} p-3`}>
-                  <div className={`font-semibold ${theme.header}`}>Gate {gate.gate} · {gate.name}</div>
-                  <div className={`mt-1 text-sm ${theme.text}`}>{gate.keynote}</div>
-                  <div className={`mt-2 text-xs ${theme.text}`}>{gate.description}</div>
-                  <div className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{gate.encyclopedic}</div>
-                  <div className={`mt-3 text-xs ${theme.text}`}>Personality: {gate.personality.length ? gate.personality.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
-                  <div className={`mt-1 text-xs ${theme.text}`}>Design: {gate.design.length ? gate.design.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : null}
         </>
       ) : null}
     </div>
