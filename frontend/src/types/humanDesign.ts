@@ -1,7 +1,8 @@
 export interface HumanDesignActivation {
   planet: string;
   longitude: number;
-  side: 'personality' | 'design';
+  retrograde: boolean;
+  side: 'personality' | 'design' | 'transit';
   gate: number;
   line: number;
   color: number;
@@ -27,8 +28,20 @@ export interface HumanDesignChannel {
   gates: [number, number];
   name: string;
   centers: [string, string];
+  circuit: string;
+  subcircuit: string;
+  stream: string;
   summary: string;
   label: string;
+  encyclopedic: string;
+}
+
+export interface HumanDesignHangingGate {
+  gate: number;
+  name: string;
+  keynote: string;
+  partner_gate: number | null;
+  sides: string[];
   encyclopedic: string;
 }
 
@@ -57,6 +70,20 @@ export interface HumanDesignGateSummary {
 }
 
 export interface HumanDesignResult {
+  meta: {
+    engine_version: string;
+    language: string;
+    zodiac: string;
+    ephemeris_source: string;
+    calculated_at: string;
+  };
+  input: {
+    birth_datetime_local: string;
+    timezone_name: string | null;
+    utc_offset: number;
+    latitude: number;
+    longitude: number;
+  };
   metadata: {
     birth: {
       date: string;
@@ -101,14 +128,47 @@ export interface HumanDesignResult {
   };
   centers: HumanDesignCenter[];
   channels: HumanDesignChannel[];
+  hanging_gates: HumanDesignHangingGate[];
   activations: {
     personality: HumanDesignActivation[];
     design: HumanDesignActivation[];
   };
   gates: HumanDesignGateSummary[];
+  person_summary: {
+    identity: string;
+    decision_making: string;
+    strengths: string;
+    risk_patterns: string;
+    recommendations: string;
+  };
+  forecast: {
+    sun_gate_periods_90d: Array<{
+      start_date: string;
+      end_date: string;
+      gate: number;
+      resonates_with_natal: boolean;
+      focus: string;
+    }>;
+    moon_gate_windows_14d: Array<{
+      date: string;
+      gate: number;
+      focus: string;
+      resonates_with_natal: boolean;
+    }>;
+  };
+  calculation_quality: {
+    ephemeris_primary: string;
+    ephemeris_fallback: string;
+    max_longitude_delta_deg: number;
+    design_offset_error_deg: number;
+    earth_opposition_consistent: boolean;
+    verification_passed: boolean;
+    quality_level: string;
+  };
   statistics: {
     defined_centers: number;
     defined_channels: number;
     active_gates: number;
+    hanging_gates: number;
   };
 }

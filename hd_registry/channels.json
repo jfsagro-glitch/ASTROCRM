@@ -1,0 +1,542 @@
+[
+  {
+    "gates": [
+      63,
+      4
+    ],
+    "name": "Logic",
+    "centers": [
+      "head",
+      "ajna"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Tests patterns and formulates answers through doubt."
+  },
+  {
+    "gates": [
+      17,
+      62
+    ],
+    "name": "Acceptance",
+    "centers": [
+      "ajna",
+      "throat"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Expresses logical opinions with precise detail."
+  },
+  {
+    "gates": [
+      31,
+      7
+    ],
+    "name": "The Alpha",
+    "centers": [
+      "throat",
+      "g"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Leads by recognized influence and directional guidance."
+  },
+  {
+    "gates": [
+      16,
+      48
+    ],
+    "name": "The Wavelength",
+    "centers": [
+      "throat",
+      "spleen"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Turns depth into practiced talent and masterful expression."
+  },
+  {
+    "gates": [
+      9,
+      52
+    ],
+    "name": "Concentration",
+    "centers": [
+      "sacral",
+      "root"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Holds still focus long enough for mastery to develop."
+  },
+  {
+    "gates": [
+      18,
+      58
+    ],
+    "name": "Judgment",
+    "centers": [
+      "spleen",
+      "root"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Improves life through corrective pressure and vitality."
+  },
+  {
+    "gates": [
+      15,
+      5
+    ],
+    "name": "Rhythm",
+    "centers": [
+      "g",
+      "sacral"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Aligns life through natural timing, extremes, and flow."
+  },
+  {
+    "gates": [
+      42,
+      53
+    ],
+    "name": "Maturation",
+    "centers": [
+      "sacral",
+      "root"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Logic",
+    "stream": "Understanding",
+    "summary": "Carries cycles from beginning to completion and growth."
+  },
+  {
+    "gates": [
+      64,
+      47
+    ],
+    "name": "Abstraction",
+    "centers": [
+      "head",
+      "ajna"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Transforms past experience into realized understanding."
+  },
+  {
+    "gates": [
+      11,
+      56
+    ],
+    "name": "Curiosity",
+    "centers": [
+      "ajna",
+      "throat"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Shares stimulating ideas and stories with others."
+  },
+  {
+    "gates": [
+      35,
+      36
+    ],
+    "name": "Transitoriness",
+    "centers": [
+      "throat",
+      "solar"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Seeks change and learns through emotional experience."
+  },
+  {
+    "gates": [
+      33,
+      13
+    ],
+    "name": "The Prodigal",
+    "centers": [
+      "throat",
+      "g"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Withdraws, reflects, and then shares lessons from experience."
+  },
+  {
+    "gates": [
+      46,
+      29
+    ],
+    "name": "Discovery",
+    "centers": [
+      "g",
+      "sacral"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Finds growth through full-bodied commitment and experience."
+  },
+  {
+    "gates": [
+      41,
+      30
+    ],
+    "name": "Recognition of Feelings",
+    "centers": [
+      "root",
+      "solar"
+    ],
+    "circuit": "Collective",
+    "subcircuit": "Abstract",
+    "stream": "Experience",
+    "summary": "Begins emotional experience through desire and imagination."
+  },
+  {
+    "gates": [
+      61,
+      24
+    ],
+    "name": "Awareness",
+    "centers": [
+      "head",
+      "ajna"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Seeks inner truth and rationalizes mystery into insight."
+  },
+  {
+    "gates": [
+      43,
+      23
+    ],
+    "name": "Structuring",
+    "centers": [
+      "ajna",
+      "throat"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Voices inner knowing in unexpectedly transformative ways."
+  },
+  {
+    "gates": [
+      8,
+      1
+    ],
+    "name": "Inspiration",
+    "centers": [
+      "throat",
+      "g"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Models creative individuality through visible contribution."
+  },
+  {
+    "gates": [
+      12,
+      22
+    ],
+    "name": "Openness",
+    "centers": [
+      "throat",
+      "solar"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Expresses emotional mood through refined social presence."
+  },
+  {
+    "gates": [
+      25,
+      51
+    ],
+    "name": "Initiation",
+    "centers": [
+      "g",
+      "ego"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Awakens spirit through courage, innocence, and shock."
+  },
+  {
+    "gates": [
+      28,
+      38
+    ],
+    "name": "Struggle",
+    "centers": [
+      "spleen",
+      "root"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Finds purpose by fighting for meaning that is worth it."
+  },
+  {
+    "gates": [
+      3,
+      60
+    ],
+    "name": "Mutation",
+    "centers": [
+      "sacral",
+      "root"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Transforms limitation into new life patterns and change."
+  },
+  {
+    "gates": [
+      2,
+      14
+    ],
+    "name": "The Beat",
+    "centers": [
+      "g",
+      "sacral"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Channels resources into empowered direction and purpose."
+  },
+  {
+    "gates": [
+      39,
+      55
+    ],
+    "name": "Emoting",
+    "centers": [
+      "root",
+      "solar"
+    ],
+    "circuit": "Individual",
+    "subcircuit": "Knowing",
+    "stream": "Centering",
+    "summary": "Provokes spirit and emotional depth through mood pressure."
+  },
+  {
+    "gates": [
+      10,
+      20
+    ],
+    "name": "Awakening",
+    "centers": [
+      "g",
+      "throat"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Lives and speaks authentic behavior in the now."
+  },
+  {
+    "gates": [
+      20,
+      57
+    ],
+    "name": "The Brainwave",
+    "centers": [
+      "throat",
+      "spleen"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Voices immediate intuitive awareness in the present."
+  },
+  {
+    "gates": [
+      10,
+      57
+    ],
+    "name": "Perfected Form",
+    "centers": [
+      "g",
+      "spleen"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Embodies intuitive survival and correct bodily behavior."
+  },
+  {
+    "gates": [
+      10,
+      34
+    ],
+    "name": "Exploration",
+    "centers": [
+      "g",
+      "sacral"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Lives self-empowerment through autonomous sacral movement."
+  },
+  {
+    "gates": [
+      34,
+      57
+    ],
+    "name": "Power",
+    "centers": [
+      "sacral",
+      "spleen"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Unites primal power with sharp instinct in the now."
+  },
+  {
+    "gates": [
+      34,
+      20
+    ],
+    "name": "Charisma",
+    "centers": [
+      "sacral",
+      "throat"
+    ],
+    "circuit": "Integration",
+    "subcircuit": "Integration",
+    "stream": "Integration",
+    "summary": "Turns sacral power directly into visible action in the moment."
+  },
+  {
+    "gates": [
+      45,
+      21
+    ],
+    "name": "Money",
+    "centers": [
+      "throat",
+      "ego"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Ego",
+    "stream": "Support",
+    "summary": "Directs resources and material power for the tribe."
+  },
+  {
+    "gates": [
+      26,
+      44
+    ],
+    "name": "Surrender",
+    "centers": [
+      "ego",
+      "spleen"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Ego",
+    "stream": "Support",
+    "summary": "Uses instinctive memory and persuasive force for influence."
+  },
+  {
+    "gates": [
+      37,
+      40
+    ],
+    "name": "Community",
+    "centers": [
+      "solar",
+      "ego"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Ego",
+    "stream": "Support",
+    "summary": "Builds tribal agreements, family bonds, and reciprocal support."
+  },
+  {
+    "gates": [
+      59,
+      6
+    ],
+    "name": "Mating",
+    "centers": [
+      "sacral",
+      "solar"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Defense",
+    "stream": "Defense",
+    "summary": "Creates bonding and intimacy through emotional chemistry."
+  },
+  {
+    "gates": [
+      27,
+      50
+    ],
+    "name": "Preservation",
+    "centers": [
+      "sacral",
+      "spleen"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Defense",
+    "stream": "Defense",
+    "summary": "Protects and nourishes life through responsible care."
+  },
+  {
+    "gates": [
+      19,
+      49
+    ],
+    "name": "Synthesis",
+    "centers": [
+      "root",
+      "solar"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Defense",
+    "stream": "Defense",
+    "summary": "Reforms bonds and support structures through need and principle."
+  },
+  {
+    "gates": [
+      32,
+      54
+    ],
+    "name": "Transformation",
+    "centers": [
+      "spleen",
+      "root"
+    ],
+    "circuit": "Tribal",
+    "subcircuit": "Defense",
+    "stream": "Defense",
+    "summary": "Uses ambition and instinct to evolve material potential."
+  }
+]

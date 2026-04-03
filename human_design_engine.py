@@ -10,11 +10,23 @@ This module calculates a practical professional-grade Human Design profile:
 
 from __future__ import annotations
 
+import json
 import math
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
+from datetime import date as date_cls, datetime, timedelta, timezone as _tz
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import swisseph as swe
+
+try:
+    from zoneinfo import ZoneInfo as _ZoneInfo  # Python 3.9+
+except ImportError:
+    try:
+        from backports.zoneinfo import ZoneInfo as _ZoneInfo  # type: ignore
+    except ImportError:
+        _ZoneInfo = None  # type: ignore
+
+ENGINE_VERSION = "2.1.0"
 
 
 GATE_ORDER = [
@@ -34,6 +46,9 @@ LINE_SPAN = GATE_SPAN / 6.0
 COLOR_SPAN = LINE_SPAN / 6.0
 TONE_SPAN = COLOR_SPAN / 6.0
 BASE_SPAN = TONE_SPAN / 5.0
+
+EPHE_FLAGS_PRIMARY = swe.FLG_SWIEPH | swe.FLG_SPEED
+EPHE_FLAGS_FALLBACK = swe.FLG_MOSEPH | swe.FLG_SPEED
 
 PLANET_SEQUENCE: List[Tuple[str, int | None]] = [
     ("sun", swe.SUN),
@@ -286,42 +301,48 @@ GATE_ENCYCLOPEDIA: Dict[int, str] = {
 }
 
 CHANNEL_DATA = [
-    {"gates": (64, 47), "name": "Abstraction", "centers": ("head", "ajna"), "summary": "Transforms past experience into realized understanding."},
-    {"gates": (61, 24), "name": "Awareness", "centers": ("head", "ajna"), "summary": "Seeks inner truth and rationalizes mystery into insight."},
-    {"gates": (63, 4), "name": "Logic", "centers": ("head", "ajna"), "summary": "Tests patterns and formulates answers through doubt."},
-    {"gates": (17, 62), "name": "Acceptance", "centers": ("ajna", "throat"), "summary": "Expresses logical opinions with precise detail."},
-    {"gates": (43, 23), "name": "Structuring", "centers": ("ajna", "throat"), "summary": "Voices inner knowing in unexpectedly transformative ways."},
-    {"gates": (11, 56), "name": "Curiosity", "centers": ("ajna", "throat"), "summary": "Shares stimulating ideas and stories with others."},
-    {"gates": (31, 7), "name": "The Alpha", "centers": ("throat", "g"), "summary": "Leads by recognized influence and directional guidance."},
-    {"gates": (8, 1), "name": "Inspiration", "centers": ("throat", "g"), "summary": "Models creative individuality through visible contribution."},
-    {"gates": (33, 13), "name": "The Prodigal", "centers": ("throat", "g"), "summary": "Withdraws, reflects, and then shares lessons from experience."},
-    {"gates": (10, 20), "name": "Awakening", "centers": ("g", "throat"), "summary": "Lives and speaks authentic behavior in the now."},
-    {"gates": (20, 57), "name": "The Brainwave", "centers": ("throat", "spleen"), "summary": "Voices immediate intuitive awareness in the present."},
-    {"gates": (16, 48), "name": "The Wavelength", "centers": ("throat", "spleen"), "summary": "Turns depth into practiced talent and masterful expression."},
-    {"gates": (12, 22), "name": "Openness", "centers": ("throat", "solar"), "summary": "Expresses emotional mood through refined social presence."},
-    {"gates": (35, 36), "name": "Transitoriness", "centers": ("throat", "solar"), "summary": "Seeks change and learns through emotional experience."},
-    {"gates": (45, 21), "name": "Money", "centers": ("throat", "ego"), "summary": "Directs resources and material power for the tribe."},
-    {"gates": (25, 51), "name": "Initiation", "centers": ("g", "ego"), "summary": "Awakens spirit through courage, innocence, and shock."},
-    {"gates": (46, 29), "name": "Discovery", "centers": ("g", "sacral"), "summary": "Finds growth through full-bodied commitment and experience."},
-    {"gates": (15, 5), "name": "Rhythm", "centers": ("g", "sacral"), "summary": "Aligns life through natural timing, extremes, and flow."},
-    {"gates": (2, 14), "name": "The Beat", "centers": ("g", "sacral"), "summary": "Channels resources into empowered direction and purpose."},
-    {"gates": (10, 57), "name": "Perfected Form", "centers": ("g", "spleen"), "summary": "Embodies intuitive survival and correct bodily behavior."},
-    {"gates": (10, 34), "name": "Exploration", "centers": ("g", "sacral"), "summary": "Lives self-empowerment through autonomous sacral movement."},
-    {"gates": (26, 44), "name": "Surrender", "centers": ("ego", "spleen"), "summary": "Uses instinctive memory and persuasive force for influence."},
-    {"gates": (37, 40), "name": "Community", "centers": ("solar", "ego"), "summary": "Builds tribal agreements, family bonds, and reciprocal support."},
-    {"gates": (27, 50), "name": "Preservation", "centers": ("sacral", "spleen"), "summary": "Protects and nourishes life through responsible care."},
-    {"gates": (34, 57), "name": "Power", "centers": ("sacral", "spleen"), "summary": "Unites primal power with sharp instinct in the now."},
-    {"gates": (59, 6), "name": "Mating", "centers": ("sacral", "solar"), "summary": "Creates bonding and intimacy through emotional chemistry."},
-    {"gates": (42, 53), "name": "Maturation", "centers": ("sacral", "root"), "summary": "Carries cycles from beginning to completion and growth."},
-    {"gates": (3, 60), "name": "Mutation", "centers": ("sacral", "root"), "summary": "Transforms limitation into new life patterns and change."},
-    {"gates": (9, 52), "name": "Concentration", "centers": ("sacral", "root"), "summary": "Holds still focus long enough for mastery to develop."},
-    {"gates": (18, 58), "name": "Judgment", "centers": ("spleen", "root"), "summary": "Improves life through corrective pressure and vitality."},
-    {"gates": (28, 38), "name": "Struggle", "centers": ("spleen", "root"), "summary": "Finds purpose by fighting for meaning that is worth it."},
-    {"gates": (32, 54), "name": "Transformation", "centers": ("spleen", "root"), "summary": "Uses ambition and instinct to evolve material potential."},
-    {"gates": (19, 49), "name": "Synthesis", "centers": ("root", "solar"), "summary": "Reforms bonds and support structures through need and principle."},
-    {"gates": (39, 55), "name": "Emoting", "centers": ("root", "solar"), "summary": "Provokes spirit and emotional depth through mood pressure."},
-    {"gates": (41, 30), "name": "Recognition of Feelings", "centers": ("root", "solar"), "summary": "Begins emotional experience through desire and imagination."},
-    {"gates": (34, 20), "name": "Charisma", "centers": ("sacral", "throat"), "summary": "Turns sacral power directly into visible action in the moment."},
+    # ── Collective Logic (Understanding) ─────────────────────────────────────
+    {"gates": (63, 4),  "name": "Logic",             "centers": ("head", "ajna"),     "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Tests patterns and formulates answers through doubt."},
+    {"gates": (17, 62), "name": "Acceptance",        "centers": ("ajna", "throat"),   "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Expresses logical opinions with precise detail."},
+    {"gates": (31, 7),  "name": "The Alpha",         "centers": ("throat", "g"),      "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Leads by recognized influence and directional guidance."},
+    {"gates": (16, 48), "name": "The Wavelength",    "centers": ("throat", "spleen"), "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Turns depth into practiced talent and masterful expression."},
+    {"gates": (9, 52),  "name": "Concentration",     "centers": ("sacral", "root"),   "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Holds still focus long enough for mastery to develop."},
+    {"gates": (18, 58), "name": "Judgment",          "centers": ("spleen", "root"),   "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Improves life through corrective pressure and vitality."},
+    {"gates": (15, 5),  "name": "Rhythm",            "centers": ("g", "sacral"),      "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Aligns life through natural timing, extremes, and flow."},
+    {"gates": (42, 53), "name": "Maturation",        "centers": ("sacral", "root"),   "circuit": "Collective", "subcircuit": "Logic",    "stream": "Understanding", "summary": "Carries cycles from beginning to completion and growth."},
+    # ── Collective Abstract (Experience) ─────────────────────────────────────
+    {"gates": (64, 47), "name": "Abstraction",       "centers": ("head", "ajna"),     "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience",    "summary": "Transforms past experience into realized understanding."},
+    {"gates": (11, 56), "name": "Curiosity",         "centers": ("ajna", "throat"),   "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience",    "summary": "Shares stimulating ideas and stories with others."},
+    {"gates": (35, 36), "name": "Transitoriness",    "centers": ("throat", "solar"),  "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience",    "summary": "Seeks change and learns through emotional experience."},
+    {"gates": (33, 13), "name": "The Prodigal",      "centers": ("throat", "g"),      "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience",    "summary": "Withdraws, reflects, and then shares lessons from experience."},
+    {"gates": (46, 29), "name": "Discovery",         "centers": ("g", "sacral"),      "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience",    "summary": "Finds growth through full-bodied commitment and experience."},
+    {"gates": (41, 30), "name": "Recognition of Feelings", "centers": ("root", "solar"), "circuit": "Collective", "subcircuit": "Abstract", "stream": "Experience", "summary": "Begins emotional experience through desire and imagination."},
+    # ── Individual (Knowing / Centering) ─────────────────────────────────────
+    {"gates": (61, 24), "name": "Awareness",         "centers": ("head", "ajna"),     "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Seeks inner truth and rationalizes mystery into insight."},
+    {"gates": (43, 23), "name": "Structuring",       "centers": ("ajna", "throat"),   "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Voices inner knowing in unexpectedly transformative ways."},
+    {"gates": (8, 1),   "name": "Inspiration",       "centers": ("throat", "g"),      "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Models creative individuality through visible contribution."},
+    {"gates": (12, 22), "name": "Openness",          "centers": ("throat", "solar"),  "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Expresses emotional mood through refined social presence."},
+    {"gates": (25, 51), "name": "Initiation",        "centers": ("g", "ego"),         "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Awakens spirit through courage, innocence, and shock."},
+    {"gates": (28, 38), "name": "Struggle",          "centers": ("spleen", "root"),   "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Finds purpose by fighting for meaning that is worth it."},
+    {"gates": (3, 60),  "name": "Mutation",          "centers": ("sacral", "root"),   "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Transforms limitation into new life patterns and change."},
+    {"gates": (2, 14),  "name": "The Beat",          "centers": ("g", "sacral"),      "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Channels resources into empowered direction and purpose."},
+    {"gates": (39, 55), "name": "Emoting",           "centers": ("root", "solar"),    "circuit": "Individual", "subcircuit": "Knowing",  "stream": "Centering",     "summary": "Provokes spirit and emotional depth through mood pressure."},
+    # ── Integration ───────────────────────────────────────────────────────────
+    {"gates": (10, 20), "name": "Awakening",         "centers": ("g", "throat"),      "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Lives and speaks authentic behavior in the now."},
+    {"gates": (20, 57), "name": "The Brainwave",     "centers": ("throat", "spleen"), "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Voices immediate intuitive awareness in the present."},
+    {"gates": (10, 57), "name": "Perfected Form",    "centers": ("g", "spleen"),      "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Embodies intuitive survival and correct bodily behavior."},
+    {"gates": (10, 34), "name": "Exploration",       "centers": ("g", "sacral"),      "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Lives self-empowerment through autonomous sacral movement."},
+    {"gates": (34, 57), "name": "Power",             "centers": ("sacral", "spleen"), "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Unites primal power with sharp instinct in the now."},
+    {"gates": (34, 20), "name": "Charisma",          "centers": ("sacral", "throat"), "circuit": "Integration", "subcircuit": "Integration", "stream": "Integration", "summary": "Turns sacral power directly into visible action in the moment."},
+    # ── Tribal — Ego (Support) ────────────────────────────────────────────────
+    {"gates": (45, 21), "name": "Money",             "centers": ("throat", "ego"),    "circuit": "Tribal", "subcircuit": "Ego",     "stream": "Support",   "summary": "Directs resources and material power for the tribe."},
+    {"gates": (26, 44), "name": "Surrender",         "centers": ("ego", "spleen"),    "circuit": "Tribal", "subcircuit": "Ego",     "stream": "Support",   "summary": "Uses instinctive memory and persuasive force for influence."},
+    {"gates": (37, 40), "name": "Community",         "centers": ("solar", "ego"),     "circuit": "Tribal", "subcircuit": "Ego",     "stream": "Support",   "summary": "Builds tribal agreements, family bonds, and reciprocal support."},
+    # ── Tribal — Defense ─────────────────────────────────────────────────────
+    {"gates": (59, 6),  "name": "Mating",            "centers": ("sacral", "solar"),  "circuit": "Tribal", "subcircuit": "Defense", "stream": "Defense",   "summary": "Creates bonding and intimacy through emotional chemistry."},
+    {"gates": (27, 50), "name": "Preservation",      "centers": ("sacral", "spleen"), "circuit": "Tribal", "subcircuit": "Defense", "stream": "Defense",   "summary": "Protects and nourishes life through responsible care."},
+    {"gates": (19, 49), "name": "Synthesis",         "centers": ("root", "solar"),    "circuit": "Tribal", "subcircuit": "Defense", "stream": "Defense",   "summary": "Reforms bonds and support structures through need and principle."},
+    {"gates": (32, 54), "name": "Transformation",    "centers": ("spleen", "root"),   "circuit": "Tribal", "subcircuit": "Defense", "stream": "Defense",   "summary": "Uses ambition and instinct to evolve material potential."},
 ]
 
 CHANNEL_ENCYCLOPEDIA: Dict[str, str] = {
@@ -364,6 +385,61 @@ CHANNEL_ENCYCLOPEDIA: Dict[str, str] = {
 }
 
 
+# Optional JSON data layer: if registry files exist, they override in-code defaults.
+_REGISTRY_DIR = Path(__file__).resolve().parent / "hd_registry"
+CROSS_CATALOG: List[Dict[str, Any]] = []
+
+
+def _load_json_registry(filename: str) -> Any:
+    path = _REGISTRY_DIR / filename
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _load_catalogs_from_registry() -> None:
+    global START_DEG, GATE_ORDER, CENTER_DATA, GATE_DATA, CHANNEL_DATA, CROSS_CATALOG
+
+    mandala = _load_json_registry("mandala_order.json")
+    if mandala:
+        gate_order = mandala.get("gate_order")
+        start_deg = mandala.get("start_deg")
+        if isinstance(gate_order, list) and len(gate_order) == 64:
+            GATE_ORDER = [int(x) for x in gate_order]
+        if isinstance(start_deg, (int, float)):
+            START_DEG = float(start_deg)
+
+    centers = _load_json_registry("centers.json")
+    if isinstance(centers, dict) and centers:
+        CENTER_DATA = centers
+
+    gates = _load_json_registry("gates.json")
+    if isinstance(gates, dict) and gates:
+        GATE_DATA = {int(k): v for k, v in gates.items()}
+
+    channels = _load_json_registry("channels.json")
+    if isinstance(channels, list) and channels:
+        normalized: List[Dict[str, Any]] = []
+        for ch in channels:
+            item = dict(ch)
+            item["gates"] = (int(ch["gates"][0]), int(ch["gates"][1]))
+            item["centers"] = (str(ch["centers"][0]), str(ch["centers"][1]))
+            normalized.append(item)
+        CHANNEL_DATA = normalized
+
+    crosses = _load_json_registry("incarnation_crosses.json")
+    if isinstance(crosses, dict):
+        items = crosses.get("items", [])
+        if isinstance(items, list):
+            CROSS_CATALOG = items
+    elif isinstance(crosses, list):
+        CROSS_CATALOG = crosses
+
+
+_load_catalogs_from_registry()
+
+
 def _norm(lon: float) -> float:
     return lon % 360.0
 
@@ -372,9 +448,20 @@ def _opposite(lon: float) -> float:
     return _norm(lon + 180.0)
 
 
-def _planet_lon(jd_ut: float, body: int) -> float:
-    result, _ = swe.calc_ut(jd_ut, body, swe.FLG_MOSEPH | swe.FLG_SPEED)
-    return _norm(float(result[0]))
+def _planet_lon_and_retro(jd_ut: float, body: int, flags: int = EPHE_FLAGS_PRIMARY) -> Tuple[float, bool]:
+    """Return (ecliptic_longitude, is_retrograde)."""
+    try:
+        result, _ = swe.calc_ut(jd_ut, body, flags)
+    except Exception:
+        result, _ = swe.calc_ut(jd_ut, body, EPHE_FLAGS_FALLBACK)
+    lon = _norm(float(result[0]))
+    retrograde = float(result[3]) < 0.0  # longitudinal speed < 0 → retrograde
+    return lon, retrograde
+
+
+def _planet_lon(jd_ut: float, body: int, flags: int = EPHE_FLAGS_PRIMARY) -> float:
+    lon, _ = _planet_lon_and_retro(jd_ut, body, flags)
+    return lon
 
 
 def _gate_from_lon(lon: float) -> Dict[str, Any]:
@@ -422,51 +509,288 @@ def _datetime_from_jd_local(jd_ut: float, utc_offset: float) -> Dict[str, str]:
 
 
 def _unwrapped_sun_lon(jd_ut: float, birth_sun_lon: float) -> float:
-    lon = _planet_lon(jd_ut, swe.SUN)
+    lon = _planet_lon(jd_ut, swe.SUN, EPHE_FLAGS_PRIMARY)
     if lon > birth_sun_lon:
         lon -= 360.0
     return lon
 
 
 def _design_jd(birth_jd: float) -> float:
-    birth_sun = _planet_lon(birth_jd, swe.SUN)
+    birth_sun = _planet_lon(birth_jd, swe.SUN, EPHE_FLAGS_PRIMARY)
     target = birth_sun - 88.0
     low = birth_jd - 110.0
     high = birth_jd - 70.0
-    for _ in range(60):
+    for _ in range(80):
         mid = (low + high) / 2.0
         current = _unwrapped_sun_lon(mid, birth_sun)
         if current > target:
-            low = mid
-        else:
             high = mid
+        else:
+            low = mid
     return (low + high) / 2.0
 
 
-def _activation_for_planet(planet: str, lon: float, side: str) -> Dict[str, Any]:
+def _activation_for_planet(planet: str, lon: float, side: str, retrograde: bool = False) -> Dict[str, Any]:
     gate_data = _gate_from_lon(lon)
     return {
         "planet": planet,
         "longitude": round(lon, 6),
+        "retrograde": retrograde,
         "side": side,
         **gate_data,
         "label": f"{gate_data['gate']}.{gate_data['line']}.{gate_data['color']}.{gate_data['tone']}.{gate_data['base']}",
     }
 
 
-def _all_activations(jd_ut: float, side: str) -> List[Dict[str, Any]]:
+def _all_activations(jd_ut: float, side: str, flags: int = EPHE_FLAGS_PRIMARY) -> List[Dict[str, Any]]:
     activations: List[Dict[str, Any]] = []
-    cached: Dict[str, float] = {}
+    cached_lon: Dict[str, float] = {}
     for planet_name, body in PLANET_SEQUENCE:
         if planet_name == "earth":
-            lon = _opposite(cached["sun"])
+            lon = _opposite(cached_lon["sun"])
+            retrograde = False  # derived position — retrograde not meaningful
         elif planet_name == "south_node":
-            lon = _opposite(cached["north_node"])
+            lon = _opposite(cached_lon["north_node"])
+            retrograde = False  # derived position
         else:
-            lon = _planet_lon(jd_ut, body)
-            cached[planet_name] = lon
-        activations.append(_activation_for_planet(planet_name, lon, side))
+            lon, retrograde = _planet_lon_and_retro(jd_ut, body, flags)
+            cached_lon[planet_name] = lon
+        activations.append(_activation_for_planet(planet_name, lon, side, retrograde))
     return activations
+
+
+def _verification_report(birth_jd: float, design_jd: float, personality: List[Dict[str, Any]], design: List[Dict[str, Any]]) -> Dict[str, Any]:
+    personality_moseph = _all_activations(birth_jd, "personality", EPHE_FLAGS_FALLBACK)
+    design_moseph = _all_activations(design_jd, "design", EPHE_FLAGS_FALLBACK)
+
+    def max_lon_diff(a: List[Dict[str, Any]], b: List[Dict[str, Any]]) -> float:
+        diffs: List[float] = []
+        for x, y in zip(a, b):
+            d = abs(x["longitude"] - y["longitude"])
+            if d > 180:
+                d = 360 - d
+            diffs.append(d)
+        return max(diffs) if diffs else 0.0
+
+    p_diff = max_lon_diff(personality, personality_moseph)
+    d_diff = max_lon_diff(design, design_moseph)
+
+    def circ_diff(a: float, b: float) -> float:
+        d = abs((a - b) % 360.0)
+        return min(d, 360.0 - d)
+
+    p_map = {item["planet"]: item for item in personality}
+    d_map = {item["planet"]: item for item in design}
+    earth_ok = circ_diff(_opposite(p_map["sun"]["longitude"]), p_map["earth"]["longitude"]) < 1e-6
+    design_earth_ok = circ_diff(_opposite(d_map["sun"]["longitude"]), d_map["earth"]["longitude"]) < 1e-6
+
+    birth_sun = _planet_lon(birth_jd, swe.SUN, EPHE_FLAGS_PRIMARY)
+    design_sun_unwrapped = _unwrapped_sun_lon(design_jd, birth_sun)
+    offset_from_88 = abs(design_sun_unwrapped - (birth_sun - 88.0))
+
+    max_diff = max(p_diff, d_diff)
+    quality = "high" if max_diff < 0.01 and offset_from_88 < 0.02 else ("good" if max_diff < 0.05 else "needs_review")
+    return {
+        "ephemeris_primary": "SWIEPH",
+        "ephemeris_fallback": "MOSEPH",
+        "max_longitude_delta_deg": round(max_diff, 6),
+        "design_offset_error_deg": round(offset_from_88, 6),
+        "earth_opposition_consistent": earth_ok and design_earth_ok,
+        "verification_passed": quality != "needs_review" and earth_ok and design_earth_ok,
+        "quality_level": quality,
+    }
+
+
+def _sun_gate_periods(start_day: date_cls, days: int, active_gate_set: set[int]) -> List[Dict[str, Any]]:
+    periods: List[Dict[str, Any]] = []
+    current_gate: int | None = None
+    current_start: date_cls | None = None
+
+    for i in range(days + 1):
+        day = start_day + timedelta(days=i)
+        jd_ut = swe.julday(day.year, day.month, day.day, 12.0)
+        gate = _gate_from_lon(_planet_lon(jd_ut, swe.SUN))["gate"]
+        if current_gate is None:
+            current_gate = gate
+            current_start = day
+            continue
+        if gate != current_gate:
+            periods.append({
+                "start_date": current_start.strftime("%Y-%m-%d"),
+                "end_date": (day - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "gate": current_gate,
+                "resonates_with_natal": current_gate in active_gate_set,
+                "focus": GATE_DATA[current_gate]["name"],
+            })
+            current_gate = gate
+            current_start = day
+
+    if current_gate is not None and current_start is not None:
+        periods.append({
+            "start_date": current_start.strftime("%Y-%m-%d"),
+            "end_date": (start_day + timedelta(days=days)).strftime("%Y-%m-%d"),
+            "gate": current_gate,
+            "resonates_with_natal": current_gate in active_gate_set,
+            "focus": GATE_DATA[current_gate]["name"],
+        })
+    return periods
+
+
+def _moon_gate_windows(start_day: date_cls, days: int, active_gate_set: set[int]) -> List[Dict[str, Any]]:
+    windows: List[Dict[str, Any]] = []
+    for i in range(days):
+        day = start_day + timedelta(days=i)
+        jd_ut = swe.julday(day.year, day.month, day.day, 12.0)
+        gate = _gate_from_lon(_planet_lon(jd_ut, swe.MOON))["gate"]
+        windows.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "gate": gate,
+            "focus": GATE_DATA[gate]["name"],
+            "resonates_with_natal": gate in active_gate_set,
+        })
+    return windows
+
+
+def _person_summary(overview: Dict[str, Any], centers: List[Dict[str, Any]], channels: List[Dict[str, Any]], gates: List[Dict[str, Any]]) -> Dict[str, str]:
+    defined = [c["name"] for c in centers if c["defined"]]
+    open_centers = [c["name"] for c in centers if not c["defined"]]
+    top_channels = channels[:3]
+    top_gates = gates[:5]
+
+    identity = (
+        f"Type {overview['type']} with profile {overview['profile_name']} and {overview['definition']}. "
+        f"Core stable circuitry: {', '.join(defined) if defined else 'none'}; adaptive openness: {', '.join(open_centers) if open_centers else 'none'}."
+    )
+    decision = (
+        f"Primary strategy is '{overview['strategy']}'. Authority is {overview['authority']}: {overview['authority_description']} "
+        f"Key operational marker: signature '{overview['signature']}', not-self marker '{overview['not_self']}'."
+    )
+    strengths = (
+        "Top deterministic competencies are carried by channels: "
+        + (", ".join(f"{c['label']} {c['name']}" for c in top_channels) if top_channels else "none")
+        + ". Dominant gate themes: "
+        + (", ".join(f"{g['gate']} {g['name']}" for g in top_gates) if top_gates else "none")
+        + "."
+    )
+    risks = (
+        "Primary risk pattern is de-alignment from strategy/authority under external pressure, especially through open centers: "
+        + (", ".join(open_centers) if open_centers else "minimal open-center distortion")
+        + ". Corrective action is pacing decisions and validating body signal before commitment."
+    )
+    recommendations = (
+        "1) Decide only via authority protocol, 2) Track weekly energy quality vs signature/not-self states, "
+        "3) Prioritize environments and collaborations that support defined-center strengths, "
+        "4) Build monthly review of recurring gate/channel themes in behavior and outcomes."
+    )
+    return {
+        "identity": identity,
+        "decision_making": decision,
+        "strengths": strengths,
+        "risk_patterns": risks,
+        "recommendations": recommendations,
+    }
+
+
+def _hanging_gates(active_gates: Dict[int, Dict[str, Any]], defined_channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Gates active in the chart that do not complete any channel (hanging / dangling gates §4.4)."""
+    defined_gate_set: set = set()
+    for ch in defined_channels:
+        a, b = ch["gates"]
+        defined_gate_set.add(a)
+        defined_gate_set.add(b)
+
+    # Build a lookup: gate → its channel partner gate
+    partner_map: Dict[int, int] = {}
+    for ch in CHANNEL_DATA:
+        a, b = ch["gates"]
+        partner_map[a] = b
+        partner_map[b] = a
+
+    result = []
+    for gate_num, gate_data in active_gates.items():
+        if gate_num not in defined_gate_set:
+            sides = []
+            if gate_data["personality"]:
+                sides.append("personality")
+            if gate_data["design"]:
+                sides.append("design")
+            result.append({
+                "gate": gate_num,
+                "name": gate_data["name"],
+                "keynote": gate_data["keynote"],
+                "partner_gate": partner_map.get(gate_num),
+                "sides": sides,
+                "encyclopedic": gate_data.get("encyclopedic", ""),
+            })
+    return sorted(result, key=lambda x: x["gate"])
+
+
+def _jd_from_iana(date_str: str, time_str: str, timezone_name: str) -> Tuple[float, float, Dict[str, Any]]:
+    """Return (jd_ut, utc_offset_hours, trace) from local datetime in IANA zone.
+
+    Includes explicit guard for ambiguous and nonexistent wall-times around DST
+    transitions and returns a trace payload describing resolution.
+    """
+    if _ZoneInfo is None:
+        raise RuntimeError(
+            "IANA timezone support requires Python 3.9+ (zoneinfo) or "
+            "'pip install backports.zoneinfo'."
+        )
+
+    fmt = "%Y-%m-%d %H:%M:%S" if len(time_str.split(":")) == 3 else "%Y-%m-%d %H:%M"
+    local_naive = datetime.strptime(f"{date_str} {time_str}", fmt)
+    tz = _ZoneInfo(timezone_name)
+
+    # Evaluate both folds to classify DST behavior explicitly.
+    fold_candidates: List[Dict[str, Any]] = []
+    for fold in (0, 1):
+        aware = local_naive.replace(tzinfo=tz, fold=fold)
+        to_utc = aware.astimezone(_tz.utc)
+        roundtrip = to_utc.astimezone(tz).replace(tzinfo=None)
+        offset_hours = aware.utcoffset().total_seconds() / 3600.0
+        fold_candidates.append({
+            "fold": fold,
+            "offset_hours": offset_hours,
+            "valid_roundtrip": roundtrip == local_naive,
+            "utc_iso": to_utc.isoformat().replace("+00:00", "Z"),
+        })
+
+    valid = [x for x in fold_candidates if x["valid_roundtrip"]]
+    if not valid:
+        raise ValueError(
+            f"Nonexistent local time due to DST transition: {date_str} {time_str} in {timezone_name}"
+        )
+
+    distinct_offsets = {v["offset_hours"] for v in valid}
+    is_ambiguous = len(valid) > 1 and len(distinct_offsets) > 1
+    chosen = valid[0]  # deterministic policy: earliest fold when ambiguous
+    local_aware = local_naive.replace(tzinfo=tz, fold=int(chosen["fold"]))
+    utc_aware = local_aware.astimezone(_tz.utc)
+    utc_offset_hours = local_aware.utcoffset().total_seconds() / 3600.0
+    hour_frac = utc_aware.hour + utc_aware.minute / 60.0 + utc_aware.second / 3600.0
+    jd = swe.julday(utc_aware.year, utc_aware.month, utc_aware.day, hour_frac)
+    trace = {
+        "source": "iana",
+        "timezone_name": timezone_name,
+        "input_local": f"{date_str}T{time_str}",
+        "ambiguous": is_ambiguous,
+        "chosen_fold": int(chosen["fold"]),
+        "candidate_folds": fold_candidates,
+        "resolved_utc": utc_aware.isoformat().replace("+00:00", "Z"),
+    }
+    return jd, utc_offset_hours, trace
+
+
+def _cross_from_catalog(p_sun: int, p_earth: int, d_sun: int, d_earth: int) -> Optional[Dict[str, Any]]:
+    for item in CROSS_CATALOG:
+        if (
+            int(item.get("personality_sun_gate", -1)) == p_sun
+            and int(item.get("personality_earth_gate", -1)) == p_earth
+            and int(item.get("design_sun_gate", -1)) == d_sun
+            and int(item.get("design_earth_gate", -1)) == d_earth
+        ):
+            return item
+    return None
 
 
 def _build_active_gates(personality: List[Dict[str, Any]], design: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
@@ -721,20 +1045,65 @@ def _cross(personality_sun: Dict[str, Any], personality_earth: Dict[str, Any], d
         f"with grounding in Gate {personality_earth['gate']} {personality_earth['name']}, while the design side adds "
         f"Gate {design_sun['gate']} {design_sun['name']} and Gate {design_earth['gate']} {design_earth['name']}."
     )
+
+    catalog_match = _cross_from_catalog(
+        int(personality_sun["gate"]),
+        int(personality_earth["gate"]),
+        int(design_sun["gate"]),
+        int(design_earth["gate"]),
+    )
+
     return {
-        "name": cross_name,
-        "angle": angle,
+        "name": catalog_match.get("cross_name", cross_name) if catalog_match else cross_name,
+        "canonical_name": catalog_match.get("cross_name", cross_name) if catalog_match else cross_name,
+        "angle": catalog_match.get("angle_type", angle) if catalog_match else angle,
+        "code": catalog_match.get("cross_code", "dynamic") if catalog_match else "dynamic",
         "gates": gates,
-        "description": description,
+        "description": catalog_match.get("interpretation_short", description) if catalog_match else description,
+        "catalog_match": bool(catalog_match),
     }
 
 
-def calc_human_design(date: str, time: str, lat: float, lon: float, utc: float) -> Dict[str, Any]:
-    birth_jd = _jd_from_local(date, time, utc)
+def calc_human_design(
+    date: str,
+    time: str,
+    lat: float,
+    lon: float,
+    utc: float,
+    timezone_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Calculate a full Human Design bodygraph.
+
+    Args:
+        date: Birth date YYYY-MM-DD
+        time: Birth time HH:MM or HH:MM:SS (local)
+        lat:  Latitude degrees (north positive)
+        lon:  Longitude degrees (east positive)
+        utc:  UTC offset hours.  Ignored when *timezone_name* is given.
+        timezone_name: IANA timezone string (e.g. "Europe/Chisinau").
+            When supplied the UTC offset is derived precisely including DST.
+    """
+    resolved_tz: Optional[str] = timezone_name
+    timezone_trace: Dict[str, Any]
+    if timezone_name:
+        birth_jd, utc, timezone_trace = _jd_from_iana(date, time, timezone_name)
+    else:
+        birth_jd = _jd_from_local(date, time, utc)
+        resolved_tz = f"UTC{'+' if utc >= 0 else ''}{utc:g}"
+        timezone_trace = {
+            "source": "utc_offset",
+            "timezone_name": resolved_tz,
+            "input_local": f"{date}T{time}",
+            "ambiguous": False,
+            "chosen_fold": 0,
+            "candidate_folds": [],
+            "resolved_utc": None,
+        }
+
     design_jd = _design_jd(birth_jd)
 
-    personality = _all_activations(birth_jd, "personality")
-    design = _all_activations(design_jd, "design")
+    personality = _all_activations(birth_jd, "personality", EPHE_FLAGS_PRIMARY)
+    design = _all_activations(design_jd, "design", EPHE_FLAGS_PRIMARY)
     active_gates = _build_active_gates(personality, design)
     defined_channels = _defined_channels(active_gates)
     centers = _defined_centers(defined_channels, active_gates)
@@ -744,13 +1113,45 @@ def calc_human_design(date: str, time: str, lat: float, lon: float, utc: float) 
     design_map = {item["planet"]: item for item in design}
     profile_data = _profile(personality_map["sun"], design_map["sun"])
     definition = _definition(defined_channels, centers)
+    gates_sorted = sorted(active_gates.values(), key=lambda item: item["gate"])
+    hanging = _hanging_gates(active_gates, defined_channels)
     cross = _cross(
         personality_map["sun"], personality_map["earth"],
         design_map["sun"], design_map["earth"],
         profile_data,
     )
+    quality = _verification_report(birth_jd, design_jd, personality, design)
+    today = datetime.utcnow().date()
+    active_gate_set = set(active_gates)
+    forecast = {
+        "sun_gate_periods_90d": _sun_gate_periods(today, 90, active_gate_set),
+        "moon_gate_windows_14d": _moon_gate_windows(today, 14, active_gate_set),
+    }
+    summary = _person_summary({**type_data, **profile_data, "definition": definition}, centers, defined_channels, gates_sorted)
 
     return {
+        "meta": {
+            "engine_version": ENGINE_VERSION,
+            "language": "en",
+            "zodiac": "tropical",
+            "ephemeris_source": "Swiss Ephemeris",
+            "calculated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "input": {
+            "birth_datetime_local": f"{date}T{time}",
+            "timezone_name": resolved_tz,
+            "utc_offset": round(utc, 4),
+            "latitude": lat,
+            "longitude": lon,
+        },
+        "trace": {
+            "timezone": timezone_trace,
+            "catalog_registry": {
+                "path": str(_REGISTRY_DIR),
+                "loaded": _REGISTRY_DIR.exists(),
+                "cross_catalog_items": len(CROSS_CATALOG),
+            },
+        },
         "metadata": {
             "birth": {
                 "date": date,
@@ -773,14 +1174,19 @@ def calc_human_design(date: str, time: str, lat: float, lon: float, utc: float) 
         "incarnation_cross": cross,
         "centers": centers,
         "channels": defined_channels,
+        "hanging_gates": hanging,
         "activations": {
             "personality": personality,
             "design": design,
         },
-        "gates": sorted(active_gates.values(), key=lambda item: item["gate"]),
+        "gates": gates_sorted,
+        "person_summary": summary,
+        "forecast": forecast,
+        "calculation_quality": quality,
         "statistics": {
             "defined_centers": sum(1 for center in centers if center["defined"]),
             "defined_channels": len(defined_channels),
             "active_gates": len(active_gates),
+            "hanging_gates": len(hanging),
         },
     }

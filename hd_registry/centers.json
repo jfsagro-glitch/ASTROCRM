@@ -1,0 +1,47 @@
+{
+  "head": {
+    "name": "Head",
+    "defined_meaning": "Consistent pressure to inspire, question, and conceptualize.",
+    "open_meaning": "Amplifies mental pressure from the environment and samples inspiration."
+  },
+  "ajna": {
+    "name": "Ajna",
+    "defined_meaning": "Reliable way of processing concepts and forming perspective.",
+    "open_meaning": "Flexible mind that can see many viewpoints without needing certainty."
+  },
+  "throat": {
+    "name": "Throat",
+    "defined_meaning": "Consistent way of expressing, manifesting, or making energy visible.",
+    "open_meaning": "Variable expression; wisdom grows by noticing when to speak and when not to."
+  },
+  "g": {
+    "name": "G Center",
+    "defined_meaning": "Stable identity, direction, and love signature.",
+    "open_meaning": "Fluid identity and direction; thrives in correct people and places."
+  },
+  "ego": {
+    "name": "Ego / Heart",
+    "defined_meaning": "Consistent willpower, value, and capacity to commit resources.",
+    "open_meaning": "Inconsistent willpower; wisdom comes from not forcing proof or promises."
+  },
+  "spleen": {
+    "name": "Spleen",
+    "defined_meaning": "Stable instinct, immunity, and body awareness in the present.",
+    "open_meaning": "Sensitive to fear and wellbeing of others; learns what is healthy to release."
+  },
+  "solar": {
+    "name": "Solar Plexus",
+    "defined_meaning": "Consistent emotional wave and depth of feeling over time.",
+    "open_meaning": "Amplifies emotions from others; clarity comes by not avoiding feeling."
+  },
+  "sacral": {
+    "name": "Sacral",
+    "defined_meaning": "Sustainable life-force, work energy, and response capacity.",
+    "open_meaning": "Variable access to workforce energy; wisdom lies in rest and discernment."
+  },
+  "root": {
+    "name": "Root",
+    "defined_meaning": "Steady pressure to start, evolve, and move through stress.",
+    "open_meaning": "Amplifies stress pressure; mastery comes from pacing instead of rushing."
+  }
+}

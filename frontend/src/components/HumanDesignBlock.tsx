@@ -142,6 +142,42 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
           </div>
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
+            <h3 className={`text-lg font-semibold ${theme.header}`}>Calculation Quality & Verification</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard title="Quality" value={result.calculation_quality.quality_level} subtitle={`Verified: ${result.calculation_quality.verification_passed ? 'yes' : 'no'}`} theme={theme} />
+              <StatCard title="Ephemeris" value={result.calculation_quality.ephemeris_primary} subtitle={`Fallback: ${result.calculation_quality.ephemeris_fallback}`} theme={theme} />
+              <StatCard title="Max Delta" value={`${result.calculation_quality.max_longitude_delta_deg.toFixed(6)}°`} subtitle="SWIEPH vs MOSEPH" theme={theme} />
+              <StatCard title="Design Error" value={`${result.calculation_quality.design_offset_error_deg.toFixed(6)}°`} subtitle="88° offset precision" theme={theme} />
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border ${theme.card} p-5`}>
+            <h3 className={`text-lg font-semibold ${theme.header}`}>Detailed Human Design Synthesis</h3>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Identity</div>
+                <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.identity}</div>
+              </div>
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Decision Making</div>
+                <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.decision_making}</div>
+              </div>
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Strengths</div>
+                <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.strengths}</div>
+              </div>
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Risk Patterns</div>
+                <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.risk_patterns}</div>
+              </div>
+            </div>
+            <div className={`mt-3 rounded-xl border ${theme.card} p-3`}>
+              <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Recommendations</div>
+              <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.recommendations}</div>
+            </div>
+          </div>
+
+          <div className={`rounded-2xl border ${theme.card} p-5`}>
             <div className="flex items-center gap-2">
               <GitBranch className={`h-5 w-5 ${theme.symbol}`} />
               <h3 className={`text-lg font-semibold ${theme.header}`}>Incarnation Cross</h3>
@@ -208,6 +244,45 @@ export default function HumanDesignBlock({ birth, theme }: { birth: BirthInput &
           <div className="grid gap-4 xl:grid-cols-2">
             <ActivationTable title="Personality Activations" items={result.activations.personality} theme={theme} />
             <ActivationTable title="Design Activations" items={result.activations.design} theme={theme} />
+          </div>
+
+          <div className={`rounded-2xl border ${theme.card} p-5`}>
+            <h3 className={`text-lg font-semibold ${theme.header}`}>Forecast by Periods</h3>
+            <p className={`mt-1 text-sm ${theme.text}`}>
+              Transit-based Human Design periods for tactical planning: Sun-gate cycles (90 days) and Moon-gate windows (14 days).
+            </p>
+
+            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-sm font-semibold ${theme.header}`}>Sun Gate Periods (90d)</div>
+                <div className="mt-3 space-y-2 max-h-80 overflow-auto pr-1">
+                  {result.forecast.sun_gate_periods_90d.map((p, idx) => (
+                    <div key={`${p.start_date}-${p.gate}-${idx}`} className={`rounded-lg border ${theme.card} p-2`}>
+                      <div className={`text-xs ${theme.text}`}>{p.start_date} - {p.end_date}</div>
+                      <div className={`text-sm ${theme.header}`}>Gate {p.gate} · {p.focus}</div>
+                      <div className={`text-xs ${theme.text}`}>
+                        Resonance: {p.resonates_with_natal ? 'matches natal activation' : 'background transit'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className={`rounded-xl border ${theme.card} p-3`}>
+                <div className={`text-sm font-semibold ${theme.header}`}>Moon Gate Windows (14d)</div>
+                <div className="mt-3 space-y-2 max-h-80 overflow-auto pr-1">
+                  {result.forecast.moon_gate_windows_14d.map((m, idx) => (
+                    <div key={`${m.date}-${m.gate}-${idx}`} className={`rounded-lg border ${theme.card} p-2`}>
+                      <div className={`text-xs ${theme.text}`}>{m.date}</div>
+                      <div className={`text-sm ${theme.header}`}>Gate {m.gate} · {m.focus}</div>
+                      <div className={`text-xs ${theme.text}`}>
+                        Resonance: {m.resonates_with_natal ? 'natal gate amplified' : 'transit-only emphasis'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>

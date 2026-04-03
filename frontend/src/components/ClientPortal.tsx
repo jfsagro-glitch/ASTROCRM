@@ -2048,12 +2048,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
   const tabs = [
     { key: 'natal',          icon: Star,      label: tr.natalChart },
-    { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'astrosummary',   icon: Sun,       label: 'Астросводка' },
     { key: 'predictive',     icon: Clock,     label: tr.predictive },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
     { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
+    { key: 'human-design',   icon: Layers,    label: 'Human Design' },
   ] as const;
 
   return (
@@ -2143,7 +2143,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         <div className="flex gap-2 border-b pb-1 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
           {tabs.map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${key === 'human-design' ? 'ml-6 border-2 border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : ''} ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}

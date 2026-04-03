@@ -1,0 +1,322 @@
+{
+  "1": {
+    "name": "Creativity",
+    "keynote": "creative self-expression",
+    "description": "Brings original expression, aesthetic force, and authentic contribution."
+  },
+  "2": {
+    "name": "Direction",
+    "keynote": "inner orientation",
+    "description": "Sets the course through receptivity, direction, and attunement."
+  },
+  "3": {
+    "name": "Ordering",
+    "keynote": "mutation through chaos",
+    "description": "Transforms confusion into new order through adaptation."
+  },
+  "4": {
+    "name": "Answers",
+    "keynote": "mental formulation",
+    "description": "Searches for workable explanations and conceptual solutions."
+  },
+  "5": {
+    "name": "Rhythms",
+    "keynote": "natural timing",
+    "description": "Establishes dependable patterns, routines, and energetic cadence."
+  },
+  "6": {
+    "name": "Friction",
+    "keynote": "emotional boundaries",
+    "description": "Creates intimacy and clarity through emotional discernment."
+  },
+  "7": {
+    "name": "Leadership",
+    "keynote": "direction for the group",
+    "description": "Guides collective direction through role awareness and strategy."
+  },
+  "8": {
+    "name": "Contribution",
+    "keynote": "individual style",
+    "description": "Adds distinct style and influence through unique contribution."
+  },
+  "9": {
+    "name": "Focus",
+    "keynote": "concentration",
+    "description": "Applies sustained attention to the small steps that matter."
+  },
+  "10": {
+    "name": "Behavior of the Self",
+    "keynote": "self-alignment",
+    "description": "Expresses authentic behavior, self-love, and lived integrity."
+  },
+  "11": {
+    "name": "Ideas",
+    "keynote": "conceptual abundance",
+    "description": "Produces many stories, images, and possibilities for sharing."
+  },
+  "12": {
+    "name": "Caution",
+    "keynote": "social timing",
+    "description": "Knows when expression is ripe and when silence is stronger."
+  },
+  "13": {
+    "name": "The Listener",
+    "keynote": "memory and witness",
+    "description": "Holds stories, history, and the lessons of shared experience."
+  },
+  "14": {
+    "name": "Power Skills",
+    "keynote": "resource power",
+    "description": "Generates fuel for prosperity, work, and empowered direction."
+  },
+  "15": {
+    "name": "Extremes",
+    "keynote": "humanity and range",
+    "description": "Moves through rhythms of extremes with deep love for humanity."
+  },
+  "16": {
+    "name": "Skills",
+    "keynote": "mastery through practice",
+    "description": "Develops talent through repetition, enthusiasm, and refinement."
+  },
+  "17": {
+    "name": "Opinions",
+    "keynote": "logical patterning",
+    "description": "Forms structured viewpoints from observed patterns and logic."
+  },
+  "18": {
+    "name": "Correction",
+    "keynote": "improvement instinct",
+    "description": "Sees what can be refined, fixed, or made healthier."
+  },
+  "19": {
+    "name": "Sensitivity",
+    "keynote": "needs and closeness",
+    "description": "Feels needs acutely and negotiates contact, support, and belonging."
+  },
+  "20": {
+    "name": "The Now",
+    "keynote": "present-moment expression",
+    "description": "Voices what is true in the immediate moment."
+  },
+  "21": {
+    "name": "Control",
+    "keynote": "managing resources",
+    "description": "Directs material resources and boundaries with decisive will."
+  },
+  "22": {
+    "name": "Grace",
+    "keynote": "mood and openness",
+    "description": "Creates refined emotional presence, charm, and social grace."
+  },
+  "23": {
+    "name": "Assimilation",
+    "keynote": "structuring insight",
+    "description": "Turns inner knowing into clear, digestible expression."
+  },
+  "24": {
+    "name": "Rationalization",
+    "keynote": "return and contemplation",
+    "description": "Revisits insight until it becomes mentally integrated."
+  },
+  "25": {
+    "name": "Innocence",
+    "keynote": "universal love",
+    "description": "Acts from purity, trust, and spirit-led openness."
+  },
+  "26": {
+    "name": "Salesmanship",
+    "keynote": "influence and memory",
+    "description": "Packages value persuasively and knows what will move others."
+  },
+  "27": {
+    "name": "Caring",
+    "keynote": "nourishment",
+    "description": "Protects life through responsible care and material support."
+  },
+  "28": {
+    "name": "Struggle",
+    "keynote": "purpose through challenge",
+    "description": "Finds meaning by engaging worthy battles and existential truth."
+  },
+  "29": {
+    "name": "Perseverance",
+    "keynote": "sacred yes",
+    "description": "Commits deeply and discovers through full-bodied experience."
+  },
+  "30": {
+    "name": "Feelings",
+    "keynote": "desire and intensity",
+    "description": "Generates emotional intensity, longing, and experiential passion."
+  },
+  "31": {
+    "name": "Influence",
+    "keynote": "democratic leadership",
+    "description": "Leads through recognized voice and collective trust."
+  },
+  "32": {
+    "name": "Continuity",
+    "keynote": "instinct for what lasts",
+    "description": "Detects what has future viability and what does not."
+  },
+  "33": {
+    "name": "Privacy",
+    "keynote": "retreat and reflection",
+    "description": "Withdraws to process experience and return with distilled wisdom."
+  },
+  "34": {
+    "name": "Power",
+    "keynote": "pure sacral force",
+    "description": "Provides raw life-force power for movement and embodiment."
+  },
+  "35": {
+    "name": "Change",
+    "keynote": "progress through experience",
+    "description": "Seeks new experiences and learns through transition."
+  },
+  "36": {
+    "name": "Crisis",
+    "keynote": "emotional turbulence",
+    "description": "Navigates uncertainty through emotional depth and adaptation."
+  },
+  "37": {
+    "name": "Friendship",
+    "keynote": "tribal bonds",
+    "description": "Builds family, loyalty, agreements, and emotional support structures."
+  },
+  "38": {
+    "name": "The Fighter",
+    "keynote": "opposition with purpose",
+    "description": "Pushes against what lacks meaning and defends what matters."
+  },
+  "39": {
+    "name": "Provocation",
+    "keynote": "emotional ignition",
+    "description": "Provokes spirit, mood, and depth through catalytic pressure."
+  },
+  "40": {
+    "name": "Deliverance",
+    "keynote": "work and aloneness",
+    "description": "Balances service to the tribe with the need for rest and autonomy."
+  },
+  "41": {
+    "name": "Contraction",
+    "keynote": "imagination and beginning",
+    "description": "Begins cycles through desire, fantasy, and emotional fuel."
+  },
+  "42": {
+    "name": "Growth",
+    "keynote": "completion",
+    "description": "Finishes processes and matures experience into development."
+  },
+  "43": {
+    "name": "Insight",
+    "keynote": "inner knowing",
+    "description": "Produces breakthrough knowing that often precedes understanding."
+  },
+  "44": {
+    "name": "Alertness",
+    "keynote": "pattern memory",
+    "description": "Recognizes recurring patterns and social or material opportunities."
+  },
+  "45": {
+    "name": "Gathering",
+    "keynote": "stewardship",
+    "description": "Organizes resources and voices the needs of the tribe."
+  },
+  "46": {
+    "name": "Embodiment",
+    "keynote": "love of the body",
+    "description": "Finds right place and right timing through embodied presence."
+  },
+  "47": {
+    "name": "Realization",
+    "keynote": "mental alchemy",
+    "description": "Turns confusion into realization through pressure and reflection."
+  },
+  "48": {
+    "name": "Depth",
+    "keynote": "well of solutions",
+    "description": "Carries practical depth and fear of inadequacy that drives mastery."
+  },
+  "49": {
+    "name": "Principles",
+    "keynote": "revolution of values",
+    "description": "Changes bonds and agreements when core values are crossed."
+  },
+  "50": {
+    "name": "Values",
+    "keynote": "custodianship",
+    "description": "Protects what sustains the tribe through ethics and responsibility."
+  },
+  "51": {
+    "name": "Shock",
+    "keynote": "initiation",
+    "description": "Catalyzes awakening through courage, surprise, and competitive spirit."
+  },
+  "52": {
+    "name": "Stillness",
+    "keynote": "concentration through restraint",
+    "description": "Holds energy still so focus can become powerful."
+  },
+  "53": {
+    "name": "Beginnings",
+    "keynote": "starting cycles",
+    "description": "Opens developmental cycles that need time to mature."
+  },
+  "54": {
+    "name": "Ambition",
+    "keynote": "drive to rise",
+    "description": "Transforms material ambition into evolutionary momentum."
+  },
+  "55": {
+    "name": "Spirit",
+    "keynote": "emotional abundance",
+    "description": "Moves through moods that reveal spirit, freedom, and faith."
+  },
+  "56": {
+    "name": "Stimulation",
+    "keynote": "storytelling",
+    "description": "Animates ideas through narrative, curiosity, and experience-sharing."
+  },
+  "57": {
+    "name": "Intuitive Clarity",
+    "keynote": "survival instinct",
+    "description": "Perceives subtle truth instantly through sharpened instinct."
+  },
+  "58": {
+    "name": "Joy",
+    "keynote": "vitality for improvement",
+    "description": "Brings zest, life-enhancement, and pressure to make things better."
+  },
+  "59": {
+    "name": "Intimacy",
+    "keynote": "breaking barriers",
+    "description": "Creates bonding, fertility, and closeness by dissolving defenses."
+  },
+  "60": {
+    "name": "Limitation",
+    "keynote": "mutation through constraints",
+    "description": "Accepts limits so real innovation can occur."
+  },
+  "61": {
+    "name": "Inner Truth",
+    "keynote": "mystery pressure",
+    "description": "Seeks the unknowable and is driven toward inner certainty."
+  },
+  "62": {
+    "name": "Details",
+    "keynote": "precision",
+    "description": "Names specifics and builds trustworthy understanding through detail."
+  },
+  "63": {
+    "name": "Doubt",
+    "keynote": "testing patterns",
+    "description": "Questions assumptions to strengthen logic and proof."
+  },
+  "64": {
+    "name": "Confusion",
+    "keynote": "pressure before clarity",
+    "description": "Carries abstract pressure that resolves into perspective over time."
+  }
+}
