@@ -84,6 +84,10 @@ export default function HumanDesignBlock({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Keep a ref so event handlers can read current result without adding it to deps
+  const resultRef = React.useRef<HumanDesignResult | null>(null);
+  resultRef.current = result;
+
   useEffect(() => {
     setResult(null);
     setError(null);
@@ -91,7 +95,10 @@ export default function HumanDesignBlock({
 
   const canCalculate = Boolean(birth.date && birth.time && Number.isFinite(birth.lat) && Number.isFinite(birth.lon));
 
-  const calculate = useCallback(async () => {
+  // Accepts an optional explicit mode so mode-change handler can pass the new
+  // value directly before the prop update propagates — avoids a second render.
+  const calculate = useCallback(async (explicitMode?: HumanDesignContentMode) => {
+    const modeToUse = explicitMode ?? contentMode;
     if (!canCalculate) {
       setError('Укажите дату, время и город рождения.');
       return;
@@ -99,7 +106,7 @@ export default function HumanDesignBlock({
     setLoading(true);
     setError(null);
     try {
-      setResult(await getHumanDesign(birth, contentMode));
+      setResult(await getHumanDesign(birth, modeToUse));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось рассчитать Human Design');
     } finally {
@@ -107,10 +114,14 @@ export default function HumanDesignBlock({
     }
   }, [birth, canCalculate, contentMode]);
 
-  useEffect(() => {
-    if (!result || result.meta.mode === contentMode) return;
-    void calculate();
-  }, [calculate, contentMode, result]);
+  // Single handler for mode-button clicks: notify parent AND auto-refetch
+  // without any useEffect cascade that could cause React reconciliation errors.
+  const handleModeChange = useCallback((newMode: HumanDesignContentMode) => {
+    onContentModeChange(newMode);
+    if (resultRef.current) {
+      void calculate(newMode);
+    }
+  }, [onContentModeChange, calculate]);
 
   const centerGroups = useMemo(() => {
     if (!result) return [];
@@ -153,7 +164,7 @@ export default function HumanDesignBlock({
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => onContentModeChange(option.key)}
+                  onClick={() => handleModeChange(option.key)}
                   disabled={loading}
                   className={`rounded-full border px-3 py-2 text-left text-xs transition-all ${contentMode === option.key ? theme.tabActive : theme.tabInactive} ${loading ? 'opacity-70' : ''}`}
                 >
