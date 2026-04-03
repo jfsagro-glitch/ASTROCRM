@@ -51,6 +51,29 @@ export async function getAstroSummary(targetDate: string, timeUtc = '12:00') {
   });
 }
 
+export interface RectificationEventInput {
+  type: string;
+  date: string;
+  time?: string;
+}
+
+export async function getRectification(
+  b: BirthInput,
+  events: RectificationEventInput[],
+  rangeMinutes = 180,
+) {
+  return post('/predictive/rectification', {
+    date: b.date,
+    time: b.time,
+    lat: b.lat,
+    lon: b.lon,
+    utc: b.utc,
+    events,
+    range_minutes: rangeMinutes,
+    houses: 'placidus',
+  });
+}
+
 export async function getEphemerisStatus(): Promise<{
   available: boolean; using_se_files: boolean; ephe_dir?: string;
   files?: Record<string, { exists: boolean; bytes: number }>;

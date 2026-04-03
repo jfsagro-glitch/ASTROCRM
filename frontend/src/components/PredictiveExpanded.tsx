@@ -12,14 +12,15 @@ import {
   getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections,
   getTertiaryProgressions, getConverseProgressions,
-  getAstroSummary,
+  getAstroSummary, getRectification,
 } from '../services/astrologyService';
+import type { RectificationEventInput } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-type TabKey = 'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'astrosummary';
+type TabKey = 'transits'|'secondary'|'solar-arc'|'solar-return'|'lunar-return'|'profections'|'tertiary'|'converse'|'astrosummary'|'rectification';
 type AnyResult = Record<string, unknown>;
 
 interface Props {
@@ -33,6 +34,7 @@ interface Props {
 const TABS: { key: TabKey; icon: string; label: string }[] = [
   { key: 'transits',      icon: '🌍', label: 'Транзиты' },
   { key: 'astrosummary',  icon: '🧭', label: 'Астросводка' },
+  { key: 'rectification', icon: '🧬', label: 'Ректификация' },
   { key: 'secondary',     icon: '🌿', label: 'Вторичные прогр.' },
   { key: 'solar-arc',     icon: '☀️', label: 'Солярная дуга' },
   { key: 'solar-return',  icon: '🌞', label: 'Соляр' },
@@ -650,6 +652,68 @@ function AstroSummaryView({ result, theme }: { result: AnyResult; theme: Props['
   );
 }
 
+const RECT_EVENT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'children_birth', label: 'Рождение детей' },
+  { value: 'marriage', label: 'Брак / официальный союз' },
+  { value: 'divorce', label: 'Развод / расставание' },
+  { value: 'relative_death', label: 'Смерть родственника' },
+  { value: 'career_peak', label: 'Карьерный прорыв' },
+  { value: 'relocation', label: 'Переезд' },
+  { value: 'surgery_accident', label: 'Операция / травма / авария' },
+  { value: 'financial_breakthrough', label: 'Финансовый перелом' },
+];
+
+function RectificationView({ result, theme }: { result: AnyResult; theme: Props['theme'] }) {
+  const top = (result.top_candidates as Array<Record<string, unknown>>) ?? [];
+  const diag = (result.event_diagnostics as Array<Record<string, unknown>>) ?? [];
+  return (
+    <div className="space-y-4">
+      <div className={`rounded-xl border ${theme.card} p-4`}>
+        <h4 className={`font-semibold ${theme.header} mb-2`}>Результат автоматической ректификации</h4>
+        <p className={`text-sm ${theme.text}`}>
+          Ректифицированное время: <span className={`font-bold ${theme.accent}`}>{String(result.rectified_time_local ?? '')}</span>
+        </p>
+        <p className={`text-xs ${theme.text} opacity-70 mt-1`}>
+          Смещение от исходного: {String(result.delta_seconds_from_input ?? 0)} сек · Надежность: {String(result.confidence_percent ?? 0)}%
+        </p>
+        <p className={`text-sm ${theme.text} mt-2`}>{String(result.verdict ?? '')}</p>
+      </div>
+
+      {!!top.length && (
+        <div className={`rounded-xl border ${theme.card} p-4`}>
+          <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Топ-кандидаты времени</h4>
+          <div className="space-y-1.5">
+            {top.map((c, i) => (
+              <div key={i} className={`text-xs ${theme.text} flex items-center justify-between`}>
+                <span>#{i + 1} · {String(c.time_local ?? '')}</span>
+                <span className={theme.accent}>score {String(c.score ?? '')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!!diag.length && (
+        <div className={`rounded-xl border ${theme.card} p-4`}>
+          <h4 className={`text-sm font-semibold ${theme.header} mb-2`}>Диагностика по событиям</h4>
+          <div className="space-y-2">
+            {diag.map((d, i) => (
+              <div key={i} className={`text-xs ${theme.text} border-t border-white/10 pt-2`}>
+                <div>• {String(d.event_type ?? '')} ({String(d.event_date ?? '')}) — score {String(d.score ?? '')}</div>
+                {!!d.best_hit && (
+                  <div className="opacity-70 mt-0.5">
+                    Лучший триггер: {String((d.best_hit as Record<string, unknown>).transit ?? '')} {String((d.best_hit as Record<string, unknown>).aspect ?? '')} {String((d.best_hit as Record<string, unknown>).target ?? '')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function PredictiveExpanded({ birth, theme }: Props) {
   const [tab, setTab] = useState<TabKey>('transits');
@@ -665,6 +729,14 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
   // Period range state (for period mode)
   const [periodStart, setPeriodStart] = useState(new Date().toISOString().slice(0, 10));
   const [periodDays,  setPeriodDays]  = useState(30);
+  const [rangeMinutes, setRangeMinutes] = useState(180);
+  const [rectEvents, setRectEvents] = useState<RectificationEventInput[]>([
+    { type: 'marriage', date: '' },
+    { type: 'children_birth', date: '' },
+    { type: 'career_peak', date: '' },
+    { type: 'relocation', date: '' },
+    { type: 'relative_death', date: '' },
+  ]);
 
   const isDark = theme.wheelTheme === 'dark';
 
@@ -682,12 +754,22 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
         case 'tertiary':      data = await getTertiaryProgressions(birth, targetDate) as AnyResult; break;
         case 'converse':      data = await getConverseProgressions(birth, targetDate) as AnyResult; break;
         case 'astrosummary':  data = await getAstroSummary(targetDate, '12:00') as AnyResult; break;
+        case 'rectification': {
+          const prepared = rectEvents
+            .filter(e => e.date)
+            .map(e => ({ type: e.type, date: e.date, time: e.time || undefined }));
+          if (prepared.length < 5) {
+            throw new Error('Для профессиональной ректификации добавьте минимум 5 событий с датами.');
+          }
+          data = await getRectification(birth, prepared, rangeMinutes) as AnyResult;
+          break;
+        }
         default: return;
       }
       setResult(data);
     } catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
-  }, [tab, birth, targetDate, returnYear]);
+  }, [tab, birth, targetDate, returnYear, rectEvents, rangeMinutes]);
 
   // Quick presets (for single-date mode)
   const presets = useMemo(() => {
@@ -725,6 +807,8 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
       return <ProfectionView result={result} theme={theme} />;
     if (type === 'astrosummary')
       return <AstroSummaryView result={result} theme={theme} />;
+    if (type === 'rectification')
+      return <RectificationView result={result} theme={theme} />;
     return (
       <pre className={`text-xs ${theme.text} overflow-auto max-h-60 p-3 rounded-xl border ${theme.card}`}>
         {JSON.stringify(result, null, 2)}
@@ -829,7 +913,77 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
       <div className={`rounded-xl border ${theme.card} p-4 space-y-3`}>
         <h4 className={`text-sm font-semibold ${theme.header}`}>📅 Выбор даты</h4>
 
-        {tab === 'solar-return' ? (
+        {tab === 'rectification' ? (
+          <div className="space-y-3">
+            <p className={`text-xs ${theme.text} opacity-70`}>
+              Автоматическая ректификация: добавьте 5-7 ключевых событий жизни. Время события указывайте, если известно.
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {rectEvents.map((ev, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <label className={`text-[11px] ${theme.text} mb-1 block`}>Событие #{idx + 1}</label>
+                    <select
+                      value={ev.type}
+                      onChange={e => setRectEvents(prev => prev.map((x, i) => i === idx ? { ...x, type: e.target.value } : x))}
+                      className={`w-full px-2 py-2 rounded-lg border text-xs ${theme.card}`}
+                    >
+                      {RECT_EVENT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-4">
+                    <label className={`text-[11px] ${theme.text} mb-1 block`}>Дата</label>
+                    <input
+                      type="date"
+                      value={ev.date}
+                      onChange={e => setRectEvents(prev => prev.map((x, i) => i === idx ? { ...x, date: e.target.value } : x))}
+                      className={`w-full px-2 py-2 rounded-lg border text-xs ${theme.card}`}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className={`text-[11px] ${theme.text} mb-1 block`}>Время</label>
+                    <input
+                      type="time"
+                      step="1"
+                      value={ev.time ?? ''}
+                      onChange={e => setRectEvents(prev => prev.map((x, i) => i === idx ? { ...x, time: e.target.value } : x))}
+                      className={`w-full px-2 py-2 rounded-lg border text-xs ${theme.card}`}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <button
+                      type="button"
+                      onClick={() => setRectEvents(prev => prev.length > 5 ? prev.filter((_, i) => i !== idx) : prev)}
+                      className={`w-full px-2 py-2 rounded-lg border text-xs ${theme.tabInactive}`}
+                      title="Удалить"
+                    >×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRectEvents(prev => prev.length < 7 ? [...prev, { type: 'career_peak', date: '' }] : prev)}
+                className={`px-3 py-1.5 text-xs rounded-lg border ${theme.tabInactive}`}
+              >
+                + Добавить событие
+              </button>
+              <div>
+                <label className={`text-[11px] ${theme.text} mb-1 block`}>Диапазон поиска (мин)</label>
+                <input
+                  type="number"
+                  min={30}
+                  max={720}
+                  step={30}
+                  value={rangeMinutes}
+                  onChange={e => setRangeMinutes(Math.max(30, Math.min(720, parseInt(e.target.value || '180', 10))))}
+                  className={`px-2 py-2 rounded-lg border text-xs w-28 ${theme.card}`}
+                />
+              </div>
+            </div>
+          </div>
+        ) : tab === 'solar-return' ? (
           <div className="flex items-end gap-3">
             <div>
               <label className={`text-xs ${theme.text} mb-1 block`}>Год возврата</label>

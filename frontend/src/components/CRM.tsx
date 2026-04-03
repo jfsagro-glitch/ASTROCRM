@@ -172,7 +172,7 @@ function AddConsultationModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                <input type="time" value={time} onChange={e => setTime(e.target.value)}
+                <input type="time" step="1" value={time} onChange={e => setTime(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
             </div>

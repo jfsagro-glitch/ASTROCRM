@@ -680,6 +680,212 @@ def astro_summary(target_date_str, time_str="12:00"):
     }
 
 
+def rectify_birth_time(date_str, time_str, lat, lon, utc, events,
+                       range_minutes=180, houses_system="placidus"):
+    """
+    Automatic rectification of birth time using major life events.
+    events: list[{'type': str, 'date': 'YYYY-MM-DD', 'time': Optional['HH:MM[:SS]']}]
+    """
+    if not events:
+        raise ValueError("Rectification requires at least one event")
+
+    EVENT_PROFILES = {
+        "children_birth": {"targets": ["h5", "moon", "venus", "jupiter"], "houses": {5, 4, 11}},
+        "marriage": {"targets": ["h7", "venus", "moon", "jupiter"], "houses": {7, 1, 5}},
+        "divorce": {"targets": ["h7", "venus", "saturn", "uranus"], "houses": {7, 8, 12}},
+        "relative_death": {"targets": ["h8", "saturn", "pluto", "node"], "houses": {8, 4, 12}},
+        "career_peak": {"targets": ["h10", "sun", "saturn", "jupiter"], "houses": {10, 6, 2}},
+        "relocation": {"targets": ["h4", "h9", "uranus", "jupiter"], "houses": {4, 9, 3}},
+        "surgery_accident": {"targets": ["h1", "h6", "h8", "mars", "saturn", "uranus"], "houses": {1, 6, 8}},
+        "financial_breakthrough": {"targets": ["h2", "h8", "venus", "jupiter"], "houses": {2, 8, 10}},
+    }
+    ASPECT_WEIGHTS = {
+        "conjunction": (0.0, 1.00),
+        "opposition": (180.0, 0.92),
+        "square": (90.0, 0.84),
+        "trine": (120.0, 0.75),
+        "sextile": (60.0, 0.62),
+    }
+    TRANSIT_BODIES = ["mars", "jupiter", "saturn", "uranus", "neptune", "pluto", "node"]
+
+    hh, mi, sc = parse_time_arg(time_str)
+    yr, mo, dy = parse_date_arg(date_str)
+    base_local_jd = jd(yr, mo, dy, hh, mi, sc)
+    base_utc_jd = base_local_jd - float(utc) / 24.0
+
+    parsed_events = []
+    for ev in events:
+        ev_type = str(ev.get("type") or "").strip().lower()
+        ev_date = str(ev.get("date") or "").strip()
+        if not ev_date:
+            continue
+        ev_time = str(ev.get("time") or "12:00").strip() or "12:00"
+        e_jd = _parse_target_datetime(ev_date, ev_time) - float(utc) / 24.0
+        parsed_events.append({"type": ev_type, "date": ev_date, "time": ev_time, "jd": e_jd})
+
+    if len(parsed_events) < 2:
+        raise ValueError("Rectification needs at least 2 valid events with dates")
+
+    def score_candidate(cand_utc_jd):
+        natal_planets = calc_planets(cand_utc_jd)
+        natal_houses = calc_houses(cand_utc_jd, lat, lon, houses_system)
+        asc_lon = natal_houses.get("h1", natal_houses.get("asc", 0.0))
+        mc_lon = natal_houses.get("h10", natal_houses.get("mc", 0.0))
+
+        total = 0.0
+        signals = []
+
+        for ev in parsed_events:
+            profile = EVENT_PROFILES.get(ev["type"], {"targets": ["h1", "h10", "sun", "moon"], "houses": {1, 10}})
+            transit_planets = calc_planets(ev["jd"])
+            targets = []
+
+            for t in profile["targets"]:
+                if t.startswith("h") and t[1:].isdigit():
+                    if t in natal_houses:
+                        targets.append((t, natal_houses[t]))
+                elif t == "asc":
+                    targets.append(("asc", asc_lon))
+                elif t == "mc":
+                    targets.append(("mc", mc_lon))
+                elif t in natal_planets:
+                    targets.append((t, natal_planets[t]))
+
+            if not targets:
+                continue
+
+            ev_score = 0.0
+            ev_best = None
+            orb = 2.4
+
+            for tr_body in TRANSIT_BODIES:
+                tr_lon = transit_planets.get(tr_body)
+                if tr_lon is None:
+                    continue
+                for t_name, t_lon in targets:
+                    diff = _aspect_diff(tr_lon, t_lon)
+                    for a_name, (a_angle, a_w) in ASPECT_WEIGHTS.items():
+                        dev = abs(diff - a_angle)
+                        if dev <= orb:
+                            hit = a_w * (1.0 - dev / orb)
+                            ev_score += hit
+                            if ev_best is None or hit > ev_best["score"]:
+                                ev_best = {
+                                    "transit": tr_body,
+                                    "target": t_name,
+                                    "aspect": a_name,
+                                    "orb": round(dev, 3),
+                                    "score": round(hit, 4),
+                                }
+
+            age_years = max(0.0, (ev["jd"] - cand_utc_jd) / 365.25)
+            prog_jd = cand_utc_jd + age_years
+            prog = calc_planets(prog_jd)
+            for pp in ["sun", "moon"]:
+                plon = prog.get(pp)
+                if plon is None:
+                    continue
+                for ang_name, ang_lon in [("asc", asc_lon), ("mc", mc_lon)]:
+                    d = _aspect_diff(plon, ang_lon)
+                    for a_name, (a_angle, a_w) in ASPECT_WEIGHTS.items():
+                        dev = abs(d - a_angle)
+                        if dev <= 1.6:
+                            ev_score += 0.7 * a_w * (1.0 - dev / 1.6)
+
+            age_int = int(age_years)
+            annual_house = (age_int % 12) + 1
+            if annual_house in profile["houses"]:
+                ev_score += 0.85
+
+            ev_weight = 1.0 + (0.15 if ev.get("time") and ev.get("time") != "12:00" else 0.0)
+            ev_score *= ev_weight
+            total += ev_score
+            signals.append({
+                "event_type": ev["type"],
+                "event_date": ev["date"],
+                "annual_house": annual_house,
+                "score": round(ev_score, 4),
+                "best_hit": ev_best,
+            })
+
+        return total, signals
+
+    def local_time_from_utc_jd(cand_utc_jd):
+        local_jd = cand_utc_jd + float(utc) / 24.0
+        frac_day = (local_jd + 0.5) % 1.0
+        sec_total = int(round(frac_day * 86400)) % 86400
+        h = sec_total // 3600
+        m = (sec_total % 3600) // 60
+        s = sec_total % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    coarse = []
+    step_coarse = 300
+    for delta_sec in range(-int(range_minutes) * 60, int(range_minutes) * 60 + 1, step_coarse):
+        cand = base_utc_jd + delta_sec / 86400.0
+        sc, _ = score_candidate(cand)
+        coarse.append((sc, cand))
+    coarse.sort(key=lambda x: x[0], reverse=True)
+    best0 = coarse[0][1]
+
+    fine = []
+    for delta_sec in range(-15 * 60, 15 * 60 + 1, 60):
+        cand = best0 + delta_sec / 86400.0
+        sc, _ = score_candidate(cand)
+        fine.append((sc, cand))
+    fine.sort(key=lambda x: x[0], reverse=True)
+    best1 = fine[0][1]
+
+    final = []
+    for delta_sec in range(-120, 120 + 1, 5):
+        cand = best1 + delta_sec / 86400.0
+        sc, sig = score_candidate(cand)
+        final.append((sc, cand, sig))
+    final.sort(key=lambda x: x[0], reverse=True)
+
+    best_score, best_jd, best_signals = final[0]
+    second_score = final[1][0] if len(final) > 1 else 0.0
+    confidence = max(0.0, min(100.0, 55.0 + 12.0 * (best_score - second_score) + 2.5 * len(parsed_events)))
+
+    top_candidates = []
+    for sc_val, c_jd, _ in final[:7]:
+        top_candidates.append({
+            "time_local": local_time_from_utc_jd(c_jd),
+            "score": round(sc_val, 4),
+            "delta_seconds_from_input": int(round((c_jd - base_utc_jd) * 86400)),
+        })
+
+    abs_delta = abs(int(round((best_jd - base_utc_jd) * 86400)))
+    if abs_delta <= 120:
+        verdict = "Исходное время очень близко к оптимальному."
+    elif abs_delta <= 900:
+        verdict = "Требуется умеренная коррекция времени рождения."
+    else:
+        verdict = "Вероятно, исходное время заметно отличается от ректифицированного."
+
+    return {
+        "type": "rectification",
+        "input": {
+            "date": date_str,
+            "time": time_str if len(time_str.split(":")) == 3 else f"{time_str}:00",
+            "utc": utc,
+            "lat": lat,
+            "lon": lon,
+            "events_count": len(parsed_events),
+        },
+        "rectified_time_local": local_time_from_utc_jd(best_jd),
+        "delta_seconds_from_input": int(round((best_jd - base_utc_jd) * 86400)),
+        "confidence_percent": round(confidence, 1),
+        "verdict": verdict,
+        "top_candidates": top_candidates,
+        "event_diagnostics": best_signals,
+        "notes": [
+            "Алгоритм использует: транзиты к углам/сигнификаторам, вторичные прогрессии и годовые профекции.",
+            "Точность выше при 5-7 событиях и наличии точного времени минимум у 2-3 событий.",
+        ],
+    }
+
+
 def ephemerides_table(start_date_str, days=30, time_str="12:00"):
     """
     Build daily ephemerides for core planets.

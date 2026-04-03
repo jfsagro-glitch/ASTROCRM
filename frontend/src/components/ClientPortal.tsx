@@ -174,7 +174,7 @@ function BirthForm({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.time}</label>
-          <input type="time" value={value.time}
+          <input type="time" step="1" value={value.time}
             onChange={e => onChange({ ...value, time: e.target.value })}
             className={inp} />
         </div>
