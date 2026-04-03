@@ -882,7 +882,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
 }
 
 // ─── Synastry Panel ───────────────────────────────────────────────────────────
-type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'composite'|'davison';
+type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'advanced'|'composite'|'davison';
 
 function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey]; people?: SavedPerson[] }) {
   const { tr } = useLang();
@@ -908,6 +908,14 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
   const [forecast, setForecast]           = useState<RelationshipForecast | null>(null);
   const [forecastSphere, setForecastSphere] = useState<string | null>(null);
   const [expandedFortnight, setExpandedFortnight] = useState<number | null>(null);
+
+  // Advanced: synastry + current transits (for both partners)
+  const [advancedDate, setAdvancedDate] = useState(today);
+  const [advancedTime, setAdvancedTime] = useState('12:00');
+  const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [advancedError, setAdvancedError] = useState<string | null>(null);
+  const [advancedSelfTransits, setAdvancedSelfTransits] = useState<AnyResult | null>(null);
+  const [advancedPartnerTransits, setAdvancedPartnerTransits] = useState<AnyResult | null>(null);
 
   const run = useCallback(async () => {
     if (!partner.date) { setError('Введите дату рождения партнёра'); return; }
@@ -940,12 +948,87 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
     [sphereScores, selectedSphere]
   );
 
+  const runAdvanced = useCallback(async () => {
+    if (!partner.date) {
+      setAdvancedError('Сначала заполните данные партнёра и рассчитайте синастрию.');
+      return;
+    }
+    setAdvancedLoading(true);
+    setAdvancedError(null);
+    try {
+      const [selfT, partnerT] = await Promise.all([
+        getTransits(birth, advancedDate, advancedTime),
+        getTransits(partner, advancedDate, advancedTime),
+      ]);
+      setAdvancedSelfTransits(selfT as AnyResult);
+      setAdvancedPartnerTransits(partnerT as AnyResult);
+    } catch (e: unknown) {
+      setAdvancedError((e as Error).message);
+    } finally {
+      setAdvancedLoading(false);
+    }
+  }, [birth, partner, advancedDate, advancedTime]);
+
+  const advancedSummary = useMemo(() => {
+    const selfAspects = ((advancedSelfTransits?.aspects as Array<Record<string, unknown>>) ?? []);
+    const partnerAspects = ((advancedPartnerTransits?.aspects as Array<Record<string, unknown>>) ?? []);
+    const all = [...selfAspects, ...partnerAspects];
+    if (!all.length) {
+      return null;
+    }
+
+    const positive = new Set(['trine', 'sextile']);
+    const challenging = new Set(['square', 'opposition', 'quincunx', 'semisquare', 'sesquisquare', 'contra_parallel']);
+
+    let supportive = 0;
+    let tense = 0;
+    const top = all
+      .map(item => {
+        const aspect = String(item.aspect || '');
+        const orb = typeof item.orb === 'number' ? item.orb : 6;
+        const intensity = Math.max(0.1, 1 - Math.min(orb, 6) / 6);
+        if (positive.has(aspect)) supportive += intensity;
+        if (challenging.has(aspect)) tense += intensity;
+        return {
+          transit: String(item.transit_planet || ''),
+          natal: String(item.natal_planet || ''),
+          aspect,
+          orb,
+          intensity,
+        };
+      })
+      .sort((a, b) => b.intensity - a.intensity)
+      .slice(0, 8);
+
+    const ratio = supportive + tense > 0 ? supportive / (supportive + tense) : 0.5;
+    const balanceLabel = ratio >= 0.62
+      ? 'Поддерживающий транзитный фон'
+      : ratio <= 0.42
+      ? 'Напряжённый транзитный фон'
+      : 'Смешанный транзитный фон';
+
+    const strongestSphere = sphereScores[0];
+    const weakSphere = [...sphereScores].sort((a, b) => a.score - b.score)[0];
+
+    return {
+      totalAspects: all.length,
+      supportive: Math.round(supportive * 100) / 100,
+      tense: Math.round(tense * 100) / 100,
+      ratio,
+      balanceLabel,
+      top,
+      strongestSphere,
+      weakSphere,
+    };
+  }, [advancedSelfTransits, advancedPartnerTransits, sphereScores]);
+
   const TABS: Array<[SynTab, string]> = [
     ['compat',       '⭐ Совместимость'],
     ['aspects',      '🔗 Аспекты'],
     ['spheres',      '🌐 Сферы жизни'],
     ['compensation', '💡 Компенсаторика'],
     ['forecast',     '🔮 Прогностика'],
+    ['advanced',     '🧠 Синастрия + транзиты'],
     ['composite',    '🔵 Композит'],
     ['davison',      '🟡 Дэвисон'],
   ];
@@ -1613,6 +1696,119 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                       isDark={theme.wheelTheme === 'dark'}
                     />
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── ADVANCED: SYNASTRY + TRANSITS ── */}
+          {tab === 'advanced' && (
+            <div className="space-y-4">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <h4 className={`font-semibold ${theme.header} mb-1`}>🧠 Продвинутый уровень: Синастрия + транзиты</h4>
+                <p className={`text-xs ${theme.text} opacity-70`}>
+                  Что это: влияние другого человека + текущие движения планет. Этот блок показывает,
+                  как базовая совместимость пары модифицируется транзитным фоном "здесь и сейчас".
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3 items-end">
+                  <div>
+                    <label className={`text-xs ${theme.text} mb-1 block`}>Дата транзитов</label>
+                    <input
+                      type="date"
+                      value={advancedDate}
+                      onChange={e => setAdvancedDate(e.target.value)}
+                      className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-xs ${theme.text} mb-1 block`}>Время (UTC)</label>
+                    <input
+                      type="time"
+                      value={advancedTime}
+                      onChange={e => setAdvancedTime(e.target.value || '12:00')}
+                      className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`}
+                    />
+                  </div>
+                  <button
+                    onClick={runAdvanced}
+                    disabled={advancedLoading}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${theme.btn}`}
+                  >
+                    {advancedLoading ? <><Spin />Считаю двойные транзиты…</> : 'Обновить продвинутый анализ'}
+                  </button>
+                </div>
+              </div>
+
+              {advancedError && <Err msg={advancedError} />}
+
+              {advancedSummary ? (
+                <>
+                  <div className={`rounded-xl border ${theme.card} p-5`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h5 className={`font-semibold ${theme.header}`}>Баланс транзитного фона пары</h5>
+                        <p className={`text-xs ${theme.text} opacity-70 mt-0.5`}>{advancedSummary.balanceLabel}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm ${theme.text}`}>Аспектов учтено: {advancedSummary.totalAspects}</div>
+                        <div className={`text-xs ${theme.text} opacity-70`}>
+                          Поддержка {advancedSummary.supportive} · Напряжение {advancedSummary.tense}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 mt-3">
+                      <div
+                        className={`h-2 rounded-full ${advancedSummary.ratio >= 0.5 ? 'bg-green-500' : 'bg-orange-500'}`}
+                        style={{ width: `${Math.round(advancedSummary.ratio * 100)}%` }}
+                      />
+                    </div>
+                    <p className={`text-sm leading-relaxed ${theme.text} mt-3`}>
+                      База пары: {overallScore}% совместимости. Сильная сфера: {advancedSummary.strongestSphere?.sphere.name ?? '—'}.
+                      Зона риска: {advancedSummary.weakSphere?.sphere.name ?? '—'}.
+                      Сейчас транзитный фон: {advancedSummary.balanceLabel.toLowerCase()}.
+                    </p>
+                  </div>
+
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <h5 className={`text-sm font-semibold ${theme.accent} mb-2`}>Как читать результат</h5>
+                    <div className="space-y-1.5 text-xs">
+                      <p className={theme.text}>1. Синастрия показывает устойчивую базу отношений (долгий контур).</p>
+                      <p className={theme.text}>2. Транзиты показывают текущую погоду (когда легче договариваться, а когда лучше снизить напряжение).</p>
+                      <p className={theme.text}>3. Если база сильная, но транзиты напряжённые: действуйте мягче, откладывайте острые решения.</p>
+                      <p className={theme.text}>4. Если база средняя, но транзиты поддерживающие: это окно для укрепления договорённостей и сближения.</p>
+                    </div>
+                  </div>
+
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <h5 className={`text-sm font-semibold ${theme.accent} mb-3`}>Топ текущих движений (по силе влияния)</h5>
+                    <div className="space-y-2">
+                      {advancedSummary.top.map((item, idx) => (
+                        <div key={`${item.transit}-${item.natal}-${idx}`} className={`rounded-lg border ${theme.card} p-2 text-xs`}>
+                          <div className={`font-medium ${theme.header}`}>
+                            {pname(item.transit)} {ASPECT_SYMBOLS[item.aspect] || item.aspect} {pname(item.natal)}
+                          </div>
+                          <div className={`${theme.text} opacity-70`}>
+                            orb {item.orb.toFixed(2)}° · интенсивность {item.intensity.toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <h5 className={`text-sm font-semibold ${theme.accent} mb-2`}>Практика на период</h5>
+                    <div className="space-y-1.5 text-xs">
+                      <p className={theme.text}>• В дни напряжения: обсуждать правила и факты, а не претензии и оценки.</p>
+                      <p className={theme.text}>• В дни поддержки: планировать шаги в ключевой сфере пары и фиксировать договорённости письменно.</p>
+                      <p className={theme.text}>• Еженедельно: 1 разговор о чувствах, 1 разговор о быте/ресурсах, 1 совместная восстановительная активность.</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-8 text-center`}>
+                  <p className={`text-sm ${theme.text} opacity-70`}>
+                    Нажмите «Обновить продвинутый анализ», чтобы объединить синастрию с текущими транзитами.
+                  </p>
                 </div>
               )}
             </div>
