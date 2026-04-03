@@ -222,11 +222,74 @@ export async function getParans(b: BirthInput, observerLat: number) {
   });
 }
 
-// ─── Geocoding (Nominatim + TimeAPI) ─────────────────────────────────────────
+// ─── Geocoding (Nominatim + Multi-source Timezone Resolution) ─────────────────
 function _parseUtcOffset(s: string): number {
   const m = s.match(/([+-])(\d{1,2}):(\d{2})/);
   if (!m) return 0;
   return (m[1] === '+' ? 1 : -1) * (parseInt(m[2]) + parseInt(m[3]) / 60);
+}
+
+async function _resolveTimezoneViaMethods(lat: number, lon: number): Promise<number> {
+  // Method 1: GeoNames timezone lookup (Public API, works for most locations including Tiraspo)
+  try {
+    const geonamesRes = await fetchJsonWithTimeout(
+      `https://secure.geonames.org/timezoneJSON?lat=${lat}&lng=${lon}&username=demo`,
+      3000
+    );
+    if (geonamesRes.ok) {
+      const data = await geonamesRes.json();
+      if (data.dstOffset !== undefined && data.rawOffset !== undefined) {
+        // Return base offset (corrected for DST if applicable)
+        return (data.rawOffset + data.dstOffset) / 3600;
+      }
+    }
+  } catch (e) {
+    // GeoNames failed, try next method
+  }
+
+  // Method 2: Our backend timezone endpoint (if available)
+  const timezoneApis = getTimezoneApiCandidates();
+  for (const baseUrl of timezoneApis) {
+    try {
+      const tzRes = await fetchJsonWithTimeout(`${baseUrl}/timezone?lat=${lat}&lon=${lon}`, 3000);
+      if (!tzRes.ok) continue;
+      const tzData = await tzRes.json();
+      const parsed = Number(tzData.utc_offset);
+      if (Number.isFinite(parsed)) return parsed;
+    } catch {
+      // Continue to next method
+    }
+  }
+
+  // Method 3: Open-Meteo timezone lookup (Reliable, no API key needed)
+  try {
+    const openMeteoRes = await fetchJsonWithTimeout(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto`,
+      3000
+    );
+    if (openMeteoRes.ok) {
+      const data = await openMeteoRes.json();
+      if (data.timezone) {
+        // Parse timezone string like "Europe/Chisinau" to UTC offset
+        const formatter = new Intl.DateTimeFormat('en', {
+          timeZone: data.timezone,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+        const now = new Date();
+        const localStr = formatter.format(now);
+        const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+        const localDate = new Date(localStr);
+        const diffMs = localDate.getTime() - utcDate.getTime();
+        return diffMs / (3600 * 1000);
+      }
+    }
+  } catch (e) {
+    // Open-Meteo failed
+  }
+
+  // Fallback: return 0 (UTC)
+  return 0;
 }
 
 export async function geocodeCity(cityName: string): Promise<{
@@ -245,28 +308,13 @@ export async function geocodeCity(cityName: string): Promise<{
   const parts = (geoData[0].display_name as string).split(',');
   const displayName = parts.slice(0, 2).join(',').trim();
 
-  // Resolve UTC offset via our own backend (no CORS issues)
-  let utc = 0;
-  const timezoneApis = getTimezoneApiCandidates();
-  for (const baseUrl of timezoneApis) {
-    try {
-      const tzRes = await fetchJsonWithTimeout(`${baseUrl}/timezone?lat=${lat}&lon=${lon}`);
-      if (!tzRes.ok) continue;
-      const tzData = await tzRes.json();
-      const parsed = Number(tzData.utc_offset);
-      if (Number.isFinite(parsed)) {
-        utc = parsed;
-        break;
-      }
-    } catch {
-      // Try next candidate URL.
-    }
-  }
+  // Resolve UTC offset using multiple methods for reliability
+  const utc = await _resolveTimezoneViaMethods(lat, lon);
 
   return {
     lat: Math.round(lat * 10000) / 10000,
     lon: Math.round(lon * 10000) / 10000,
-    utc,
+    utc: Math.round(utc * 4) / 4, // Round to nearest 0.25 hours (15 min increments)
     displayName,
   };
 }

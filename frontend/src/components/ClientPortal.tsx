@@ -109,7 +109,8 @@ function CityField({
     try {
       const data = await geocodeCity(city);
       onFound(data.lat, data.lon, data.utc);
-      setResult(tr.cityFoundPrefix + data.displayName + ` (${data.lat}, ${data.lon}, UTC${data.utc >= 0 ? '+' : ''}${data.utc})`);
+      const tzSign = data.utc >= 0 ? '+' : '';
+      setResult(`✓ ${data.displayName} · UTC${tzSign}${data.utc}`);
     } catch (e: unknown) {
       setError((e as Error).message === 'City not found' ? tr.cityNotFound : (e as Error).message);
     } finally {
@@ -244,43 +245,24 @@ function BirthForm({
         </div>
       </div>
 
-      {/* Row 2: Time picker + UTC (auto-filled, still editable) */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Row 2: Time picker (UTC offset auto-filled by city, hidden from UI) */}
+      <div className="grid grid-cols-1 gap-2">
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.time}</label>
           <input type="time" step="1" value={value.time}
             onChange={e => onChange({ ...value, time: e.target.value })}
             className={inp} />
         </div>
-        <div>
-          <label className={`text-xs ${theme.text} mb-1 block`}>{tr.utcOffset}</label>
-          <input type="number" step="0.5" value={value.utc}
-            onChange={e => onChange({ ...value, utc: parseFloat(e.target.value) })}
-            className={inp} />
-        </div>
       </div>
 
-      {/* Row 3: City geocoder — fills lat/lon/utc */}
+      {/* UTC offset, latitude, longitude are auto-populated by city search - hidden from UI */}
+      {/* _utc, lat, lon remain in state but not editable by user */}
+
+      {/* City geocoder — auto-fills lat/lon/utc. Manual coords hidden. */}
       <CityField
         onFound={(lat, lon, utc) => onChange({ ...value, lat, lon, utc })}
         theme={theme}
       />
-
-      {/* Row 4: Lat/Lon (auto-filled by city, still editable) */}
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className={`text-xs ${theme.text} mb-1 block`}>{tr.latitude}</label>
-          <input type="number" step="0.0001" value={value.lat}
-            onChange={e => onChange({ ...value, lat: parseFloat(e.target.value) })}
-            className={inp} />
-        </div>
-        <div>
-          <label className={`text-xs ${theme.text} mb-1 block`}>{tr.longitude}</label>
-          <input type="number" step="0.0001" value={value.lon}
-            onChange={e => onChange({ ...value, lon: parseFloat(e.target.value) })}
-            className={inp} />
-        </div>
-      </div>
     </div>
   );
 }
