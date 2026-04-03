@@ -127,6 +127,7 @@ export interface HumanDesignResult {
     primary_language?: string;
     primary_title?: string;
     primary_text?: string;
+    reader_full_report_ru?: string;
     profile_context_ru?: string;
     available_modes?: HumanDesignContentMode[];
     gates: Array<{

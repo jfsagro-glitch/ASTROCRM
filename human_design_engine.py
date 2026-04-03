@@ -871,14 +871,18 @@ def _cross_primary_text(cross: Dict[str, Any], mode: str, profile_code: str) -> 
     primary_text = cross.get(primary_key)
     if not primary_text:
         primary_text = cross.get("interpretation_short_ru") or cross.get("description")
+
+    reader_full_report_ru = None
     if selected_mode == "reader":
-        primary_text = _reader_mode_expanded_text(cross, profile_context_ru, primary_text)
+        reader_full_report_ru = _reader_mode_expanded_text(cross, profile_context_ru, primary_text)
 
     enriched = dict(cross)
     enriched["primary_mode"] = selected_mode
     enriched["primary_language"] = "ru"
     enriched["primary_title"] = cross.get("cross_name_ru") or cross.get("name")
     enriched["primary_text"] = primary_text
+    if reader_full_report_ru:
+        enriched["reader_full_report_ru"] = reader_full_report_ru
     enriched["profile_context_ru"] = profile_context_ru
     enriched["available_modes"] = sorted(SUPPORTED_HD_MODES)
     return enriched

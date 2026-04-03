@@ -144,6 +144,7 @@ export default function HumanDesignBlock({
 
   const crossTitle = result?.incarnation_cross.primary_title || result?.incarnation_cross.cross_name_ru || result?.incarnation_cross.name;
   const crossText = result?.incarnation_cross.primary_text || result?.incarnation_cross.description;
+  const readerCrossFullText = result?.incarnation_cross.reader_full_report_ru;
   const profileContext = result?.incarnation_cross.profile_context_ru;
 
   const definedCenters = useMemo(() => result?.centers.filter(center => center.defined) ?? [], [result]);
@@ -243,13 +244,18 @@ export default function HumanDesignBlock({
 
   const [selectedSunPeriodIndex, setSelectedSunPeriodIndex] = useState(0);
   const [selectedMoonWindowIndex, setSelectedMoonWindowIndex] = useState(0);
+  const [readerCrossView, setReaderCrossView] = useState<'short' | 'full'>('short');
   const selectedSunPeriod = result?.forecast.sun_gate_periods_90d[selectedSunPeriodIndex] ?? null;
   const selectedMoonWindow = result?.forecast.moon_gate_windows_14d[selectedMoonWindowIndex] ?? null;
+  const crossDisplayText = isReaderMode && readerCrossView === 'full' && readerCrossFullText
+    ? readerCrossFullText
+    : crossText;
 
   useEffect(() => {
     setSelectedSphereKey('work');
     setSelectedSunPeriodIndex(0);
     setSelectedMoonWindowIndex(0);
+    setReaderCrossView('short');
   }, [result?.meta.calculated_at]);
 
   return (
@@ -425,7 +431,25 @@ export default function HumanDesignBlock({
                 {result.meta.mode}
               </span>
             </div>
-            <p className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{crossText}</p>
+            {isReaderMode && readerCrossFullText ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReaderCrossView('short')}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-all ${readerCrossView === 'short' ? theme.tabActive : theme.tabInactive}`}
+                >
+                  Кратко
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReaderCrossView('full')}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition-all ${readerCrossView === 'full' ? theme.tabActive : theme.tabInactive}`}
+                >
+                  Подробно
+                </button>
+              </div>
+            ) : null}
+            <p className={`mt-2 whitespace-pre-line text-sm leading-relaxed ${theme.text}`}>{crossDisplayText}</p>
             {profileContext ? <p className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{profileContext}</p> : null}
             {isReaderMode ? (
               <div className="mt-3 grid gap-3 md:grid-cols-3">
