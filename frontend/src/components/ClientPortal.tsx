@@ -22,6 +22,7 @@ import ChartWheel from './ChartWheel';
 import HumanDesignBlock from './HumanDesignBlock';
 import JyotishBlock from './JyotishBlock';
 import SynastryForecast from './SynastryForecast';
+import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
 import InterpretationPanel from './InterpretationPanel';
 import {
@@ -900,7 +901,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
 }
 
 // ─── Synastry Panel ───────────────────────────────────────────────────────────
-type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'advanced'|'composite'|'davison';
+type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'advanced'|'interaction-engine'|'composite'|'davison';
 
 function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey]; people?: SavedPerson[] }) {
   const { tr } = useLang();
@@ -1081,6 +1082,7 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
     ['compensation', '💡 Компенсаторика'],
     ['forecast',     '🔮 Прогностика'],
     ['advanced',     '🧠 Синастрия + транзиты'],
+    ['interaction-engine', '🧩 Движок взаимодействия'],
     ['composite',    '🔵 Композит'],
     ['davison',      '🟡 Дэвисон'],
   ];
@@ -1923,6 +1925,19 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
             </div>
           )}
 
+          {tab === 'interaction-engine' && (
+            <SynastryInteractionEngine
+              birthA={birth}
+              birthB={partner}
+              synastry={result}
+              advancedDate={advancedDate}
+              selfTransits={advancedSelfTransits}
+              partnerTransits={advancedPartnerTransits}
+              compositeChart={compositeChart}
+              theme={theme}
+            />
+          )}
+
           {/* ── COMPOSITE CHART ── */}
           {tab === 'composite' && compositeChart && (
             <div className="space-y-3">
@@ -2278,6 +2293,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   const { tr } = useLang();
   const [themeKey, setThemeKey] = useState<ThemeKey>('cosmic');
   const theme = chartThemes[themeKey];
+  const transitionSeqRef = React.useRef(0);
 
   // ─── Auth & people list ───────────────────────────────────────────────────
   const { user, signOut: authSignOut, configured } = useAuth();
@@ -2311,6 +2327,41 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  const prevTransitionRef = React.useRef<{ activeTab: string; humanDesignMode: HumanDesignContentMode } | null>(null);
+  useEffect(() => {
+    const prev = prevTransitionRef.current;
+    const next = { activeTab, humanDesignMode };
+    if (!prev) {
+      prevTransitionRef.current = next;
+      return;
+    }
+    if (prev.activeTab === next.activeTab && prev.humanDesignMode === next.humanDesignMode) {
+      return;
+    }
+
+    transitionSeqRef.current += 1;
+    const snapshot = {
+      seq: transitionSeqRef.current,
+      from: prev,
+      to: next,
+      loading,
+      isExporting,
+      hasNatal: Boolean(natalChart),
+      hasError: Boolean(error),
+      timestamp: new Date().toISOString(),
+    };
+
+    console.info('[runtime-guard] portal-transition', snapshot);
+    try {
+      (window as Window & { __HOLO_RUNTIME_LOG__?: unknown[] }).__HOLO_RUNTIME_LOG__ ??= [];
+      (window as Window & { __HOLO_RUNTIME_LOG__?: unknown[] }).__HOLO_RUNTIME_LOG__!.push(snapshot);
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
+
+    prevTransitionRef.current = next;
+  }, [activeTab, humanDesignMode, loading, isExporting, natalChart, error]);
 
   const calcNatal = useCallback(async () => {
     if (!birth.date || !birth.time) { setError(tr.dateTimeRequired); return; }
@@ -2461,14 +2512,14 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
         <div className="flex gap-2 border-b pb-1 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
           {tabs.map(({ key, icon: Icon, label }) => (
-            <button key={key} onClick={() => setActiveTab(key)}
+            <button key={key} onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${key === 'human-design' ? 'ml-6 border-2 border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : ''} ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}
         </div>
 
-        <div>
+        <div key={activeTab}>
           {activeTab === 'natal' && (
             <div id="pdf-section-natal" className="space-y-4">
               {natalChart ? (

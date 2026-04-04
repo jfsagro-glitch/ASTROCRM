@@ -92,19 +92,20 @@ export default function HumanDesignBlock({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep a ref so event handlers can read current result without adding it to deps
-  const resultRef = React.useRef<HumanDesignResult | null>(null);
-  resultRef.current = result;
+  // Tracks whether we already have a rendered result and can safely refetch by mode.
+  const hasResultRef = React.useRef(false);
 
   useEffect(() => {
     setResult(null);
     setError(null);
   }, [birth.date, birth.time, birth.lat, birth.lon, birth.utc]);
 
+  useEffect(() => {
+    hasResultRef.current = Boolean(result);
+  }, [result]);
+
   const canCalculate = Boolean(birth.date && birth.time && Number.isFinite(birth.lat) && Number.isFinite(birth.lon));
 
-  // Accepts an optional explicit mode so mode-change handler can pass the new
-  // value directly before the prop update propagates — avoids a second render.
   const calculate = useCallback(async (explicitMode?: HumanDesignContentMode) => {
     const modeToUse = explicitMode ?? contentMode;
     if (!canCalculate) {
@@ -122,14 +123,15 @@ export default function HumanDesignBlock({
     }
   }, [birth, canCalculate, contentMode]);
 
-  // Single handler for mode-button clicks: notify parent AND auto-refetch
-  // without any useEffect cascade that could cause React reconciliation errors.
   const handleModeChange = useCallback((newMode: HumanDesignContentMode) => {
+    if (newMode === contentMode) return;
     onContentModeChange(newMode);
-    if (resultRef.current) {
-      void calculate(newMode);
-    }
-  }, [onContentModeChange, calculate]);
+  }, [contentMode, onContentModeChange]);
+
+  useEffect(() => {
+    if (!hasResultRef.current) return;
+    void calculate(contentMode);
+  }, [contentMode, calculate]);
 
   const centerGroups = useMemo(() => {
     if (!result) return [];
