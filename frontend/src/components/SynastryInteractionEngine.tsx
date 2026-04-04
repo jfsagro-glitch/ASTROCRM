@@ -70,6 +70,26 @@ type RouteInsight = {
   rationale: string;
 };
 
+type PersonalImpact = {
+  id: string;
+  natalPoint: string;
+  transitPlanet: string;
+  transitAspect: string;
+  transitOrb: number;
+  transitPhase: 'applying' | 'exact' | 'separating';
+  synastrModifiers: Array<{
+    bPoint: string;
+    aspect: string;
+    modifier: 'amplifies' | 'softens' | 'redirects';
+    strength: number;
+  }>;
+  netScore: number;
+  netVector: 'expanding' | 'contracting' | 'transforming' | 'stabilizing' | 'testing';
+  lifeAreas: string[];
+  windowStart: string;
+  windowEnd: string;
+};
+
 const ASPECT_WEIGHTS: Record<string, number> = {
   conjunction: 10,
   opposition: 8,
@@ -212,6 +232,88 @@ function getHouseByLongitude(chart: NatalChart, lon: number): number | null {
   return null;
 }
 
+const PLANET_RU: Record<string, string> = {
+  sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера', mars: 'Марс',
+  jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран', neptune: 'Нептун', pluto: 'Плутон',
+  chiron: 'Хирон', node: 'Сев. узел', asc: 'Асцендент', mc: 'Мидхевен',
+  ic: 'Надир', desc: 'Десцендент',
+};
+const ASPECT_RU: Record<string, string> = {
+  conjunction: 'соединение', square: 'квадрат', opposition: 'оппозиция',
+  trine: 'трин', sextile: 'секстиль', quincunx: 'квинконс', overlay: 'наложение',
+};
+function pRU(p: string): string { return PLANET_RU[p.toLowerCase()] ?? p; }
+function aRU(a: string): string { return ASPECT_RU[a.toLowerCase()] ?? a; }
+
+function natalPointToLifeAreas(point: string): string[] {
+  const p = point.toLowerCase();
+  if (p.includes('sun')) return ['идентичность', 'жизненная сила', 'самовыражение'];
+  if (p.includes('moon')) return ['эмоции', 'дом', 'привычки'];
+  if (p.includes('mercury')) return ['коммуникации', 'обучение', 'решения'];
+  if (p.includes('venus')) return ['любовь', 'финансы', 'эстетика'];
+  if (p.includes('mars')) return ['энергия', 'инициатива', 'конфликты'];
+  if (p.includes('jupiter')) return ['рост', 'возможности', 'удача'];
+  if (p.includes('saturn')) return ['карьера', 'структура', 'обязательства'];
+  if (p.includes('uranus')) return ['перемены', 'инновации'];
+  if (p.includes('neptune')) return ['духовность', 'интуиция'];
+  if (p.includes('pluto')) return ['трансформация', 'власть'];
+  if (p.includes('node')) return ['судьба', 'развитие'];
+  if (p.includes('chiron')) return ['исцеление', 'уязвимость'];
+  if (p === 'asc' || p.includes('h1')) return ['имидж', 'здоровье'];
+  if (p === 'mc' || p.includes('h10')) return ['карьера', 'репутация'];
+  return ['общий тонус'];
+}
+
+function transitNetVector(
+  tp: string,
+  aspect: string,
+  mods: Array<{ modifier: 'amplifies' | 'softens' | 'redirects' }>,
+): 'expanding' | 'contracting' | 'transforming' | 'stabilizing' | 'testing' {
+  const hard = aspect === 'square' || aspect === 'opposition';
+  const soft = aspect === 'trine' || aspect === 'sextile';
+  const p = tp.toLowerCase();
+  const isTransform = ['pluto', 'uranus', 'neptune'].includes(p);
+  const isConstrict = ['saturn', 'pluto'].includes(p);
+  const isExpand = ['jupiter', 'venus'].includes(p);
+  const ampCount = mods.filter(m => m.modifier === 'amplifies').length;
+  const softCount = mods.filter(m => m.modifier === 'softens').length;
+  if (isTransform && hard) return 'transforming';
+  if (isConstrict && hard && softCount === 0) return 'contracting';
+  if (isExpand && soft) return 'expanding';
+  if (hard && ampCount > 0) return 'testing';
+  if (soft || (aspect === 'conjunction' && !isConstrict)) return 'expanding';
+  return 'stabilizing';
+}
+
+function synModifierType(bPoint: string, bAspect: string): 'amplifies' | 'softens' | 'redirects' {
+  const bp = bPoint.toLowerCase();
+  const soft = bAspect === 'trine' || bAspect === 'sextile';
+  const hard = bAspect === 'square' || bAspect === 'opposition';
+  const isExpansive = ['jupiter', 'venus', 'sun', 'moon'].some(x => bp.includes(x));
+  const isConstrict = ['saturn', 'pluto', 'mars'].some(x => bp.includes(x));
+  if (isExpansive && soft) return 'softens';
+  if (isConstrict && hard) return 'amplifies';
+  if (bp.includes('uranus') || bp.includes('neptune')) return 'redirects';
+  if (soft) return 'softens';
+  return 'amplifies';
+}
+
+function vectorLabel(v: 'expanding' | 'contracting' | 'transforming' | 'stabilizing' | 'testing'): string {
+  const m: Record<string, string> = {
+    expanding: '↑ рост', contracting: '↓ сжатие',
+    transforming: '⟳ трансформация', stabilizing: '= стабилизация', testing: '⚡ испытание',
+  };
+  return m[v] ?? v;
+}
+
+function vectorColorClass(v: 'expanding' | 'contracting' | 'transforming' | 'stabilizing' | 'testing'): string {
+  const m: Record<string, string> = {
+    expanding: 'text-emerald-400', contracting: 'text-rose-400',
+    transforming: 'text-purple-400', stabilizing: 'text-blue-400', testing: 'text-orange-400',
+  };
+  return m[v] ?? 'text-gray-400';
+}
+
 type TopicFilter = 'all' | 'love' | 'project' | 'conflict';
 
 function matchesTopic(topic: string, filter: TopicFilter): boolean {
@@ -274,7 +376,7 @@ export default function SynastryInteractionEngine({
   compositeChart: NatalChart | null;
   theme: ThemeLike;
 }) {
-  const [view, setView] = useState<'engine' | 'routes'>('engine');
+  const [view, setView] = useState<'engine' | 'routes' | 'personal'>('engine');
   const [topicFilter, setTopicFilter] = useState<TopicFilter>('all');
   const routesPanelRef = useRef<HTMLDivElement>(null);
 
@@ -631,6 +733,69 @@ export default function SynastryInteractionEngine({
     return out.sort((a, b) => b.confidence - a.confidence);
   }, [layerDSignals, scoreBoard.compositeTriggerScore]);
 
+  const personalImpacts = useMemo(() => {
+    const aspects = getAspectList(selfTransits);
+    if (!aspects.length) return [] as PersonalImpact[];
+
+    // Build lookup: A's natal point → synastry nodes involving it
+    const synastrByNatal = new Map<string, SynNode[]>();
+    for (const node of layerBNodes) {
+      if (!node.pointA.startsWith('A.')) continue;
+      const natalPt = node.pointA.slice(2).toLowerCase();
+      const arr = synastrByNatal.get(natalPt) ?? [];
+      arr.push(node);
+      synastrByNatal.set(natalPt, arr);
+    }
+
+    const out: PersonalImpact[] = [];
+    const seen = new Set<string>();
+    aspects.forEach((item, idx) => {
+      const natalPt = String(item.natal_planet ?? '').toLowerCase();
+      const transitPt = String(item.transit_planet ?? '').toLowerCase();
+      const aspect = String(item.aspect ?? '');
+      const orb = typeof item.orb === 'number' ? item.orb : 3;
+      if (!natalPt || !transitPt || !aspect) return;
+      const key = `${transitPt}_${aspect}_${natalPt}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      const relatedNodes = synastrByNatal.get(natalPt) ?? [];
+      const synMods: PersonalImpact['synastrModifiers'] = relatedNodes.map(node => ({
+        bPoint: node.pointB,
+        aspect: node.aspect,
+        modifier: synModifierType(node.pointB, node.aspect),
+        strength: node.strength,
+      }));
+
+      const transitWeight = ASPECT_WEIGHTS[aspect] ?? 3;
+      const orbFactor = Math.max(0.25, 1 - orb / 8);
+      const baseScore = Math.round(transitWeight * 10 * orbFactor);
+      const modBoost = synMods.reduce((s, m) =>
+        s + (m.modifier === 'amplifies' ? m.strength * 0.15 : m.modifier === 'softens' ? -m.strength * 0.05 : 0), 0);
+      const netScore = Math.max(10, Math.min(99, Math.round(baseScore + modBoost)));
+
+      const applying = Boolean((item as Record<string, unknown>).applying);
+      const phase: PersonalImpact['transitPhase'] = orb < 0.35 ? 'exact' : (applying ? 'applying' : 'separating');
+      const speed = DAILY_MOTION[transitPt] ?? 0.5;
+      const days = Math.max(1, Math.round(Math.min(16, orb / Math.max(speed, 0.05))));
+      out.push({
+        id: `pi_${transitPt}_${aspect}_${natalPt}_${idx}`,
+        natalPoint: natalPt,
+        transitPlanet: transitPt,
+        transitAspect: aspect,
+        transitOrb: orb,
+        transitPhase: phase,
+        synastrModifiers: synMods,
+        netScore,
+        netVector: transitNetVector(transitPt, aspect, synMods),
+        lifeAreas: natalPointToLifeAreas(natalPt),
+        windowStart: formatDateShift(advancedDate, -days).slice(0, 10),
+        windowEnd: formatDateShift(advancedDate, days).slice(0, 10),
+      });
+    });
+    return out.sort((a, b) => b.netScore - a.netScore).slice(0, 14);
+  }, [selfTransits, layerBNodes, advancedDate]);
+
   const filteredRoutes = routes.filter(r => matchesTopic(r.topic, topicFilter));
   const routesThroughA = filteredRoutes.filter(r => r.through === 'A').slice(0, 4);
   const routesThroughB = filteredRoutes.filter(r => r.through === 'B').slice(0, 4);
@@ -691,6 +856,13 @@ export default function SynastryInteractionEngine({
               className={`px-3 py-1.5 text-xs rounded-full border ${view === 'routes' ? theme.tabActive : theme.tabInactive}`}
             >
               What comes through A/B
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('personal')}
+              className={`px-3 py-1.5 text-xs rounded-full border ${view === 'personal' ? theme.tabActive : theme.tabInactive}`}
+            >
+              Личная ситуация
             </button>
           </div>
         </div>
@@ -922,6 +1094,95 @@ export default function SynastryInteractionEngine({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {view === 'personal' && (
+        <div className="space-y-4">
+          {personalImpacts.length === 0 ? (
+            <div className={`rounded-xl border ${theme.card} p-6 text-center`}>
+              <p className={`text-sm ${theme.text} opacity-60`}>
+                Добавьте дату расчёта транзитов для {participantA}, чтобы увидеть личный прогноз
+                через взаимодействие с {participantB}.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Summary banner */}
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <h5 className={`text-sm font-semibold ${theme.accent} mb-1`}>
+                  Личная ситуация {participantA} с учётом взаимодействия с {participantB}
+                </h5>
+                <p className={`text-xs ${theme.text} opacity-60 mb-3`}>
+                  Транзиты к натальной карте {participantA}, скорректированные через синастрические узлы с {participantB}.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['expanding', 'stabilizing', 'testing', 'contracting', 'transforming'] as const).map(v => {
+                    const cnt = personalImpacts.filter(p => p.netVector === v).length;
+                    return cnt > 0 ? (
+                      <span key={v} className={`px-2 py-1 rounded-full text-xs border border-white/15 ${vectorColorClass(v)}`}>
+                        {vectorLabel(v)}: {cnt}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+
+              {/* Impact cards */}
+              {personalImpacts.map(impact => (
+                <div key={impact.id} className={`rounded-xl border ${theme.card} p-4`}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className={`text-sm font-semibold ${theme.header}`}>
+                          {pRU(impact.transitPlanet)} {aRU(impact.transitAspect)} {pRU(impact.natalPoint)}
+                        </span>
+                        <span className={`text-xs font-medium ${vectorColorClass(impact.netVector)}`}>
+                          {vectorLabel(impact.netVector)}
+                        </span>
+                        <span className={`text-xs ${theme.text} opacity-50`}>
+                          {impact.transitPhase} · orb {impact.transitOrb.toFixed(1)}°
+                        </span>
+                      </div>
+                      <div className={`mt-1 text-xs ${theme.text} opacity-80`}>
+                        {impact.lifeAreas.join(' · ')}
+                      </div>
+                      <div className={`text-xs ${theme.text} opacity-50`}>
+                        {impact.windowStart} — {impact.windowEnd}
+                      </div>
+                    </div>
+                    <div className={`text-xl font-bold ${vectorColorClass(impact.netVector)} opacity-70 flex-shrink-0`}>
+                      {impact.netScore}
+                    </div>
+                  </div>
+
+                  {impact.synastrModifiers.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-white/10">
+                      <div className={`text-xs font-semibold ${theme.accent} mb-1.5`}>
+                        Влияние {participantB} на этот транзит:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {impact.synastrModifiers.slice(0, 3).map((m, j) => (
+                          <span
+                            key={j}
+                            className={`text-xs px-2 py-0.5 rounded-full border border-white/10 ${
+                              m.modifier === 'amplifies' ? 'text-orange-300' :
+                              m.modifier === 'softens' ? 'text-emerald-300' : 'text-purple-300'
+                            }`}
+                          >
+                            {m.bPoint.split('.')[1]?.toUpperCase() ?? m.bPoint}{' '}
+                            {m.modifier === 'amplifies' ? '⬆ усиливает' :
+                             m.modifier === 'softens' ? '⬇ смягчает' : '↺ перенаправляет'}
+                            {' '}(сила {m.strength})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
