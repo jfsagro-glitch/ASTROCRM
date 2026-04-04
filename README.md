@@ -1,74 +1,84 @@
 # HOLO Astrology CRM
 
-Full-stack astrology application with real astronomical calculations + AI interpretations.
+Full-stack astrology application with a React frontend and a Python FastAPI backend for real chart calculations.
 
 ## Architecture
 
-**frontend/** — React Vite + Tailwind  
-**server/aiProxy.ts** — Express proxy for Gemini interpretations  
-astro_api.py — Python FastAPI for astronomical calculations (optional, can run separately)
+- `frontend/` - Vite + React client
+- `astro_api.py` - primary FastAPI backend used by the frontend
+- `server/aiProxy.ts` - optional Gemini proxy for AI-only features and experiments
+- `astro_engine.py`, `astro_predictive.py`, `astro_synastry.py`, `astro_relocation.py` - calculation engines
+- `human_design_engine.py`, `jyotish_engine.py` - optional specialty engines that depend on Swiss Ephemeris bindings
 
-## Development Setup
+## Prerequisites
 
-**Prerequisites:** Node.js 18+
+- Node.js 18+
+- Python 3.11+ recommended
 
-1. Install dependencies:
-   ```bash
-   npm run install:all
-   ```
+## Install
 
-2. Configure `.env.local`:
-   ```
-   GEMINI_API_KEY=your_gemini_key
-   AI_PROXY_PORT=8787
-   ```
-
-3. Run development:
-   ```bash
-   npm run dev
-   ```
-   - Frontend: http://localhost:3000
-   - AI Proxy: http://localhost:8787
-
-## Production
-
-### Build
 ```bash
+npm run install:all
+python -m pip install -r requirements.txt
+```
+
+If you want Human Design or Jyotish endpoints, make sure `pyswisseph` is installed successfully in your Python environment.
+
+## Environment
+
+Frontend env lives in `frontend/.env.local`:
+
+```bash
+VITE_API_URL=http://localhost:8000
+```
+
+Optional Gemini proxy env can live in `.env.local` at the repo root:
+
+```bash
+GEMINI_API_KEY=your_gemini_key
+AI_PROXY_PORT=8787
+```
+
+## Development
+
+Primary local workflow:
+
+```bash
+npm run dev
+```
+
+This starts:
+
+- FastAPI backend on `http://localhost:8000`
+- Frontend on `http://localhost:3000`
+
+Useful individual commands:
+
+```bash
+npm run dev:backend
+npm run dev:frontend
+npm run dev:proxy
+```
+
+`dev:proxy` is optional. The current frontend talks to `VITE_API_URL`, not to the Gemini proxy.
+
+## Build
+
+```bash
+npm run type-check
 npm run build
 ```
-Output: `frontend/dist/` (static files)
 
-### Deploy
+Frontend production output is written to `frontend/dist/`.
 
-**Option 1: Full Stack (Frontend + API Proxy)**
-- Start AI Proxy: `npm run start:api`
-- Serve frontend from `frontend/dist/`
+## API Notes
 
-**Option 2: Serverless Frontend (recommended)**
-- Deploy `frontend/dist/` to Vercel/Netlify
-- Deploy AI Proxy to Cloud Run/Lambda
-- Use `VITE_AI_API_URL=https://your-api-url` in frontend build
-
-## Environment Variables
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `GEMINI_API_KEY` | Gemini API key | required |
-| `AI_PROXY_PORT` | Server proxy port | 8787 |
-| `VITE_AI_API_URL` | Frontend API URL | /api (dev proxy) |
-
-## Features
-
-- **4 Chart Themes** — Cosmic, Ethereal, Vintage, Cyber
-- **Fast Calcs** — Transits, progressions, synastry, relocation  
-- **AI Interpretations** — Gemini-powered readings
-- **Multi-language** — Russian/English support
-- **PDF Export** — Download charts and readings
-- **Real Astrology** — Not horoscope, real calculations
+- `/natal`, `/predictive/*`, `/synastry/*`, `/relocation/*`, `/timezone` work without Human Design bindings.
+- `/human-design*` and `/jyotish` return `503` when their optional engine dependencies are unavailable.
+- `/health` reports which optional engines are currently available.
 
 ## Troubleshooting
 
-- **"An API Key must be set"** → Set `GEMINI_API_KEY` in `.env.local`
-- **Frontend 500 errors** → Check AI Proxy is running on :8787
-- **Build fails** → Run `npm run install:all` first
-
+- If FastAPI fails on startup, install Python requirements first.
+- If Human Design or Jyotish returns `503`, check that `pyswisseph` is installed in the same Python environment used to run the API.
+- If the frontend cannot load data, verify `VITE_API_URL` points at the running FastAPI server.

@@ -3,7 +3,7 @@ HOLO Astrology REST API — FastAPI backend wrapping our Python engine.
 Run: uvicorn astro_api:app --reload --port 8000
 """
 import sys, os, re, json, math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
@@ -33,12 +33,29 @@ from astro_synastry import (
 from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
-from human_design_engine import (
-    calc_human_design,
-    present_cross_catalog,
-    CHANNEL_DATA, CENTER_DATA, TYPE_DATA, AUTHORITY_DATA, LINE_DATA, GATE_DATA,
-    GATE_ENCYCLOPEDIA, CHANNEL_ENCYCLOPEDIA, CROSS_CATALOG,
-)
+try:
+    from human_design_engine import (
+        calc_human_design,
+        present_cross_catalog,
+        CHANNEL_DATA, CENTER_DATA, TYPE_DATA, AUTHORITY_DATA, LINE_DATA, GATE_DATA,
+        GATE_ENCYCLOPEDIA, CHANNEL_ENCYCLOPEDIA, CROSS_CATALOG,
+    )
+    _HUMAN_DESIGN_OK = True
+    _HUMAN_DESIGN_IMPORT_ERROR = ""
+except Exception as exc:
+    _HUMAN_DESIGN_OK = False
+    _HUMAN_DESIGN_IMPORT_ERROR = str(exc)
+    calc_human_design = None  # type: ignore[assignment]
+    present_cross_catalog = None  # type: ignore[assignment]
+    CHANNEL_DATA = []  # type: ignore[assignment]
+    CENTER_DATA = {}  # type: ignore[assignment]
+    TYPE_DATA = {}  # type: ignore[assignment]
+    AUTHORITY_DATA = {}  # type: ignore[assignment]
+    LINE_DATA = {}  # type: ignore[assignment]
+    GATE_DATA = {}  # type: ignore[assignment]
+    GATE_ENCYCLOPEDIA = {}  # type: ignore[assignment]
+    CHANNEL_ENCYCLOPEDIA = {}  # type: ignore[assignment]
+    CROSS_CATALOG = []  # type: ignore[assignment]
 try:
     import astro_se as _se_module
 except Exception:
@@ -47,8 +64,10 @@ except Exception:
 try:
     from jyotish_engine import calc_jyotish as _calc_jyotish
     _JYOTISH_OK = True
+    _JYOTISH_IMPORT_ERROR = ""
 except Exception:
     _JYOTISH_OK = False
+    _JYOTISH_IMPORT_ERROR = str(sys.exc_info()[1] or "")
     _calc_jyotish = None  # type: ignore
 
 
@@ -69,6 +88,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _feature_unavailable(name: str, reason: str = "") -> HTTPException:
+    detail = f"{name} engine not available"
+    if reason:
+        detail = f"{detail}: {reason}"
+    return HTTPException(503, detail)
+
+
+def _require_human_design() -> None:
+    if not _HUMAN_DESIGN_OK:
+        raise _feature_unavailable("Human Design", _HUMAN_DESIGN_IMPORT_ERROR)
+
+
+def _require_jyotish() -> None:
+    if not _JYOTISH_OK:
+        raise _feature_unavailable("Jyotish", _JYOTISH_IMPORT_ERROR)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -934,8 +970,7 @@ def root():
 @app.post("/jyotish")
 def jyotish(req: BirthData):
     """Full Jyotish (Vedic astrology) chart with Lahiri sidereal, nakshatras, dashas, yogas."""
-    if not _JYOTISH_OK:
-        raise HTTPException(503, "Jyotish engine not available")
+    _require_jyotish()
     try:
         result = _calc_jyotish(req.date, req.time, req.lat, req.lon, req.utc)
         return _present(result)
@@ -975,6 +1010,7 @@ def human_design(
     mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
 ):
     """Professional Human Design bodygraph calculation (§11.1)."""
+    _require_human_design()
     try:
         return _present(calc_human_design(
             req.date, req.time, req.lat, req.lon, req.utc,
@@ -1009,6 +1045,7 @@ def human_design_transits(
     Returns natal summary + transit activations + temporary channels formed by
     the transit triggering natal hanging gates.
     """
+    _require_human_design()
     try:
         import swisseph as swe
         from human_design_engine import (
@@ -1079,6 +1116,7 @@ def human_design_synastry(
     Computes electromagnetic, companionship, compromise, dominance, and
     friendship dynamics between two people.
     """
+    _require_human_design()
     try:
         from human_design_engine import CHANNEL_DATA as _CHANNEL_DATA
 
@@ -1167,16 +1205,19 @@ def human_design_synastry(
 # ── HD — Reference (§11.5) ──────────────────────────────────────────────────
 @app.get("/human-design/reference/types")
 def hd_ref_types():
+    _require_human_design()
     return _safe(TYPE_DATA)
 
 
 @app.get("/human-design/reference/authorities")
 def hd_ref_authorities():
+    _require_human_design()
     return _safe(AUTHORITY_DATA)
 
 
 @app.get("/human-design/reference/profiles")
 def hd_ref_profiles():
+    _require_human_design()
     return _safe({
         f"{p}/{d}": {
             "conscious_line": p,
@@ -1192,16 +1233,19 @@ def hd_ref_profiles():
 
 @app.get("/human-design/reference/gates")
 def hd_ref_gates():
+    _require_human_design()
     return _safe({k: {**v, "encyclopedic": GATE_ENCYCLOPEDIA.get(k, "")} for k, v in GATE_DATA.items()})
 
 
 @app.get("/human-design/reference/channels")
 def hd_ref_channels():
+    _require_human_design()
     return _safe([{**ch, "encyclopedic": CHANNEL_ENCYCLOPEDIA.get(f"{ch['gates'][0]}-{ch['gates'][1]}", "")} for ch in CHANNEL_DATA])
 
 
 @app.get("/human-design/reference/centers")
 def hd_ref_centers():
+    _require_human_design()
     return _safe(CENTER_DATA)
 
 
@@ -1209,6 +1253,7 @@ def hd_ref_centers():
 def hd_ref_crosses(
     mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
 ):
+    _require_human_design()
     return _safe(present_cross_catalog(mode))
 
 
@@ -1620,7 +1665,15 @@ def calc_parans(req: RelocateRequest):
 # ── HEALTH ────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"ok": True, "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "ok": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "features": {
+            "human_design": _HUMAN_DESIGN_OK,
+            "jyotish": _JYOTISH_OK,
+            "swiss_ephemeris": _se_module is not None,
+        },
+    }
 
 
 @app.get("/ephemeris/status")
