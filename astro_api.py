@@ -2,8 +2,8 @@
 HOLO Astrology REST API — FastAPI backend wrapping our Python engine.
 Run: uvicorn astro_api:app --reload --port 8000
 """
-import sys, os, re, json
-from datetime import datetime
+import sys, os, re, json, math
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
@@ -458,6 +458,465 @@ class PerfectionsRequest(BaseModel):
     lat:        float; lon:     float; utc: float
     from_date:  str
     to_date:    str
+
+
+class InteractionPerson(BaseModel):
+    date: str
+    time: str
+    lat: float
+    lon: float
+    utc: float
+    timezone_name: Optional[str] = None
+    houses: str = "placidus"
+    julian: bool = False
+    name: Optional[str] = None
+    current_lat: Optional[float] = None
+    current_lon: Optional[float] = None
+
+
+class InteractionPeriod(BaseModel):
+    start: str
+    end: str
+
+
+class PersonalInteractionRequest(BaseModel):
+    subject_person: InteractionPerson
+    influencer_person: InteractionPerson
+    period: InteractionPeriod
+    topics: Optional[List[str]] = None
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def _mid_date(start_date: str, end_date: str) -> str:
+    s = datetime.strptime(start_date, "%Y-%m-%d")
+    e = datetime.strptime(end_date, "%Y-%m-%d")
+    mid = s + (e - s) / 2
+    return mid.strftime("%Y-%m-%d")
+
+
+def _topic_from_points(p_a: str, p_b: str, aspect: str) -> str:
+    pa = p_a.lower()
+    pb = p_b.lower()
+    hard = aspect in {"square", "opposition"}
+    if any(x in pa for x in ["venus", "moon", "mars", "desc"]) or any(x in pb for x in ["venus", "moon", "mars"]):
+        return "love"
+    if any(x in pa for x in ["mc", "sun", "jupiter", "saturn"]) or any(x in pb for x in ["jupiter", "saturn", "sun"]):
+        return "project"
+    if any(x in pa for x in ["mercury", "node"]) or any(x in pb for x in ["mercury", "node"]):
+        return "decisions"
+    if any(x in pa for x in ["h2", "h8"]) or any(x in pb for x in ["venus", "jupiter", "saturn"]):
+        return "money"
+    if hard:
+        return "conflict"
+    return "emotional_state"
+
+
+def _build_baseline_scores(a_transits: Dict[str, Any], topics: List[str]) -> Dict[str, int]:
+    scores: Dict[str, float] = {k: 52.0 for k in topics}
+    aspects = a_transits.get("aspects", []) if isinstance(a_transits, dict) else []
+    for asp in aspects:
+        natal_p = str(asp.get("natal_planet", "")).lower()
+        aspect = str(asp.get("aspect", "")).lower()
+        orb = float(asp.get("orb", 3.0) or 3.0)
+        hard = aspect in {"square", "opposition"}
+        soft = aspect in {"trine", "sextile"}
+        sign = -1.0 if hard else (1.0 if soft else 0.3)
+        weight = (7.0 if hard else 5.0) * max(0.25, 1 - min(orb, 8) / 8)
+
+        affected = []
+        if natal_p in {"venus", "moon", "mars"}:
+            affected.append("love")
+        if natal_p in {"sun", "jupiter", "saturn"}:
+            affected.append("career")
+        if natal_p in {"venus", "jupiter", "saturn"}:
+            affected.append("money")
+        if natal_p in {"moon", "neptune", "saturn", "pluto"}:
+            affected.append("emotional_state")
+        if natal_p in {"mercury", "sun", "node"}:
+            affected.append("decisions")
+        if not affected:
+            affected = ["emotional_state"]
+
+        for t in affected:
+            if t in scores:
+                scores[t] += sign * weight
+
+    return {k: int(round(_clamp(v, 0, 100))) for k, v in scores.items()}
+
+
+def _compute_b_availability(b_transits: Dict[str, Any]) -> float:
+    aspects = b_transits.get("aspects", []) if isinstance(b_transits, dict) else []
+    if not aspects:
+        return 0.55
+    score = 0.0
+    for asp in aspects:
+        natal_p = str(asp.get("natal_planet", "")).lower()
+        aspect = str(asp.get("aspect", "")).lower()
+        orb = float(asp.get("orb", 3.0) or 3.0)
+        hard = aspect in {"square", "opposition"}
+        soft = aspect in {"trine", "sextile"}
+        orb_factor = max(0.2, 1 - min(orb, 8) / 8)
+        if natal_p in {"moon", "venus", "sun", "mercury"} and soft:
+            score += 1.15 * orb_factor
+        if natal_p in {"moon", "venus", "saturn", "pluto"} and hard:
+            score -= 1.25 * orb_factor
+        if aspect == "conjunction" and natal_p in {"jupiter", "venus"}:
+            score += 0.95 * orb_factor
+        if aspect == "conjunction" and natal_p in {"saturn", "pluto"}:
+            score -= 0.95 * orb_factor
+    return _clamp(0.55 + score / max(8.0, len(aspects) * 2.2), 0.12, 1.0)
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371.0
+    p1 = math.radians(lat1)
+    p2 = math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(min(1.0, math.sqrt(max(0.0, a))))
+
+
+def _topic_key_from_channel_topic(topic: str) -> str:
+    if topic == "project":
+        return "career"
+    if topic == "conflict":
+        return "emotional_state"
+    return topic
+
+
+def _compute_relocation_block(
+    natal_chart: Dict[str, Any],
+    natal_jd: float,
+    natal_lat: float,
+    natal_lon: float,
+    current_lat: Optional[float],
+    current_lon: Optional[float],
+    houses_system: str,
+) -> Dict[str, Any]:
+    obs_lat = current_lat if current_lat is not None else natal_lat
+    obs_lon = current_lon if current_lon is not None else natal_lon
+    distance_km = _haversine_km(natal_lat, natal_lon, obs_lat, obs_lon)
+    if distance_km < 20:
+        return {
+            "active": False,
+            "distance_km": round(distance_km, 1),
+            "topic_shift": {"love": 0, "career": 0, "money": 0, "emotional_state": 0, "decisions": 0},
+            "topic_receptivity": {"love": 0.0, "career": 0.0, "money": 0.0, "emotional_state": 0.0, "decisions": 0.0},
+            "availability_delta": 0.0,
+            "state": "natal_location",
+            "house_changes": [],
+            "angle_shift": {"asc_deg": 0.0, "mc_deg": 0.0},
+        }
+
+    rel = relocated_chart(natal_jd, obs_lat, obs_lon, houses_system=houses_system, include_aspects=False)
+    natal_h1 = float(natal_chart.get("houses", {}).get("h1", {}).get("lon", 0.0))
+    natal_h10 = float(natal_chart.get("houses", {}).get("h10", {}).get("lon", 0.0))
+    rel_h1 = float(rel.get("houses", {}).get("h1", {}).get("lon", 0.0))
+    rel_h10 = float(rel.get("houses", {}).get("h10", {}).get("lon", 0.0))
+    asc_shift = abs(((rel_h1 - natal_h1 + 180) % 360) - 180)
+    mc_shift = abs(((rel_h10 - natal_h10 + 180) % 360) - 180)
+
+    keys = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "neptune", "pluto", "node"]
+    house_changes = []
+    for p in keys:
+        n_h = natal_chart.get("planets", {}).get(p, {}).get("house")
+        r_h = rel.get("planets", {}).get(p, {}).get("house")
+        if isinstance(n_h, int) and isinstance(r_h, int) and n_h != r_h:
+            house_changes.append({"planet": p, "natal_house": n_h, "relocated_house": r_h})
+
+    topic_shift = {"love": 0.0, "career": 0.0, "money": 0.0, "emotional_state": 0.0, "decisions": 0.0}
+    receptivity = {"love": 0.0, "career": 0.0, "money": 0.0, "emotional_state": 0.0, "decisions": 0.0}
+
+    for ch in house_changes:
+        p = ch["planet"]
+        rh = ch["relocated_house"]
+        if p in {"venus", "moon", "mars"}:
+            topic_shift["love"] += 1.5 if rh in {5, 7, 8} else -0.8 if rh in {6, 12} else 0.3
+            receptivity["love"] += 0.18 if rh in {5, 7, 8} else -0.09
+        if p in {"sun", "jupiter", "saturn"}:
+            topic_shift["career"] += 1.6 if rh in {10, 11} else -0.9 if rh in {4, 12} else 0.2
+            receptivity["career"] += 0.16 if rh in {10, 11} else -0.08
+        if p in {"venus", "jupiter", "saturn"}:
+            topic_shift["money"] += 1.4 if rh in {2, 8, 10} else -0.8 if rh in {6, 12} else 0.1
+            receptivity["money"] += 0.14 if rh in {2, 8, 10} else -0.07
+        if p in {"moon", "neptune", "saturn", "pluto"}:
+            topic_shift["emotional_state"] += -1.2 if rh in {8, 12} else 1.0 if rh in {4, 1} else 0.0
+            receptivity["emotional_state"] += 0.15 if rh in {4, 8, 12} else 0.03
+        if p in {"mercury", "sun", "node"}:
+            topic_shift["decisions"] += 1.3 if rh in {1, 7, 10} else -0.7 if rh in {12} else 0.2
+            receptivity["decisions"] += 0.12 if rh in {1, 7, 10} else -0.06
+
+    intensity = _clamp((asc_shift + mc_shift) / 140.0 + len(house_changes) / 10.0, 0.0, 1.0)
+    for k in topic_shift:
+        topic_shift[k] = _clamp(topic_shift[k] * (0.65 + intensity * 0.6), -12.0, 12.0)
+        receptivity[k] = _clamp(receptivity[k] * (0.55 + intensity * 0.7), -0.25, 0.35)
+
+    b_like_delta = _clamp(
+        (0.08 if rel.get("planets", {}).get("moon", {}).get("house") in {1, 7, 10, 11} else -0.04)
+        + (0.06 if rel.get("planets", {}).get("venus", {}).get("house") in {1, 5, 7, 10, 11} else -0.03)
+        + (0.05 if rel.get("planets", {}).get("mercury", {}).get("house") in {1, 3, 7, 10, 11} else -0.03)
+        - (0.05 if rel.get("planets", {}).get("saturn", {}).get("house") in {8, 12} else 0.0),
+        -0.18,
+        0.18,
+    )
+
+    return {
+        "active": True,
+        "distance_km": round(distance_km, 1),
+        "distance_band": "global" if distance_km > 3000 else "regional" if distance_km > 700 else "local",
+        "topic_shift": {k: int(round(v)) for k, v in topic_shift.items()},
+        "topic_receptivity": {k: round(v, 3) for k, v in receptivity.items()},
+        "availability_delta": round(b_like_delta, 3),
+        "state": "relocated",
+        "house_changes": house_changes[:12],
+        "angle_shift": {"asc_deg": round(asc_shift, 2), "mc_deg": round(mc_shift, 2)},
+    }
+
+
+def _compute_interaction_model(req: PersonalInteractionRequest) -> Dict[str, Any]:
+    a = req.subject_person
+    b = req.influencer_person
+    topics = req.topics or ["love", "career", "money", "emotional_state"]
+    period_start = req.period.start
+    period_end = req.period.end
+    period_mid = _mid_date(period_start, period_end)
+
+    # Core charts
+    ay, amo, ad = _parse_date(a.date)
+    ah, ami, asc = _parse_time(a.time)
+    by, bmo, bd = _parse_date(b.date)
+    bh, bmi, bsc = _parse_time(b.time)
+
+    chart_a = calc_chart(ay, amo, ad, ah, ami, asc, a.lat, a.lon, a.utc, houses_system=a.houses, julian=a.julian)
+    chart_b = calc_chart(by, bmo, bd, bh, bmi, bsc, b.lat, b.lon, b.utc, houses_system=b.houses, julian=b.julian)
+
+    jd_a = _to_jd(a.date, a.time, a.utc)
+    jd_b = _to_jd(b.date, b.time, b.utc)
+
+    # Relocation-aware layer (current location can differ from natal location)
+    a_relocation = _compute_relocation_block(
+        chart_a, jd_a, a.lat, a.lon, a.current_lat, a.current_lon, a.houses,
+    )
+    b_relocation = _compute_relocation_block(
+        chart_b, jd_b, b.lat, b.lon, b.current_lat, b.current_lon, b.houses,
+    )
+
+    syn_aspects = synastry_aspects(chart_a, chart_b)
+    syn_score = synastry_score(syn_aspects)
+    comp_chart = composite_chart(jd_a, a.lat, a.lon, a.utc, jd_b, b.lat, b.lon, b.utc, houses_system=a.houses)
+
+    # Current state transits within target period (middle point)
+    a_transits = transits(jd_a, period_mid, "12:00", lat=a.lat, lon=a.lon)
+    b_transits = transits(jd_b, period_mid, "12:00", lat=b.lat, lon=b.lon)
+    b_availability = _compute_b_availability(b_transits)
+    b_availability = _clamp(b_availability + float(b_relocation.get("availability_delta", 0.0)), 0.12, 1.0)
+
+    rel_a_planets = None
+    if bool(a_relocation.get("active")):
+        rel_a_cached = relocated_chart(
+            jd_a,
+            a.current_lat if a.current_lat is not None else a.lat,
+            a.current_lon if a.current_lon is not None else a.lon,
+            houses_system=a.houses,
+            include_aspects=False,
+        )
+        rel_a_planets = rel_a_cached.get("planets", {})
+
+    # Build directional channels B -> A
+    a_transit_aspects = a_transits.get("aspects", []) if isinstance(a_transits, dict) else []
+    b_transit_aspects = b_transits.get("aspects", []) if isinstance(b_transits, dict) else []
+    channels: List[Dict[str, Any]] = []
+    for i, asp in enumerate(syn_aspects[:48], start=1):
+        p_a = str(asp.get("p1", ""))
+        p_b = str(asp.get("p2", ""))
+        aspect = str(asp.get("aspect", ""))
+        orb = float(asp.get("orb", 7.0) or 7.0)
+
+        entry_house = None
+        try:
+            entry_house = (rel_a_planets or chart_a.get("planets", {})).get(p_a, {}).get("house")
+        except Exception:
+            entry_house = None
+
+        base_strength = _clamp((10 - min(orb, 10)) * (1.15 if aspect == "conjunction" else 1.0), 0.8, 10.0)
+        a_hits = [x for x in a_transit_aspects if str(x.get("natal_planet", "")).lower() == p_a.lower()]
+        b_hits = [x for x in b_transit_aspects if str(x.get("natal_planet", "")).lower() == p_b.lower()]
+        transit_amp = 1.0 + min(0.7, 0.08 * (len(a_hits) + len(b_hits)))
+        topic = _topic_from_points(p_a, p_b, aspect)
+        topic_key = _topic_key_from_channel_topic(topic)
+        relocation_receptivity = float(a_relocation.get("topic_receptivity", {}).get(topic_key, 0.0))
+        transit_amp = _clamp(transit_amp + relocation_receptivity, 0.75, 1.95)
+
+        realization = _clamp(
+            (base_strength / 10.0) * 0.48 + (transit_amp - 1.0) * 0.25 + b_availability * 0.27,
+            0.05,
+            0.99,
+        )
+
+        channels.append({
+            "id": f"influence_{i:03d}",
+            "direction": "B_to_A",
+            "topic": topic,
+            "entry_point_in_A": p_a,
+            "entry_house_in_A": entry_house,
+            "source_point_in_B": p_b,
+            "synastry_aspect": aspect,
+            "base_strength": round(base_strength, 2),
+            "transit_amplifier": round(transit_amp, 2),
+            "relocation_receptivity": round(relocation_receptivity, 3),
+            "b_availability": round(b_availability, 2),
+            "realization_probability": round(realization, 2),
+            "active_now": bool(realization >= 0.58 and transit_amp >= 1.08),
+            "window_start": period_start,
+            "window_peak": period_mid,
+            "window_end": period_end,
+        })
+
+    channels.sort(key=lambda x: x["realization_probability"], reverse=True)
+
+    baseline = _build_baseline_scores(a_transits, topics)
+    for k, v in a_relocation.get("topic_shift", {}).items():
+        if k in baseline:
+            baseline[k] = int(round(_clamp(baseline[k] + float(v), 0, 100)))
+
+    delta = {k: 0.0 for k in topics}
+
+    for ch in channels:
+        raw = (float(ch["realization_probability"]) - 0.5) * 34.0
+        if ch["active_now"]:
+            raw *= 1.14
+        if ch["topic"] == "love" and "love" in delta:
+            delta["love"] += raw
+        if ch["topic"] == "project" and "career" in delta:
+            delta["career"] += raw * 0.75
+        if ch["topic"] == "money" and "money" in delta:
+            delta["money"] += raw * 0.88
+        if ch["topic"] == "emotional_state" and "emotional_state" in delta:
+            delta["emotional_state"] += raw * 0.84
+        if ch["topic"] == "decisions" and "decisions" in delta:
+            delta["decisions"] += raw * 0.9
+        if ch["topic"] == "conflict":
+            if "emotional_state" in delta:
+                delta["emotional_state"] -= abs(raw) * 0.72
+            if "love" in delta:
+                delta["love"] -= abs(raw) * 0.45
+            if "decisions" in delta:
+                delta["decisions"] += abs(raw) * 0.3
+
+    # Composite adjustment as relationship entity pressure
+    comp_pressure = (float(syn_score.get("percent", 50)) - 50.0) / 9.0 if isinstance(syn_score, dict) else 0.0
+    if "love" in delta:
+        delta["love"] += comp_pressure * 0.8
+    if "career" in delta:
+        delta["career"] += comp_pressure * 0.42
+    if "emotional_state" in delta:
+        delta["emotional_state"] += comp_pressure * 0.55
+
+    availability_adj = (b_availability - 0.5) * 16.0
+    for k in list(delta.keys()):
+        delta[k] += availability_adj * (0.8 if k in {"love", "emotional_state"} else 0.45)
+
+    low_conf_ratio = (len([c for c in channels if c["realization_probability"] < 0.48]) / len(channels)) if channels else 0.0
+    distortion_noise = low_conf_ratio * 8.0
+    if "emotional_state" in delta:
+        delta["emotional_state"] -= distortion_noise * 0.85
+    if "decisions" in delta:
+        delta["decisions"] -= distortion_noise * 0.45
+
+    # Relocation also shifts interaction sensitivity of A in current location
+    for k, v in a_relocation.get("topic_shift", {}).items():
+        if k in delta:
+            delta[k] += float(v) * 0.45
+
+    delta_int = {k: int(round(_clamp(v, -35, 35))) for k, v in delta.items()}
+    final_scores = {k: int(round(_clamp(baseline[k] + delta_int[k], 0, 100))) for k in baseline.keys()}
+
+    active_windows = [
+        {
+            "title": f"{c['source_point_in_B']} -> {c['entry_point_in_A']} ({c['topic']})",
+            "start": c["window_start"],
+            "peak": c["window_peak"],
+            "end": c["window_end"],
+            "probability": c["realization_probability"],
+        }
+        for c in channels if c["active_now"] or c["realization_probability"] >= 0.62
+    ][:12]
+
+    through_come = []
+    through_leave = []
+    for c in channels[:18]:
+        t = c["topic"]
+        p = c["realization_probability"]
+        if p >= 0.6:
+            if t == "love": through_come.append("романтическое сближение")
+            if t == "project": through_come.append("карьерный шанс и полезный союз")
+            if t == "money": through_come.append("финансовая возможность через контакт")
+            if t == "decisions": through_come.append("решающий разговор и выбор траектории")
+            if t == "emotional_state": through_come.append("эмоциональная ясность")
+            if t == "conflict": through_come.append("кризис определения и перезапуск сценария")
+        if p >= 0.55:
+            if t == "conflict": through_leave.append("старый формат ожиданий")
+            if t == "project": through_leave.append("карьерный застой")
+            if t == "love" and b_availability < 0.42: through_leave.append("старая эмоциональная стабильность")
+            if t == "decisions": through_leave.append("промедление и неопределенность")
+
+    through_come = list(dict.fromkeys(through_come))[:6]
+    through_leave = list(dict.fromkeys(through_leave))[:6]
+
+    can_do = []
+    avoid = []
+    conflict_active = len([c for c in channels if c["topic"] == "conflict" and c["active_now"]])
+    if b_availability < 0.45:
+        avoid.append("требовать быстрых обещаний")
+        can_do.append("снижать темп и проверять контакт действиями")
+    if conflict_active >= 2:
+        avoid.append("давить на определенность")
+        can_do.append("вести короткий структурный разговор и обозначать границы")
+    if delta_int.get("love", 0) > 8:
+        can_do.append("мягко сближаться и прояснять ожидания")
+    if delta_int.get("emotional_state", 0) < -8:
+        avoid.append("принимать необратимые решения в перегрузе")
+        can_do.append("делать паузу 24-48 часов перед ключевым выбором")
+    if not can_do:
+        can_do.append("действовать по фактической взаимности")
+    if not avoid:
+        avoid.append("форсировать события вне активного окна")
+
+    return {
+        "subject": a.name or "A",
+        "influencer": b.name or "B",
+        "period": {"start": period_start, "end": period_end, "peak": period_mid},
+        "topics": topics,
+        "baseline_forecast": baseline,
+        "interaction_adjustments": delta_int,
+        "final_forecast": final_scores,
+        "through_b_may_come": through_come,
+        "through_b_may_leave": through_leave,
+        "active_windows": active_windows,
+        "recommendations": {
+            "can_do": list(dict.fromkeys(can_do))[:6],
+            "avoid": list(dict.fromkeys(avoid))[:6],
+        },
+        "b_current_state": {
+            "availability": round(b_availability, 3),
+            "state": "active_conductor" if b_availability >= 0.62 else "potential_conductor" if b_availability >= 0.42 else "limited_conductor",
+            "transit_aspects_count": len(b_transits.get("aspects", [])) if isinstance(b_transits, dict) else 0,
+        },
+        "relocation": {
+            "subject": a_relocation,
+            "influencer": b_relocation,
+        },
+        "channels": channels,
+        "meta": {
+            "synastry_score": syn_score,
+            "composite_present": bool(comp_chart),
+            "distortion_noise": round(distortion_noise, 3),
+        },
+    }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1029,6 +1488,76 @@ def calc_davison(req: PersonPair):
                                jd2, req.lat2, req.lon2, req.utc2,
                                houses_system=req.houses)
         return _safe(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── INTERACTION-ADJUSTED PERSONAL FORECAST ──────────────────────────────────
+@app.post("/interaction/personal-forecast")
+def interaction_personal_forecast(req: PersonalInteractionRequest):
+    try:
+        result = _compute_interaction_model(req)
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/interaction/routes")
+def interaction_routes(req: PersonalInteractionRequest):
+    try:
+        result = _compute_interaction_model(req)
+        return _present({
+            "subject": result["subject"],
+            "influencer": result["influencer"],
+            "period": result["period"],
+            "b_current_state": result["b_current_state"],
+            "relocation": result.get("relocation", {}),
+            "routes": result["channels"],
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/interaction/timeline")
+def interaction_timeline(req: PersonalInteractionRequest):
+    try:
+        result = _compute_interaction_model(req)
+        return _present({
+            "subject": result["subject"],
+            "influencer": result["influencer"],
+            "period": result["period"],
+            "relocation": result.get("relocation", {}),
+            "active_windows": result["active_windows"],
+            "recommendations": result["recommendations"],
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/interaction/delta")
+def interaction_delta(req: PersonalInteractionRequest):
+    try:
+        result = _compute_interaction_model(req)
+        return _present({
+            "subject": result["subject"],
+            "influencer": result["influencer"],
+            "period": result["period"],
+            "relocation": result.get("relocation", {}),
+            "baseline_forecast": result["baseline_forecast"],
+            "interaction_adjustments": result["interaction_adjustments"],
+            "final_forecast": result["final_forecast"],
+            "through_b_may_come": result["through_b_may_come"],
+            "through_b_may_leave": result["through_b_may_leave"],
+            "meta": result["meta"],
+        })
     except HTTPException:
         raise
     except Exception as e:
