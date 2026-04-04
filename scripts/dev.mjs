@@ -4,20 +4,23 @@ import path from 'node:path';
 
 const rootDir = process.cwd();
 const isWindows = process.platform === 'win32';
+// On Windows, .cmd wrappers require `shell: true`; exe files do not.
 const npmCmd = isWindows ? 'npm.cmd' : 'npm';
 const venvPython = path.join(rootDir, '.venv', isWindows ? 'Scripts' : 'bin', isWindows ? 'python.exe' : 'python');
-const pythonCmd = existsSync(venvPython) ? venvPython : 'python';
+const pythonCmd = existsSync(venvPython) ? venvPython : (isWindows ? 'python.exe' : 'python');
 
 const children = [
   spawn(
     pythonCmd,
     ['-m', 'uvicorn', 'astro_api:app', '--reload', '--host', '0.0.0.0', '--port', '8000'],
-    { cwd: rootDir, stdio: 'inherit' },
+    // shell: false so the absolute venv path is not reinterpreted by cmd.exe
+    { cwd: rootDir, stdio: 'inherit', shell: false },
   ),
   spawn(
     npmCmd,
     ['--prefix', 'frontend', 'run', 'dev'],
-    { cwd: rootDir, stdio: 'inherit' },
+    // npm.cmd needs shell: true on Windows to be found via PATH
+    { cwd: rootDir, stdio: 'inherit', shell: isWindows },
   ),
 ];
 
