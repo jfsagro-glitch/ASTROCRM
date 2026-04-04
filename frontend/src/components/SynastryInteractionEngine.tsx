@@ -90,6 +90,28 @@ type PersonalImpact = {
   windowEnd: string;
 };
 
+type TopicKey = 'love' | 'career' | 'money' | 'emotional_state' | 'decisions';
+
+type TopicScores = Record<TopicKey, number>;
+
+type InfluenceChannel = {
+  id: string;
+  direction: 'B_to_A';
+  topic: 'love' | 'project' | 'conflict' | 'money' | 'emotional_state' | 'decisions';
+  entry_point_in_A: string;
+  entry_house_in_A: number | null;
+  source_point_in_B: string;
+  synastry_aspect: string;
+  base_strength: number;
+  transit_amplifier: number;
+  b_availability: number;
+  realization_probability: number;
+  active_now: boolean;
+  window_start: string;
+  window_peak: string;
+  window_end: string;
+};
+
 const ASPECT_WEIGHTS: Record<string, number> = {
   conjunction: 10,
   opposition: 8,
@@ -355,6 +377,34 @@ function heatmapColor(topic: string, intensity: number): string {
   if (['conflict', 'crisis', 'decision', 'stress'].some(w => topic.includes(w)))
     return `rgba(251,146,60,${a.toFixed(2)})`;
   return `rgba(167,139,250,${a.toFixed(2)})`;
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function topicByNatalPoint(point: string): TopicKey[] {
+  const p = point.toLowerCase();
+  if (p.includes('venus') || p.includes('moon') || p.includes('mars') || p.includes('h5') || p.includes('h7') || p.includes('desc')) return ['love'];
+  if (p.includes('mc') || p.includes('h10') || p.includes('sun') || p.includes('saturn') || p.includes('jupiter')) return ['career'];
+  if (p.includes('h2') || p.includes('h8')) return ['money'];
+  if (p.includes('ic') || p.includes('h4') || p.includes('neptune') || p.includes('pluto')) return ['emotional_state'];
+  if (p.includes('mercury') || p.includes('node') || p.includes('h1') || p.includes('h7') || p.includes('h10')) return ['decisions'];
+  return ['emotional_state'];
+}
+
+function emptyTopicScores(seed = 50): TopicScores {
+  return { love: seed, career: seed, money: seed, emotional_state: seed, decisions: seed };
+}
+
+function channelTopicFromNode(node: SynNode): InfluenceChannel['topic'] {
+  if (node.meaningTags.includes('love') || node.meaningTags.includes('sex') || node.meaningTags.includes('attraction')) return 'love';
+  if (node.meaningTags.includes('project') || node.meaningTags.includes('status') || node.meaningTags.includes('growth')) return 'project';
+  if (node.meaningTags.includes('conflict') || node.meaningTags.includes('crisis')) return 'conflict';
+  const byPoint = topicByNatalPoint(node.pointA.replace('A.', ''));
+  if (byPoint.includes('money')) return 'money';
+  if (byPoint.includes('decisions')) return 'decisions';
+  return byPoint.includes('career') ? 'project' : 'emotional_state';
 }
 
 export default function SynastryInteractionEngine({
@@ -796,6 +846,215 @@ export default function SynastryInteractionEngine({
     return out.sort((a, b) => b.netScore - a.netScore).slice(0, 14);
   }, [selfTransits, layerBNodes, advancedDate]);
 
+  const bAvailability = useMemo(() => {
+    const aspects = getAspectList(partnerTransits);
+    if (!aspects.length) return 0.55;
+    let score = 0;
+    aspects.forEach(item => {
+      const natal = String(item.natal_planet ?? '').toLowerCase();
+      const aspect = String(item.aspect ?? '').toLowerCase();
+      const orb = typeof item.orb === 'number' ? item.orb : 4;
+      const hard = aspect === 'square' || aspect === 'opposition';
+      const soft = aspect === 'trine' || aspect === 'sextile';
+      const orbFactor = Math.max(0.2, 1 - orb / 8);
+      if ((natal === 'moon' || natal === 'venus' || natal === 'sun' || natal === 'mercury') && soft) score += 1.2 * orbFactor;
+      if ((natal === 'moon' || natal === 'venus' || natal === 'saturn' || natal === 'pluto') && hard) score -= 1.3 * orbFactor;
+      if (aspect === 'conjunction' && (natal === 'jupiter' || natal === 'venus')) score += 1.1 * orbFactor;
+      if (aspect === 'conjunction' && (natal === 'saturn' || natal === 'pluto')) score -= 1.1 * orbFactor;
+    });
+    return clamp(0.55 + score / Math.max(8, aspects.length * 2), 0.15, 1);
+  }, [partnerTransits]);
+
+  const influenceChannels = useMemo(() => {
+    const byNodeActs = new Map<string, TransitActivation[]>();
+    layerCActivations.forEach(a => {
+      const arr = byNodeActs.get(a.targetRef) ?? [];
+      arr.push(a);
+      byNodeActs.set(a.targetRef, arr);
+    });
+
+    const out: InfluenceChannel[] = [];
+    layerBNodes.forEach((node, idx) => {
+      if (!node.pointA.startsWith('A.')) return;
+      const entryPoint = node.pointA.slice(2);
+      const sourcePoint = node.pointB.slice(2);
+      const acts = byNodeActs.get(node.id) ?? [];
+      const bestAct = acts[0] ?? null;
+      const transitAmplifier = bestAct ? clamp(1 + (3 - bestAct.orb) / 4, 0.8, 1.7) : 1;
+      const baseStrength = clamp(node.strength / 10, 0.8, 10);
+      const realizationProbability = clamp(
+        (baseStrength / 10) * 0.45 + ((transitAmplifier - 0.8) / 0.9) * 0.25 + bAvailability * 0.3,
+        0.05,
+        0.99,
+      );
+      const entryLon = synastry.chart1.planets[entryPoint.toLowerCase()]?.lon;
+      const entryHouse = typeof entryLon === 'number' ? getHouseByLongitude(synastry.chart1, entryLon) : null;
+      const start = bestAct ? bestAct.windowStart.slice(0, 10) : formatDateShift(advancedDate, -4).slice(0, 10);
+      const peak = bestAct ? bestAct.dateExact.slice(0, 10) : advancedDate;
+      const end = bestAct ? bestAct.windowEnd.slice(0, 10) : formatDateShift(advancedDate, 4).slice(0, 10);
+      out.push({
+        id: `influence_${String(idx + 1).padStart(3, '0')}`,
+        direction: 'B_to_A',
+        topic: channelTopicFromNode(node),
+        entry_point_in_A: entryPoint,
+        entry_house_in_A: entryHouse,
+        source_point_in_B: sourcePoint,
+        synastry_aspect: node.aspect,
+        base_strength: Number(baseStrength.toFixed(2)),
+        transit_amplifier: Number(transitAmplifier.toFixed(2)),
+        b_availability: Number(bAvailability.toFixed(2)),
+        realization_probability: Number(realizationProbability.toFixed(2)),
+        active_now: Boolean(bestAct),
+        window_start: start,
+        window_peak: peak,
+        window_end: end,
+      });
+    });
+
+    return out.sort((a, b) => b.realization_probability - a.realization_probability).slice(0, 24);
+  }, [layerBNodes, layerCActivations, bAvailability, synastry.chart1, advancedDate]);
+
+  const baselineForecast = useMemo(() => {
+    const scores = emptyTopicScores(52);
+    const aspects = getAspectList(selfTransits);
+    aspects.forEach(item => {
+      const natal = String(item.natal_planet ?? '').toLowerCase();
+      const aspect = String(item.aspect ?? '').toLowerCase();
+      const orb = typeof item.orb === 'number' ? item.orb : 4;
+      const hard = aspect === 'square' || aspect === 'opposition';
+      const soft = aspect === 'trine' || aspect === 'sextile';
+      const neutral = aspect === 'conjunction' || aspect === 'quincunx';
+      const sign = hard ? -1 : soft ? 1 : neutral ? 0.35 : 0;
+      const weight = (ASPECT_WEIGHTS[aspect] ?? 4) * Math.max(0.25, 1 - orb / 8) * 1.9;
+      topicByNatalPoint(natal).forEach(t => {
+        scores[t] += sign * weight;
+      });
+    });
+    (Object.keys(scores) as TopicKey[]).forEach(k => {
+      scores[k] = Math.round(clamp(scores[k], 8, 95));
+    });
+    return scores;
+  }, [selfTransits]);
+
+  const interactionAdjustments = useMemo(() => {
+    const delta = emptyTopicScores(0);
+    influenceChannels.forEach(ch => {
+      const raw = (ch.realization_probability - 0.5) * 40 * (ch.active_now ? 1.12 : 0.86);
+      if (ch.topic === 'love') delta.love += raw;
+      if (ch.topic === 'project') {
+        delta.career += raw * 0.72;
+        delta.money += raw * 0.46;
+      }
+      if (ch.topic === 'money') delta.money += raw * 0.9;
+      if (ch.topic === 'emotional_state') delta.emotional_state += raw * 0.82;
+      if (ch.topic === 'decisions') delta.decisions += raw * 0.8;
+      if (ch.topic === 'conflict') {
+        delta.emotional_state -= Math.abs(raw) * 0.7;
+        delta.love -= Math.abs(raw) * 0.4;
+        delta.decisions += Math.abs(raw) * 0.35;
+      }
+    });
+
+    const compositeAdj = (scoreBoard.compositeTriggerScore - 50) / 8;
+    delta.love += compositeAdj * 0.75;
+    delta.career += compositeAdj * 0.4;
+    delta.emotional_state += compositeAdj * 0.5;
+
+    const availAdj = (bAvailability - 0.5) * 16;
+    delta.love += availAdj * 0.8;
+    delta.career += availAdj * 0.45;
+    delta.money += availAdj * 0.35;
+    delta.emotional_state += availAdj * 0.55;
+    delta.decisions += availAdj * 0.4;
+
+    const lowConfidenceShare = influenceChannels.length
+      ? influenceChannels.filter(ch => ch.realization_probability < 0.48).length / influenceChannels.length
+      : 0;
+    const distortionNoise = lowConfidenceShare * 8;
+    delta.emotional_state -= distortionNoise * 0.8;
+    delta.decisions -= distortionNoise * 0.45;
+
+    (Object.keys(delta) as TopicKey[]).forEach(k => {
+      delta[k] = Math.round(clamp(delta[k], -35, 35));
+    });
+    return delta;
+  }, [influenceChannels, scoreBoard.compositeTriggerScore, bAvailability]);
+
+  const finalForecast = useMemo(() => {
+    const out = emptyTopicScores(50);
+    (Object.keys(out) as TopicKey[]).forEach(k => {
+      out[k] = Math.round(clamp(baselineForecast[k] + interactionAdjustments[k], 0, 100));
+    });
+    return out;
+  }, [baselineForecast, interactionAdjustments]);
+
+  const throughBMayCome = useMemo(() => {
+    const items: string[] = [];
+    influenceChannels.slice(0, 10).forEach(ch => {
+      if (ch.realization_probability < 0.58) return;
+      if (ch.topic === 'love') items.push('романтическое сближение');
+      if (ch.topic === 'project') items.push('карьерный шанс и полезный союз');
+      if (ch.topic === 'money') items.push('финансовая возможность через контакт');
+      if (ch.topic === 'emotional_state') items.push('эмоциональная ясность и проживание чувств');
+      if (ch.topic === 'decisions') items.push('решающий разговор и выбор траектории');
+      if (ch.topic === 'conflict') items.push('триггер к пересборке сценария отношений');
+    });
+    return Array.from(new Set(items)).slice(0, 6);
+  }, [influenceChannels]);
+
+  const throughBMayLeave = useMemo(() => {
+    const items: string[] = [];
+    influenceChannels.slice(0, 12).forEach(ch => {
+      if (ch.realization_probability < 0.5) return;
+      if (ch.topic === 'conflict') items.push('старый формат ожиданий и иллюзии');
+      if (ch.topic === 'project' && ch.realization_probability > 0.68) items.push('застой в карьерной стратегии');
+      if (ch.topic === 'love' && bAvailability < 0.42) items.push('внутренняя стабильность без перезапроса границ');
+      if (ch.topic === 'decisions') items.push('промедление и неопределенность');
+    });
+    return Array.from(new Set(items)).slice(0, 6);
+  }, [influenceChannels, bAvailability]);
+
+  const activeWindows = useMemo(() => {
+    return influenceChannels
+      .filter(ch => ch.active_now || ch.realization_probability > 0.62)
+      .slice(0, 10)
+      .map(ch => ({
+        title: `${pRU(ch.source_point_in_B)} -> ${pRU(ch.entry_point_in_A)} (${ch.topic})`,
+        start: ch.window_start,
+        peak: ch.window_peak,
+        end: ch.window_end,
+        probability: ch.realization_probability,
+      }));
+  }, [influenceChannels]);
+
+  const actionPolicy = useMemo(() => {
+    const canDo: string[] = [];
+    const avoid: string[] = [];
+    const conflictActive = influenceChannels.filter(ch => ch.topic === 'conflict' && ch.active_now).length;
+    const loveBoost = interactionAdjustments.love > 8;
+    const emotionalDrop = interactionAdjustments.emotional_state < -8;
+
+    if (bAvailability < 0.45) {
+      avoid.push('требовать быстрых обещаний и фиксации статуса');
+      canDo.push('замедлить темп и проверять контакт через факты');
+    }
+    if (conflictActive >= 2) {
+      avoid.push('давить на определенность в пиковые конфликтные окна');
+      canDo.push('короткий структурный разговор и постановка границ');
+    }
+    if (loveBoost) {
+      canDo.push('мягко сближаться и прояснять взаимные ожидания');
+    }
+    if (emotionalDrop) {
+      avoid.push('принимать необратимые решения в эмоциональном перегрузе');
+      canDo.push('делать паузу перед ключевым решением 24-48 часов');
+    }
+    if (!canDo.length) canDo.push('наблюдать динамику и действовать по фактической взаимности');
+    if (!avoid.length) avoid.push('форсировать темп без подтвержденного окна контакта');
+
+    return { canDo: Array.from(new Set(canDo)).slice(0, 5), avoid: Array.from(new Set(avoid)).slice(0, 5) };
+  }, [influenceChannels, interactionAdjustments, bAvailability]);
+
   const filteredRoutes = routes.filter(r => matchesTopic(r.topic, topicFilter));
   const routesThroughA = filteredRoutes.filter(r => r.through === 'A').slice(0, 4);
   const routesThroughB = filteredRoutes.filter(r => r.through === 'B').slice(0, 4);
@@ -1099,7 +1358,7 @@ export default function SynastryInteractionEngine({
 
       {view === 'personal' && (
         <div className="space-y-4">
-          {personalImpacts.length === 0 ? (
+          {personalImpacts.length === 0 && influenceChannels.length === 0 ? (
             <div className={`rounded-xl border ${theme.card} p-6 text-center`}>
               <p className={`text-sm ${theme.text} opacity-60`}>
                 Добавьте дату расчёта транзитов для {participantA}, чтобы увидеть личный прогноз
@@ -1108,13 +1367,12 @@ export default function SynastryInteractionEngine({
             </div>
           ) : (
             <>
-              {/* Summary banner */}
               <div className={`rounded-xl border ${theme.card} p-4`}>
                 <h5 className={`text-sm font-semibold ${theme.accent} mb-1`}>
-                  Личная ситуация {participantA} с учётом взаимодействия с {participantB}
+                  Personal Interaction Forecast Engine: Forecast({participantA} | {participantB})
                 </h5>
                 <p className={`text-xs ${theme.text} opacity-60 mb-3`}>
-                  Транзиты к натальной карте {participantA}, скорректированные через синастрические узлы с {participantB}.
+                  Базовый прогноз {participantA} + влияние каналов {participantB} → {participantA} + состояние {participantB} + активация связки.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(['expanding', 'stabilizing', 'testing', 'contracting', 'transforming'] as const).map(v => {
@@ -1125,62 +1383,155 @@ export default function SynastryInteractionEngine({
                       </span>
                     ) : null;
                   })}
+                  <span className={`px-2 py-1 rounded-full text-xs border border-white/15 ${theme.text}`}>
+                    Availability B: {(bAvailability * 100).toFixed(0)}%
+                  </span>
                 </div>
               </div>
 
-              {/* Impact cards */}
-              {personalImpacts.map(impact => (
-                <div key={impact.id} className={`rounded-xl border ${theme.card} p-4`}>
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center flex-wrap gap-2">
-                        <span className={`text-sm font-semibold ${theme.header}`}>
-                          {pRU(impact.transitPlanet)} {aRU(impact.transitAspect)} {pRU(impact.natalPoint)}
-                        </span>
-                        <span className={`text-xs font-medium ${vectorColorClass(impact.netVector)}`}>
-                          {vectorLabel(impact.netVector)}
-                        </span>
-                        <span className={`text-xs ${theme.text} opacity-50`}>
-                          {impact.transitPhase} · orb {impact.transitOrb.toFixed(1)}°
-                        </span>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>1) Baseline vs With Person</h6>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className={theme.text}>
+                          <th className="px-2 py-1 text-left">Тема</th>
+                          <th className="px-2 py-1 text-left">Baseline A</th>
+                          <th className="px-2 py-1 text-left">Delta from B</th>
+                          <th className="px-2 py-1 text-left">Final A|B</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {([
+                          ['love', 'Личная жизнь'],
+                          ['career', 'Работа / статус'],
+                          ['money', 'Деньги'],
+                          ['emotional_state', 'Состояние'],
+                          ['decisions', 'Решения'],
+                        ] as Array<[TopicKey, string]>).map(([k, title]) => {
+                          const d = interactionAdjustments[k];
+                          return (
+                            <tr key={k} className="border-t border-white/10">
+                              <td className="px-2 py-1">{title}</td>
+                              <td className="px-2 py-1">{baselineForecast[k]}</td>
+                              <td className={`px-2 py-1 ${d >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{d >= 0 ? '+' : ''}{d}</td>
+                              <td className="px-2 py-1 font-semibold">{finalForecast[k]}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>2) Influence Routes (B → A)</h6>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className={theme.text}>
+                          <th className="px-2 py-1 text-left">Через B</th>
+                          <th className="px-2 py-1 text-left">В A включает</th>
+                          <th className="px-2 py-1 text-left">Тема</th>
+                          <th className="px-2 py-1 text-left">Сила</th>
+                          <th className="px-2 py-1 text-left">Активно</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {influenceChannels.slice(0, 8).map(ch => (
+                          <tr key={ch.id} className="border-t border-white/10">
+                            <td className="px-2 py-1">{pRU(ch.source_point_in_B)}</td>
+                            <td className="px-2 py-1">{pRU(ch.entry_point_in_A)}{ch.entry_house_in_A ? ` (H${ch.entry_house_in_A})` : ''}</td>
+                            <td className="px-2 py-1">{ch.topic}</td>
+                            <td className="px-2 py-1">{Math.round(ch.base_strength * 10)}</td>
+                            <td className={`px-2 py-1 ${ch.active_now ? 'text-emerald-300' : theme.text}`}>{ch.active_now ? 'да' : 'нет'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>3) Timeline: когда B влияет на A</h6>
+                  <div className="space-y-2">
+                    {activeWindows.length === 0 && <div className={`text-xs ${theme.text} opacity-70`}>Нет активных окон.</div>}
+                    {activeWindows.map((w, i) => (
+                      <div key={i} className={`rounded-lg border ${theme.card} p-2 text-xs`}>
+                        <div className={theme.header}>{w.title}</div>
+                        <div className={`${theme.text} opacity-80`}>окно {w.start} - {w.end}, пик {w.peak}</div>
+                        <div className={theme.text}>вероятность реализации {(w.probability * 100).toFixed(0)}%</div>
                       </div>
-                      <div className={`mt-1 text-xs ${theme.text} opacity-80`}>
-                        {impact.lifeAreas.join(' · ')}
-                      </div>
-                      <div className={`text-xs ${theme.text} opacity-50`}>
-                        {impact.windowStart} — {impact.windowEnd}
-                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>4) Что приходит / что уходит через B</h6>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className={`text-xs font-semibold ${theme.header} mb-1`}>Через B может прийти</div>
+                      {throughBMayCome.length === 0 && <div className={`text-xs ${theme.text} opacity-70`}>Пока без выраженного притока.</div>}
+                      {throughBMayCome.map((x, i) => <div key={i} className={`text-xs ${theme.text}`}>• {x}</div>)}
                     </div>
-                    <div className={`text-xl font-bold ${vectorColorClass(impact.netVector)} opacity-70 flex-shrink-0`}>
-                      {impact.netScore}
+                    <div>
+                      <div className={`text-xs font-semibold ${theme.header} mb-1`}>Через B может уйти</div>
+                      {throughBMayLeave.length === 0 && <div className={`text-xs ${theme.text} opacity-70`}>Пока без выраженного выхода.</div>}
+                      {throughBMayLeave.map((x, i) => <div key={i} className={`text-xs ${theme.text}`}>• {x}</div>)}
                     </div>
                   </div>
-
-                  {impact.synastrModifiers.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-white/10">
-                      <div className={`text-xs font-semibold ${theme.accent} mb-1.5`}>
-                        Влияние {participantB} на этот транзит:
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {impact.synastrModifiers.slice(0, 3).map((m, j) => (
-                          <span
-                            key={j}
-                            className={`text-xs px-2 py-0.5 rounded-full border border-white/10 ${
-                              m.modifier === 'amplifies' ? 'text-orange-300' :
-                              m.modifier === 'softens' ? 'text-emerald-300' : 'text-purple-300'
-                            }`}
-                          >
-                            {m.bPoint.split('.')[1]?.toUpperCase() ?? m.bPoint}{' '}
-                            {m.modifier === 'amplifies' ? '⬆ усиливает' :
-                             m.modifier === 'softens' ? '⬇ смягчает' : '↺ перенаправляет'}
-                            {' '}(сила {m.strength})
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ))}
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>5) Action Policy для {participantA}</h6>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className={`text-xs font-semibold ${theme.header} mb-1`}>Что можно</div>
+                      {actionPolicy.canDo.map((x, i) => (
+                        <div key={i} className={`text-xs ${theme.text}`}>• {x}</div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className={`text-xs font-semibold ${theme.header} mb-1`}>Чего не делать</div>
+                      {actionPolicy.avoid.map((x, i) => (
+                        <div key={i} className={`text-xs ${theme.text}`}>• {x}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>Core Formula Signals</h6>
+                  <div className="space-y-1 text-xs">
+                    <div className={theme.text}>NatalPotential(A): <span className={theme.header}>{Math.round((baselineForecast.love + baselineForecast.career + baselineForecast.money + baselineForecast.emotional_state + baselineForecast.decisions) / 5)}</span></div>
+                    <div className={theme.text}>TransitPressure(A): <span className={theme.header}>{Math.round(personalImpacts.reduce((s, p) => s + p.netScore, 0) / Math.max(1, personalImpacts.length))}</span></div>
+                    <div className={theme.text}>SynastryInfluence(B→A): <span className={theme.header}>{Math.round(influenceChannels.reduce((s, c) => s + c.base_strength * 10, 0) / Math.max(1, influenceChannels.length))}</span></div>
+                    <div className={theme.text}>B_CurrentState: <span className={theme.header}>{Math.round(bAvailability * 100)}</span></div>
+                    <div className={theme.text}>TransitActivationOfInteraction: <span className={theme.header}>{Math.round(influenceChannels.filter(c => c.active_now).length / Math.max(1, influenceChannels.length) * 100)}</span></div>
+                    <div className={theme.text}>CompositeEffect: <span className={theme.header}>{scoreBoard.compositeTriggerScore}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              {personalImpacts.length > 0 && (
+                <div className={`rounded-xl border ${theme.card} p-4`}>
+                  <h6 className={`text-sm font-semibold ${theme.accent} mb-2`}>Detail: активные личные триггеры A</h6>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {personalImpacts.slice(0, 8).map(impact => (
+                      <div key={impact.id} className={`rounded-lg border ${theme.card} p-2 text-xs`}>
+                        <div className={theme.header}>{pRU(impact.transitPlanet)} {aRU(impact.transitAspect)} {pRU(impact.natalPoint)}</div>
+                        <div className={`${theme.text} opacity-80`}>{impact.windowStart} - {impact.windowEnd}</div>
+                        <div className={vectorColorClass(impact.netVector)}>{vectorLabel(impact.netVector)} · {impact.netScore}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
