@@ -278,6 +278,65 @@ def _gen_prenatal_interp(result: dict) -> str:
         return "Пренатальный синодический пункт показывает лунную фазу рождения."
 
 
+def _gen_perfections_interp(result: dict) -> str:
+    """Generate interpretation for perfections transit windows."""
+    try:
+        count = len(result.get("exact_dates", [])) if isinstance(result, dict) else 0
+        return (
+            f"Найдены точные транзитные окна: {count}. Это карта периодов, когда аспекты работают максимально точно.\n\n"
+            "Просто: перфекции в этом модуле показывают конкретные даты, когда влияние планет усиливается.\n"
+            "Что это значит: такие даты чаще совпадают с поворотными решениями, важными встречами и запуском новых процессов.\n"
+            "Что делать: заранее планируйте ключевые действия на эти окна и фиксируйте результаты, чтобы увидеть, какие периоды дают лучший эффект."
+        )
+    except Exception:
+        return "Перфекции показывают точные временные окна максимальной активности."
+
+
+def _gen_eclipses_interp(result: dict) -> str:
+    """Generate interpretation for eclipses endpoint."""
+    try:
+        items = result.get("eclipses", result) if isinstance(result, dict) else result
+        count = len(items) if isinstance(items, list) else 0
+        return (
+            f"Найдено затмений в периоде: {count}. Затмения усиливают темы перемен, завершений и перенастройки приоритетов.\n\n"
+            "Просто: затмения подсвечивают важные точки, где старый этап заканчивается и начинается новый.\n"
+            "Что это значит: вблизи затмений события ощущаются интенсивнее, а решения имеют долгий эффект.\n"
+            "Что делать: в эти периоды действуйте осознанно, снижайте импульсивность и выбирайте шаги, которые соответствуют вашим долгосрочным целям."
+        )
+    except Exception:
+        return "Затмения показывают периоды сильной жизненной перенастройки."
+
+
+def _gen_stations_interp(result: dict) -> str:
+    """Generate interpretation for planetary stations endpoint."""
+    try:
+        items = result.get("stations", result) if isinstance(result, dict) else result
+        count = len(items) if isinstance(items, list) else 0
+        return (
+            f"Стационарных точек найдено: {count}. Это моменты, когда планета замедляется перед сменой направления.\n\n"
+            "Просто: в стациях энергия планеты ощущается сильнее обычного, будто тема ставится на паузу и требует внимания.\n"
+            "Что это значит: такие периоды часто приносят возврат старых вопросов и необходимость пересмотра решений.\n"
+            "Что делать: не форсируйте события, проверяйте детали и завершайте незакрытые задачи по теме соответствующей планеты."
+        )
+    except Exception:
+        return "Стации планет показывают периоды усиленного фокуса и пересмотра."
+
+
+def _gen_ingress_interp(result: dict) -> str:
+    """Generate interpretation for ingress chart endpoint."""
+    try:
+        sign = result.get("sign", "знак") if isinstance(result, dict) else "знак"
+        year = result.get("year", "") if isinstance(result, dict) else ""
+        return (
+            f"Ингресс-карта {year} для входа в {sign}. Она задает тон периода и общий стратегический фон.\n\n"
+            "Просто: ингресс показывает, какая энергия будет доминировать в выбранный цикл.\n"
+            "Что это значит: карта помогает понять, где будет основной рост, где нужен ресурс и какие темы лучше вывести в приоритет.\n"
+            "Что делать: используйте ингресс как карту года: планируйте ключевые цели в гармонии с ведущей энергией периода."
+        )
+    except Exception:
+        return "Ингресс-карта показывает стратегический фон периода."
+
+
 def _file_response_with_cache(path: str, cache_control: str) -> FileResponse:
     response = FileResponse(path)
     response.headers["Cache-Control"] = cache_control
@@ -874,7 +933,9 @@ def calc_perfections(req: PerfectionsRequest):
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = transit_exact_dates(natal_jd, req.from_date, req.to_date,
                                      lat=req.lat, lon=req.lon)
-        return _safe(result)
+        if isinstance(result, dict):
+            result["interpretation"] = _gen_perfections_interp(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -884,7 +945,12 @@ def calc_perfections(req: PerfectionsRequest):
 @app.post("/predictive/eclipses")
 def calc_eclipses(req: EclipsesRequest):
     try:
-        return _safe(find_eclipses(req.start_date, count=req.count))
+        result = find_eclipses(req.start_date, count=req.count)
+        if isinstance(result, dict):
+            result["interpretation"] = _gen_eclipses_interp(result)
+        else:
+            result = {"items": result, "interpretation": _gen_eclipses_interp(result)}
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -894,7 +960,12 @@ def calc_eclipses(req: EclipsesRequest):
 @app.post("/predictive/stations")
 def calc_stations(req: StationsRequest):
     try:
-        return _safe(find_stations(req.planet, req.start_date, req.end_date))
+        result = find_stations(req.planet, req.start_date, req.end_date)
+        if isinstance(result, dict):
+            result["interpretation"] = _gen_stations_interp(result)
+        else:
+            result = {"items": result, "interpretation": _gen_stations_interp(result)}
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -906,7 +977,9 @@ def calc_ingress(req: IngressRequest):
     try:
         result = ingress_chart(req.year, req.sign, req.lat, req.lon,
                                houses_system=req.houses)
-        return _safe(result)
+        if isinstance(result, dict):
+            result["interpretation"] = _gen_ingress_interp(result)
+        return _present(result)
     except HTTPException:
         raise
     except Exception as e:
