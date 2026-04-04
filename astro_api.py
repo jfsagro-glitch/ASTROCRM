@@ -1609,6 +1609,350 @@ def interaction_delta(req: PersonalInteractionRequest):
         raise HTTPException(500, str(e))
 
 
+# ── SCENARIO COMPARISON ENGINE ───────────────────────────────────────────────
+
+class LocationEntry(BaseModel):
+    name: str
+    lat: float
+    lon: float
+
+class ScenarioCompareRequest(BaseModel):
+    subject: InteractionPerson
+    partner: InteractionPerson
+    period: InteractionPeriod
+    locations: List[LocationEntry] = []
+    goal: str = "overall"          # love|career|money|health|creativity|spirit|stability|social
+    stay_days: int = 90
+    partner_type: str = "romantic" # romantic|business|friend|family|mentor|colleague
+
+
+def _norm_angle(v: float) -> float:
+    return ((v % 360) + 360) % 360
+
+
+def _ang_diff(a: float, b: float) -> float:
+    d = abs(_norm_angle(a) - _norm_angle(b))
+    return min(d, 360 - d)
+
+
+def _get_house_for_lon(lon: float, cusps: List[float]) -> int:
+    v = _norm_angle(lon)
+    for i in range(12):
+        s = _norm_angle(cusps[i])
+        e = _norm_angle(cusps[(i + 1) % 12])
+        in_range = (s <= v < e) if s < e else (v >= s or v < e)
+        if in_range:
+            return i + 1
+    return 1
+
+
+# Goal → {house: weight} maps (which houses activate this goal most)
+_GOAL_HOUSES: Dict[str, Dict[int, int]] = {
+    "love":       {5: 20, 7: 20, 1: 8, 8: 12, 4: 8, 11: 5},
+    "career":     {10: 22, 1: 12, 6: 10, 2: 8, 11: 8, 9: 5},
+    "money":      {2: 22, 8: 16, 11: 10, 4: 8, 10: 8, 5: 5},
+    "health":     {1: 20, 6: 18, 4: 10, 10: 6, 12: -8},
+    "creativity": {5: 20, 3: 14, 11: 12, 1: 10, 9: 8, 12: 5},
+    "spirit":     {9: 20, 12: 18, 4: 12, 8: 10, 1: 6},
+    "stability":  {4: 20, 7: 14, 10: 12, 2: 10, 1: 8},
+    "social":     {11: 20, 7: 16, 3: 12, 1: 10, 5: 8},
+    "overall":    {1: 10, 4: 10, 7: 10, 10: 10, 5: 8, 11: 8},
+}
+
+# Goal → which natal planets matter most
+_GOAL_PLANETS: Dict[str, List[str]] = {
+    "love":       ["venus", "moon", "mars", "sun", "node"],
+    "career":     ["sun", "saturn", "jupiter", "mars", "mc"],
+    "money":      ["jupiter", "venus", "saturn", "mercury"],
+    "health":     ["sun", "mars", "saturn", "moon"],
+    "creativity": ["venus", "neptune", "mercury", "moon", "uranus"],
+    "spirit":     ["neptune", "jupiter", "pluto", "node", "chiron"],
+    "stability":  ["saturn", "moon", "venus", "jupiter"],
+    "social":     ["mercury", "jupiter", "moon", "venus", "uranus"],
+    "overall":    ["sun", "moon", "venus", "mars", "saturn", "jupiter"],
+}
+
+
+def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> int:
+    """Score how well a natal chart (possibly relocated) supports a given goal."""
+    cusps = [houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
+    hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
+    planet_list = _GOAL_PLANETS.get(goal, _GOAL_PLANETS["overall"])
+
+    score = 50.0
+    for planet in planet_list:
+        p = planets.get(planet, {})
+        lon = p.get("lon")
+        if lon is None:
+            continue
+        house = _get_house_for_lon(float(lon), cusps)
+        score += hw.get(house, 0)
+
+    # Angular strength bonus: planet on ASC/DSC/MC/IC
+    angles = [cusps[0], cusps[3], cusps[6], cusps[9]]
+    for planet in planet_list[:4]:
+        p = planets.get(planet, {})
+        lon = p.get("lon")
+        if lon is None:
+            continue
+        for angle_lon in angles:
+            if _ang_diff(float(lon), float(angle_lon)) < 4:
+                score += 8
+
+    # Stay duration modifier — short stay activates only transit/event layer (~40%)
+    if stay_days <= 21:
+        factor = 0.35
+    elif stay_days <= 60:
+        factor = 0.65
+    elif stay_days <= 180:
+        factor = 0.85
+    else:
+        factor = 1.0
+
+    delta = (score - 50.0) * factor
+    return int(_clamp(50.0 + delta, 8, 96))
+
+
+def _partner_house_overlay_bonus(
+    b_planets: Dict, a_houses: Dict, goal: str
+) -> float:
+    """How much partner's planets fall into A's goal-relevant houses."""
+    cusps = [a_houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
+    hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
+    bonus = 0.0
+    for pname, p in b_planets.items():
+        lon = p.get("lon")
+        if lon is None:
+            continue
+        house = _get_house_for_lon(float(lon), cusps)
+        bonus += hw.get(house, 0) * 0.45
+    return bonus
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    φ1, φ2 = math.radians(lat1), math.radians(lat2)
+    dφ = math.radians(lat2 - lat1)
+    dλ = math.radians(lon2 - lon1)
+    a = math.sin(dφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(dλ / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def _compute_location_scenarios(
+    req: ScenarioCompareRequest,
+    loc_lat: float,
+    loc_lon: float,
+    loc_name: str,
+) -> Dict[str, Any]:
+    a = req.subject
+    b = req.partner
+    goal = req.goal
+
+    ay, amo, ad = _parse_date(a.date)
+    ah, ami, asc_s = _parse_time(a.time)
+    by, bmo, bd = _parse_date(b.date)
+    bh, bmi, bsc_s = _parse_time(b.time)
+
+    jd_a = _to_jd(a.date, a.time, a.utc)
+    jd_b = _to_jd(b.date, b.time, b.utc)
+
+    # Natal charts
+    chart_a = calc_chart(ay, amo, ad, ah, ami, asc_s, a.lat, a.lon, a.utc,
+                         houses_system=a.houses, julian=a.julian, include_aspects=False)
+    chart_b = calc_chart(by, bmo, bd, bh, bmi, bsc_s, b.lat, b.lon, b.utc,
+                         houses_system=b.houses, julian=b.julian, include_aspects=False)
+
+    # Relocated chart for A at this location
+    is_reloc = abs(loc_lat - a.lat) > 0.05 or abs(loc_lon - a.lon) > 0.05
+    if is_reloc:
+        rel_a = relocated_chart(jd_a, loc_lat, loc_lon,
+                                houses_system=a.houses, include_aspects=False)
+    else:
+        rel_a = chart_a
+
+    rel_a_houses = rel_a.get("houses", chart_a.get("houses", {}))
+    rel_a_planets = rel_a.get("planets", chart_a.get("planets", {}))
+
+    # ASC/MC shift
+    natal_asc = chart_a.get("houses", {}).get("h1", {}).get("lon", 0)
+    rel_asc    = rel_a_houses.get("h1", {}).get("lon", natal_asc)
+    natal_mc   = chart_a.get("houses", {}).get("h10", {}).get("lon", 0)
+    rel_mc     = rel_a_houses.get("h10", {}).get("lon", natal_mc)
+
+    asc_shift = round(_ang_diff(float(natal_asc), float(rel_asc)), 1)
+    mc_shift  = round(_ang_diff(float(natal_mc),  float(rel_mc)),  1)
+
+    # Synastry
+    syn_aspects_list = synastry_aspects(chart_a, chart_b)
+    syn_score_map    = synastry_score(syn_aspects_list)
+    syn_pct = float(syn_score_map.get("percent", 50))
+
+    # ── Scenario 1: A alone at location ──
+    alone_score = _score_by_goal(rel_a_planets, rel_a_houses, goal, req.stay_days)
+
+    # ── Scenario 2: A + B both at location ──
+    is_b_reloc = abs(loc_lat - b.lat) > 0.05 or abs(loc_lon - b.lon) > 0.05
+    if is_b_reloc:
+        rel_b = relocated_chart(jd_b, loc_lat, loc_lon,
+                                houses_system=b.houses, include_aspects=False)
+    else:
+        rel_b = chart_b
+    rel_b_planets = rel_b.get("planets", chart_b.get("planets", {}))
+
+    overlay_bonus = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, goal)
+    syn_adj = (syn_pct - 50.0) * 0.28
+    partner_type_factor = {
+        "romantic": 1.15, "business": 0.85, "friend": 0.9,
+        "family": 0.9, "mentor": 0.8, "colleague": 0.75,
+    }.get(req.partner_type, 1.0)
+
+    with_partner_score = int(_clamp(
+        alone_score + overlay_bonus * partner_type_factor + syn_adj,
+        8, 96,
+    ))
+
+    # ── Scenario 3: A relocated, B stays natal ──
+    distance_km = _haversine_km(loc_lat, loc_lon, b.lat, b.lon)
+    dist_penalty = 0.0
+    if distance_km > 4000:
+        dist_penalty = -12
+    elif distance_km > 2000:
+        dist_penalty = -7
+    elif distance_km > 700:
+        dist_penalty = -3
+    else:
+        dist_penalty = 0
+
+    overlay_natal_b = _partner_house_overlay_bonus(
+        chart_b.get("planets", {}), rel_a_houses, goal
+    )
+    distance_score = int(_clamp(
+        alone_score + overlay_natal_b * 0.6 * partner_type_factor + syn_adj * 0.7 + dist_penalty,
+        8, 96,
+    ))
+
+    # ── Sphere breakdown ──
+    SPHERE_GOALS = ["love", "career", "money", "health", "creativity", "spirit", "stability"]
+    sphere_alone   = {g: _score_by_goal(rel_a_planets, rel_a_houses, g, req.stay_days)
+                      for g in SPHERE_GOALS}
+    sphere_with    = {}
+    sphere_dist    = {}
+    for g in SPHERE_GOALS:
+        hw = _GOAL_HOUSES.get(g, {})
+        ov_b_rel  = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, g)
+        ov_b_nat  = _partner_house_overlay_bonus(chart_b.get("planets", {}), rel_a_houses, g)
+        g_syn_adj = (syn_pct - 50.0) * 0.25
+        sphere_with[g] = int(_clamp(sphere_alone[g] + ov_b_rel * partner_type_factor + g_syn_adj, 8, 96))
+        sphere_dist[g] = int(_clamp(sphere_alone[g] + ov_b_nat * 0.55 * partner_type_factor + g_syn_adj * 0.65 + dist_penalty * 0.6, 8, 96))
+
+    # ── What comes / leaves per scenario ──
+    def _what_through(spheres: Dict[str, int], prefix: str) -> Dict[str, List[str]]:
+        comes = []
+        leaves = []
+        if spheres.get("love", 50) >= 68:     comes.append("романтическое сближение и притяжение")
+        if spheres.get("career", 50) >= 68:   comes.append("карьерный рост и профессиональные возможности")
+        if spheres.get("money", 50) >= 68:    comes.append("финансовые потоки и ресурсы")
+        if spheres.get("creativity", 50) >= 65: comes.append("творческое вдохновение и реализация")
+        if spheres.get("social", 50) >= 65 if "social" in spheres else False: comes.append("новый социальный круг")
+        if spheres.get("spirit", 50) >= 68:   comes.append("духовный рост и внутренняя ясность")
+        if spheres.get("health", 50) >= 68:   comes.append("жизненный тонус и витальность")
+        if spheres.get("stability", 50) >= 68: comes.append("устойчивость и долгосрочные основы")
+
+        if spheres.get("love", 50) <= 38:      leaves.append("старая эмоциональная стабильность")
+        if spheres.get("career", 50) <= 38:    leaves.append("карьерный застой и рутина")
+        if spheres.get("health", 50) <= 38:    leaves.append("физический ресурс — нужен отдых")
+        if spheres.get("stability", 50) <= 38: leaves.append("ощущение почвы под ногами")
+        return {"comes": comes[:4], "leaves": leaves[:3]}
+
+    through_alone  = _what_through(sphere_alone, "alone")
+    through_with   = _what_through(sphere_with, "with")
+    through_dist   = _what_through(sphere_dist, "dist")
+
+    # Key planets on angles in relocated chart
+    key_activations = []
+    angle_names = {"h1": "ASC", "h4": "IC", "h7": "DSC", "h10": "MC"}
+    planet_names = {
+        "sun": "Солнце", "moon": "Луна", "venus": "Венера", "mars": "Марс",
+        "jupiter": "Юпитер", "saturn": "Сатурн", "uranus": "Уран",
+        "neptune": "Нептун", "pluto": "Плутон",
+    }
+    for h_key, angle_label in angle_names.items():
+        a_cusp = float(rel_a_houses.get(h_key, {}).get("lon", 999))
+        for pname, pdata in rel_a_planets.items():
+            if pname not in planet_names:
+                continue
+            p_lon = pdata.get("lon")
+            if p_lon is None:
+                continue
+            orb = _ang_diff(float(p_lon), a_cusp)
+            if orb <= 5:
+                key_activations.append({
+                    "planet": planet_names[pname],
+                    "angle": angle_label,
+                    "orb": round(orb, 1),
+                })
+    key_activations.sort(key=lambda x: x["orb"])
+
+    return {
+        "location": loc_name,
+        "lat": loc_lat,
+        "lon": loc_lon,
+        "distance_km": round(_haversine_km(a.lat, a.lon, loc_lat, loc_lon)),
+        "asc_shift": asc_shift,
+        "mc_shift": mc_shift,
+        "synastry_percent": round(syn_pct),
+        "scores": {
+            "alone": alone_score,
+            "with_partner": with_partner_score,
+            "partner_distance": distance_score,
+        },
+        "sphere_alone":   sphere_alone,
+        "sphere_with":    sphere_with,
+        "sphere_distance": sphere_dist,
+        "through_alone":  through_alone,
+        "through_with":   through_with,
+        "through_distance": through_dist,
+        "key_planet_activations": key_activations[:6],
+    }
+
+
+@app.post("/interaction/compare-scenarios")
+def compare_scenarios(req: ScenarioCompareRequest):
+    """
+    Multi-scenario location comparison.
+    Returns scores for alone / with_partner / partner_stays_natal
+    across all provided candidate locations (+ natal baseline).
+    """
+    try:
+        a = req.subject
+        results = []
+
+        # Always include natal as baseline
+        natal_entry = _compute_location_scenarios(req, a.lat, a.lon, "Родная локация")
+        results.append(natal_entry)
+
+        for loc in req.locations:
+            entry = _compute_location_scenarios(req, loc.lat, loc.lon, loc.name)
+            results.append(entry)
+
+        # Sort target locations by with_partner score for the goal
+        target_sorted = sorted(results[1:], key=lambda x: x["scores"]["with_partner"], reverse=True)
+
+        return _present({
+            "goal": req.goal,
+            "partner_type": req.partner_type,
+            "stay_days": req.stay_days,
+            "baseline": results[0],
+            "locations": target_sorted,
+            "all_locations": results,
+            "recommendation": target_sorted[0]["location"] if target_sorted else None,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 # ── RELOCATION ────────────────────────────────────────────────────────────────
 @app.post("/relocation/chart")
 def calc_relocation(req: RelocateRequest):

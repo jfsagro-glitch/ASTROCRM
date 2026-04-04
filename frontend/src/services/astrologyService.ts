@@ -222,6 +222,52 @@ export async function getParans(b: BirthInput, observerLat: number) {
   });
 }
 
+// ─── Interaction + Relocation Scenarios ──────────────────────────────────────
+
+export interface InteractionPersonInput {
+  date: string; time: string; lat: number; lon: number; utc: number;
+  name?: string; houses?: string; julian?: boolean;
+  current_lat?: number; current_lon?: number;
+}
+
+export interface LocationInput { name: string; lat: number; lon: number; }
+
+export async function compareScenarios(
+  subject: InteractionPersonInput,
+  partner: InteractionPersonInput,
+  periodStart: string,
+  periodEnd: string,
+  locations: LocationInput[],
+  goal = 'overall',
+  stayDays = 90,
+  partnerType = 'romantic',
+) {
+  return post('/interaction/compare-scenarios', {
+    subject: { ...subject, houses: subject.houses ?? 'placidus', julian: subject.julian ?? false },
+    partner: { ...partner, houses: partner.houses ?? 'placidus', julian: partner.julian ?? false },
+    period: { start: periodStart, end: periodEnd },
+    locations,
+    goal,
+    stay_days: stayDays,
+    partner_type: partnerType,
+  });
+}
+
+export async function getPersonalForecastInteraction(
+  subject: InteractionPersonInput,
+  partner: InteractionPersonInput,
+  periodStart: string,
+  periodEnd: string,
+  topics?: string[],
+) {
+  return post('/interaction/personal-forecast', {
+    subject_person: { ...subject, houses: subject.houses ?? 'placidus', julian: subject.julian ?? false },
+    influencer_person: { ...partner, houses: partner.houses ?? 'placidus', julian: partner.julian ?? false },
+    period: { start: periodStart, end: periodEnd },
+    topics: topics ?? ['love', 'career', 'money', 'emotional_state', 'decisions'],
+  });
+}
+
 // ─── Geocoding (Nominatim + Multi-source Timezone Resolution) ─────────────────
 function _parseUtcOffset(s: string): number {
   const m = s.match(/([+-])(\d{1,2}):(\d{2})/);

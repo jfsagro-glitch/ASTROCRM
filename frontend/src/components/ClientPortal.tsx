@@ -3,7 +3,7 @@ import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,
   AlertCircle, Loader2, Search, BookOpen, ChevronRight, Lightbulb,
-  LogOut, UserCircle, Trash2,
+  LogOut, UserCircle, Trash2, Compass,
 } from 'lucide-react';
 import {
   scoreSpheres, getPairInterp, getAspectCategory, getAspectInterpText,
@@ -24,6 +24,7 @@ import JyotishBlock from './JyotishBlock';
 import SynastryForecast from './SynastryForecast';
 import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
+import InteractionRelocationEngine from './InteractionRelocationEngine';
 import InterpretationPanel from './InterpretationPanel';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -2321,7 +2322,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2421,6 +2422,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'predictive',     icon: Clock,     label: tr.predictive },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
+    { key: 'navigation',     icon: Compass,   label: '🧭 Навигация' },
     { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
@@ -2618,6 +2620,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                     <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
                   </div>
               }
+            </div>
+          )}
+
+          {activeTab === 'navigation' && (
+            <div>
+              <InteractionRelocationEngine birth={birth} theme={theme} />
             </div>
           )}
 
