@@ -6,6 +6,8 @@ import {
   TECHNIQUE_INFO, PROFECTION_HOUSE_MEANINGS, TRANSIT_THROUGH_HOUSE,
   getTransitInterp, getPlanetRuName, getAspectRuName, aspectEnergyColor,
   getPeriodTheme,
+  SR_SUN_HOUSE_INTERP, LR_MOON_HOUSE_INTERP,
+  SOLAR_ARC_PLANET_INTERP, PROG_SUN_SIGN_INTERP,
 } from '../data/predictiveData';
 import { PLANETARY_EVENTS } from '../data/forecastData';
 import {
@@ -316,10 +318,17 @@ function TransitView({ result, theme }: { result: AnyResult; theme: Props['theme
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className={`rounded-xl border ${theme.card} p-4`}>
+      <div className={`rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200'} p-4`}>
         <p className={`text-xs ${theme.text} opacity-60 mb-2`}>📅 {targetDate}</p>
-        <p className={`font-semibold text-sm ${theme.header}`}>{headline}</p>
-        {points.map((p, i) => <p key={i} className={`text-xs ${theme.text} mt-1`}>• {p}</p>)}
+        <p className={`font-semibold text-sm ${isDark ? 'text-indigo-200' : 'text-indigo-800'} mb-2`}>{headline}</p>
+        <div className="space-y-1.5">
+          {points.map((p, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`${isDark ? 'text-indigo-400' : 'text-indigo-600'} text-xs mt-0.5 shrink-0`}>▸</span>
+              <p className={`text-xs ${theme.text} leading-relaxed`}>{p}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Transit planets */}
@@ -470,6 +479,21 @@ function ProgressionView({ result, theme }: { result: AnyResult; theme: Props['t
         </div>
       </div>
 
+      {/* Progressed Sun sign interpretation */}
+      {isProg && planetsMap.sun && PROG_SUN_SIGN_INTERP[planetsMap.sun.sign] && (
+        <div className={`rounded-xl border ${isDark ? 'bg-amber-900/20 border-amber-700/30' : 'bg-amber-50 border-amber-200'} p-4`}>
+          <h4 className={`text-sm font-bold mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'} flex items-center gap-2`}>
+            ☀️ Прогрессированное Солнце в {sname(planetsMap.sun.sign)}
+          </h4>
+          <p className={`text-xs leading-relaxed ${theme.text}`}>
+            {PROG_SUN_SIGN_INTERP[planetsMap.sun.sign]}
+          </p>
+          <p className={`text-[11px] ${isDark ? 'text-amber-400/60' : 'text-amber-600/70'} mt-1.5`}>
+            Прогр. Солнце меняет знак примерно раз в 30 лет — это глубинный сдвиг самоощущения и жизненных приоритетов.
+          </p>
+        </div>
+      )}
+
       {/* Progressed Moon interpretation */}
       {isProg && planetsMap.moon && (
         <div className={`rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200'} p-4`}>
@@ -479,8 +503,48 @@ function ProgressionView({ result, theme }: { result: AnyResult; theme: Props['t
           <p className={`text-xs leading-relaxed ${theme.text}`}>
             {PROG_MOON_SIGN_INTERP[planetsMap.moon.sign] ?? 'Луна формирует эмоциональный тон периода.'}
           </p>
+          <p className={`text-[11px] ${isDark ? 'text-indigo-400/60' : 'text-indigo-600/70'} mt-1.5`}>
+            Прогр. Луна меняет знак каждые ~2.5 года — это главный индикатор эмоциональной темы периода. Смотрите также в каком натальном доме она находится.
+          </p>
         </div>
       )}
+
+      {/* Solar arc directed planet narrative for exact aspects */}
+      {!isProg && (() => {
+        const aspects2 = (result.aspects_directed_to_natal as Array<Record<string, unknown>>) ?? [];
+        const exact = aspects2.filter(a => (a.orb as number) < 1.0);
+        if (exact.length === 0) return null;
+        return (
+          <div className={`rounded-xl border ${isDark ? 'bg-violet-900/20 border-violet-700/30' : 'bg-violet-50 border-violet-200'} p-4`}>
+            <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-violet-300' : 'text-violet-700'}`}>
+              ☀️ Точные аспекты Солярной дуги (орб &lt; 1°)
+            </h4>
+            <p className={`text-xs ${theme.text} opacity-70 mb-3`}>
+              Точные аспекты солярной дуги — самые значимые «временные маркеры». Событие или переход происходит именно тогда, когда орб минимален.
+            </p>
+            <div className="space-y-3">
+              {exact.slice(0, 3).map((a, i) => {
+                const dp = a.directed_planet as string;
+                const np = a.natal_planet as string;
+                const interp = SOLAR_ARC_PLANET_INTERP[dp] ?? SOLAR_ARC_PLANET_INTERP[np];
+                return (
+                  <div key={i} className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                    <div className="flex items-center gap-2 mb-1 text-xs font-semibold">
+                      <span className={theme.accent}>{getPlanetRuName(dp)} → {getPlanetRuName(np)}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${isDark ? 'bg-violet-800/50 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
+                        {getAspectRuName(a.aspect as string)} · {(a.orb as number).toFixed(2)}°
+                      </span>
+                    </div>
+                    {interp && (
+                      <p className={`text-xs ${theme.text} leading-relaxed`}>{interp.text}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -562,6 +626,75 @@ function ReturnView({ result, theme }: { result: AnyResult; theme: Props['theme'
           </div>
         </div>
       )}
+
+      {/* Solar Return: Sun in house interpretation */}
+      {isSolar && (() => {
+        const sunHouseNum = result.sun_house as number | undefined;
+        const interp = sunHouseNum ? SR_SUN_HOUSE_INTERP[sunHouseNum] : null;
+        if (!interp) return null;
+        return (
+          <div className={`rounded-xl border ${isDark ? 'bg-amber-900/20 border-amber-700/30' : 'bg-amber-50 border-amber-200'} p-4`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">☀️</span>
+              <div>
+                <div className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                  Солнце в {sunHouseNum}-м доме Соляра
+                </div>
+                <div className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600/70'}`}>{interp.theme}</div>
+              </div>
+            </div>
+            <p className={`text-sm leading-relaxed ${theme.text} mb-2`}>{interp.text}</p>
+            <div className={`text-xs ${isDark ? 'text-amber-300/80' : 'text-amber-700'} font-medium`}>
+              💡 {interp.advice}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Lunar Return: Moon in house interpretation */}
+      {!isSolar && (() => {
+        // Find which house the Moon is in for the lunar return
+        const planetsMap2 = result.planets as Record<string, { lon: number; sign: string; deg_min: string }>;
+        const moonLon = planetsMap2?.moon?.lon;
+        let moonHouseNum: number | null = null;
+        if (moonLon != null && houses) {
+          // Find house by checking ASC longitude sequence
+          const houseLons = Array.from({ length: 12 }, (_, i) => {
+            const h = houses[`h${i + 1}`];
+            return h ? (h.lon as number) : null;
+          });
+          for (let i = 0; i < 12; i++) {
+            const lon1 = houseLons[i];
+            const lon2 = houseLons[(i + 1) % 12];
+            if (lon1 == null || lon2 == null) continue;
+            const norm = (v: number, base: number) => ((v - base + 360) % 360);
+            if (norm(moonLon, lon1) < norm(lon2, lon1)) {
+              moonHouseNum = i + 1;
+              break;
+            }
+          }
+          if (!moonHouseNum) moonHouseNum = 1;
+        }
+        const interp = moonHouseNum ? LR_MOON_HOUSE_INTERP[moonHouseNum] : null;
+        if (!interp) return null;
+        return (
+          <div className={`rounded-xl border ${isDark ? 'bg-sky-900/20 border-sky-700/30' : 'bg-sky-50 border-sky-200'} p-4`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">🌙</span>
+              <div>
+                <div className={`text-sm font-bold ${isDark ? 'text-sky-300' : 'text-sky-700'}`}>
+                  Луна в {moonHouseNum}-м доме лунного возврата
+                </div>
+                <div className={`text-xs ${isDark ? 'text-sky-400/70' : 'text-sky-600/70'}`}>{interp.theme}</div>
+              </div>
+            </div>
+            <p className={`text-sm leading-relaxed ${theme.text} mb-2`}>{interp.text}</p>
+            <div className={`text-xs ${isDark ? 'text-sky-300/80' : 'text-sky-700'} font-medium`}>
+              💡 {interp.advice}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
