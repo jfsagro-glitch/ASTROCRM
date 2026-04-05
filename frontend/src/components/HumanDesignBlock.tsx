@@ -16,9 +16,9 @@ type ThemeLike = {
 };
 
 const HD_MODE_OPTIONS: Array<{ key: HumanDesignContentMode; label: string; subtitle: string }> = [
-  { key: 'reader', label: 'Reader', subtitle: 'Коротко и ясно' },
-  { key: 'analyst', label: 'Analyst', subtitle: 'Структурный разбор' },
-  { key: 'practitioner', label: 'Practitioner', subtitle: 'Прикладной фокус' },
+  { key: 'reader', label: 'Простой', subtitle: 'Для жизни — понятно и по делу' },
+  { key: 'analyst', label: 'Аналитик', subtitle: 'Полный структурный разбор' },
+  { key: 'practitioner', label: 'Практик', subtitle: 'Инструментальный фокус' },
 ];
 
 type ReaderSphere = {
@@ -55,10 +55,10 @@ function ActivationTable({
         <table className="w-full text-sm">
           <thead>
             <tr className={theme.text}>
-              <th className="px-4 py-2 text-left font-medium">Planet</th>
-              <th className="px-4 py-2 text-left font-medium">Gate</th>
-              <th className="px-4 py-2 text-left font-medium">L/C/T/B</th>
-              <th className="px-4 py-2 text-left font-medium">Theme</th>
+              <th className="px-4 py-2 text-left font-medium">Планета</th>
+              <th className="px-4 py-2 text-left font-medium">Ворота</th>
+              <th className="px-4 py-2 text-left font-medium">Л/Ц/Т/О</th>
+              <th className="px-4 py-2 text-left font-medium">Тема</th>
             </tr>
           </thead>
           <tbody>
@@ -76,6 +76,13 @@ function ActivationTable({
     </div>
   );
 }
+
+const CROSS_ROLE_MAP: Record<string, string> = {
+  'Conscious Sun':    'Сознат. Солнце',
+  'Conscious Earth':  'Сознат. Земля',
+  'Unconscious Sun':  'Бессознат. Солнце',
+  'Unconscious Earth':'Бессознат. Земля',
+};
 
 export default function HumanDesignBlock({
   birth,
@@ -268,8 +275,7 @@ export default function HumanDesignBlock({
             <div className={`text-xs uppercase tracking-[0.22em] ${theme.text}`}>Human Design</div>
             <h2 className={`mt-2 text-2xl font-semibold ${theme.header}`}>Bodygraph & Incarnation Cross</h2>
             <p className={`mt-2 max-w-3xl text-sm ${theme.text}`}>
-              Отдельный расчётный блок: тип, стратегия, внутренний авторитет, профиль, определённости центров,
-              каналы, активные ворота и инкарнационный крест. Не зависит от натальной интерпретации и считается отдельно.
+              Хьюман Дизайн — система самопознания, основанная на точном времени рождения. Здесь рассчитывается ваш тип, стратегия, внутренний авторитет, профиль, центры бодиграфа, каналы и инкарнационный крест. Всё это помогает понять, как вам принимать решения, куда направлять энергию и почему одни ситуации даются легко, а другие — нет.
             </p>
             <div className={`mt-4 rounded-xl border ${theme.card} p-3`}>
               <div className="flex flex-wrap items-center gap-2">
@@ -279,7 +285,7 @@ export default function HumanDesignBlock({
                 </span>
               </div>
               <p className={`mt-2 text-sm ${theme.text}`}>
-                {selectedModeOption.subtitle}. В отчёт экспортируется этот же серверный формат интерпретации Human Design.
+                {selectedModeOption.subtitle}. Режим влияет на глубину и стиль интерпретации — как на экране, так и в PDF-отчёте.
               </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -321,34 +327,34 @@ export default function HumanDesignBlock({
       {result ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard title="Type" value={result.overview.type} subtitle={result.overview.type_description} theme={theme} />
-            <StatCard title="Strategy" value={result.overview.strategy} subtitle={`Authority: ${result.overview.authority}`} theme={theme} />
-            <StatCard title="Profile" value={result.overview.profile_name} subtitle={result.overview.description} theme={theme} />
-            <StatCard title="Definition" value={result.overview.definition} subtitle={`Signature: ${result.overview.signature} | Not-self: ${result.overview.not_self}`} theme={theme} />
+            <StatCard title="Тип" value={result.overview.type} subtitle={result.overview.type_description} theme={theme} />
+            <StatCard title="Стратегия" value={result.overview.strategy} subtitle={`Авторитет: ${result.overview.authority}`} theme={theme} />
+            <StatCard title="Профиль" value={result.overview.profile_name} subtitle={result.overview.description} theme={theme} />
+            <StatCard title="Определённость" value={result.overview.definition} subtitle={`Сигнатура: ${result.overview.signature} · Не-я: ${result.overview.not_self}`} theme={theme} />
           </div>
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
-            <h3 className={`text-lg font-semibold ${theme.header}`}>Detailed Human Design Synthesis</h3>
+            <h3 className={`text-lg font-semibold ${theme.header}`}>Ваш Хьюман Дизайн: разбор по ключевым блокам</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Identity</div>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Кто вы по системе</div>
                 <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.identity}</div>
               </div>
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Decision Making</div>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Как принимать решения</div>
                 <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.decision_making}</div>
               </div>
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Strengths</div>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Природные силы и таланты</div>
                 <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.strengths}</div>
               </div>
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Risk Patterns</div>
+                <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Зоны уязвимости и типичные ловушки</div>
                 <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.risk_patterns}</div>
               </div>
             </div>
             <div className={`mt-3 rounded-xl border ${theme.card} p-3`}>
-              <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Recommendations</div>
+              <div className={`text-xs uppercase tracking-[0.16em] ${theme.text}`}>Практические рекомендации</div>
               <div className={`mt-2 text-sm leading-relaxed ${theme.text}`}>{result.person_summary.recommendations}</div>
             </div>
           </div>
@@ -425,7 +431,7 @@ export default function HumanDesignBlock({
           <div className={`rounded-2xl border ${theme.card} p-5`}>
             <div className="flex items-center gap-2">
               <GitBranch className={`h-5 w-5 ${theme.symbol}`} />
-              <h3 className={`text-lg font-semibold ${theme.header}`}>Incarnation Cross</h3>
+              <h3 className={`text-lg font-semibold ${theme.header}`}>Инкарнационный Крест</h3>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <div className={`text-base font-medium ${theme.accent}`}>{crossTitle}</div>
@@ -476,8 +482,8 @@ export default function HumanDesignBlock({
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {result.incarnation_cross.gates.map(item => (
                 <div key={`${item.role}-${item.gate}`} className={`rounded-xl border ${theme.card} p-3`}>
-                  <div className={`text-[11px] uppercase tracking-[0.18em] ${theme.text}`}>{item.role}</div>
-                  <div className={`mt-1 text-lg font-semibold ${theme.header}`}>Gate {item.gate}.{item.line}</div>
+                  <div className={`text-[11px] uppercase tracking-[0.18em] ${theme.text}`}>{CROSS_ROLE_MAP[item.role] ?? item.role}</div>
+                  <div className={`mt-1 text-lg font-semibold ${theme.header}`}>Ворота {item.gate}.{item.line}</div>
                   <div className={`mt-1 text-sm ${theme.text}`}>{item.name}</div>
                 </div>
               ))}
@@ -489,7 +495,7 @@ export default function HumanDesignBlock({
             <div className={`rounded-2xl border ${theme.card} p-5`}>
               <div className="flex items-center gap-2">
                 <Aperture className={`h-5 w-5 ${theme.symbol}`} />
-                <h3 className={`text-lg font-semibold ${theme.header}`}>Centers</h3>
+                <h3 className={`text-lg font-semibold ${theme.header}`}>Центры Бодиграфа</h3>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {centerGroups.map(center => (
@@ -497,16 +503,16 @@ export default function HumanDesignBlock({
                     <div className="flex items-center justify-between gap-2">
                       <div className={`font-semibold ${theme.header}`}>{center.name}</div>
                       <span className={`rounded-full border px-2 py-1 text-[11px] ${center.badgeClass}`}>
-                        {center.defined ? 'Defined' : 'Open'}
+                        {center.defined ? 'Определён' : 'Открыт'}
                       </span>
                     </div>
                     <div className={`mt-2 text-xs ${theme.text}`}>{center.interpretation}</div>
                     <div className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{center.encyclopedic}</div>
                     <div className={`mt-3 text-xs ${theme.text}`}>
-                      Gates: {center.active_gates.length ? center.active_gates.join(', ') : 'none'}
+                      Ворота: {center.active_gates.length ? center.active_gates.join(', ') : 'нет'}
                     </div>
                     <div className={`mt-1 text-xs ${theme.text}`}>
-                      Channels: {center.channels.length ? center.channels.join(', ') : 'none'}
+                      Каналы: {center.channels.length ? center.channels.join(', ') : 'нет'}
                     </div>
                   </div>
                 ))}
@@ -516,7 +522,7 @@ export default function HumanDesignBlock({
             <div className={`rounded-2xl border ${theme.card} p-5`}>
               <div className="flex items-center gap-2">
                 <Activity className={`h-5 w-5 ${theme.symbol}`} />
-                <h3 className={`text-lg font-semibold ${theme.header}`}>Defined Channels</h3>
+                <h3 className={`text-lg font-semibold ${theme.header}`}>Определённые Каналы</h3>
               </div>
               <div className="mt-4 space-y-3">
                 {result.channels.length ? result.channels.map(channel => (
@@ -526,7 +532,7 @@ export default function HumanDesignBlock({
                     <div className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{channel.encyclopedic}</div>
                     <div className={`mt-2 text-xs ${theme.text}`}>{channel.centers.join(' → ')}</div>
                   </div>
-                )) : <div className={`text-sm ${theme.text}`}>No full channels. This usually indicates a highly open or selective bodygraph structure.</div>}
+                )) : <div className={`text-sm ${theme.text}`}>Определённых каналов не обнаружено. Это указывает на очень открытый или избирательный бодиграф — вы легко усиливаете чужую энергию, но важно не путать её со своей.</div>}
               </div>
             </div>
           </div>
@@ -534,13 +540,13 @@ export default function HumanDesignBlock({
 
           {!isReaderMode ? (
             <div className="grid gap-4 xl:grid-cols-2">
-              <ActivationTable title="Personality Activations" items={result.activations.personality} theme={theme} />
-              <ActivationTable title="Design Activations" items={result.activations.design} theme={theme} />
+              <ActivationTable title="Активации личности (сознательное)" items={result.activations.personality} theme={theme} />
+              <ActivationTable title="Активации дизайна (бессознательное)" items={result.activations.design} theme={theme} />
             </div>
           ) : null}
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
-            <h3 className={`text-lg font-semibold ${theme.header}`}>Forecast by Periods</h3>
+            <h3 className={`text-lg font-semibold ${theme.header}`}>Прогноз по энергетическим периодам</h3>
             <p className={`mt-1 text-sm ${theme.text}`}>
               {isReaderMode
                 ? 'Простой и подробный прогноз: что делать по периодам, где возможности, где риски и как мягко корректировать курс.'
@@ -549,7 +555,7 @@ export default function HumanDesignBlock({
 
             <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr,1.1fr]">
               <div className={`rounded-xl border ${theme.card} p-3`}>
-                <div className={`text-sm font-semibold ${theme.header}`}>Sun Gate Periods (90d)</div>
+                <div className={`text-sm font-semibold ${theme.header}`}>Солнечные периоды ворот (90 дней)</div>
                 <div className="mt-3 space-y-2 max-h-80 overflow-auto pr-1">
                   {result.forecast.sun_gate_periods_90d.map((p, idx) => (
                     <button
@@ -561,7 +567,7 @@ export default function HumanDesignBlock({
                       <div className={`text-xs ${theme.text}`}>{p.start_date} - {p.end_date}</div>
                       <div className={`text-sm ${theme.header}`}>Gate {p.gate} · {p.focus}</div>
                       <div className={`text-xs ${theme.text}`}>
-                        Resonance: {p.resonates_with_natal ? 'matches natal activation' : 'background transit'}
+                        {p.resonates_with_natal ? '✦ Усиливает вашу тему' : '○ Фоновый транзит'}
                       </div>
                     </button>
                   ))}
@@ -593,7 +599,7 @@ export default function HumanDesignBlock({
             </div>
 
             <div className={`mt-4 rounded-xl border ${theme.card} p-3`}>
-              <div className={`text-sm font-semibold ${theme.header}`}>Moon Gate Windows (14d) — быстрые тактические окна</div>
+              <div className={`text-sm font-semibold ${theme.header}`}>Лунные окна (14 дней) — быстрые тактические периоды</div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {result.forecast.moon_gate_windows_14d.map((m, idx) => (
                   <button
@@ -631,7 +637,7 @@ export default function HumanDesignBlock({
             <div className={`rounded-2xl border ${theme.card} p-5`}>
               <div className="flex items-center gap-2">
                 <Cpu className={`h-5 w-5 ${theme.symbol}`} />
-                <h3 className={`text-lg font-semibold ${theme.header}`}>Active Gates</h3>
+                <h3 className={`text-lg font-semibold ${theme.header}`}>Активные Ворота</h3>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {result.gates.map(gate => (
@@ -640,8 +646,8 @@ export default function HumanDesignBlock({
                     <div className={`mt-1 text-sm ${theme.text}`}>{gate.keynote}</div>
                     <div className={`mt-2 text-xs ${theme.text}`}>{gate.description}</div>
                     <div className={`mt-2 text-xs leading-relaxed ${theme.text}`}>{gate.encyclopedic}</div>
-                    <div className={`mt-3 text-xs ${theme.text}`}>Personality: {gate.personality.length ? gate.personality.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
-                    <div className={`mt-1 text-xs ${theme.text}`}>Design: {gate.design.length ? gate.design.map(item => `${item.planet} ${item.label}`).join(', ') : 'none'}</div>
+                    <div className={`mt-3 text-xs ${theme.text}`}>Личность: {gate.personality.length ? gate.personality.map(item => `${item.planet} ${item.label}`).join(', ') : 'нет'}</div>
+                    <div className={`mt-1 text-xs ${theme.text}`}>Дизайн: {gate.design.length ? gate.design.map(item => `${item.planet} ${item.label}`).join(', ') : 'нет'}</div>
                   </div>
                 ))}
               </div>

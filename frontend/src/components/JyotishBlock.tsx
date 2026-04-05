@@ -349,9 +349,11 @@ function NakshatraTab({ grahas }: { grahas: Record<string, GrahaData> }) {
             <div><span className="text-slate-500">Господин накшатры:</span> <span className="text-white">{moonNak.nakshatra_lord}</span></div>
             <div><span className="text-slate-500">Раши Луны:</span> <span className="text-white">{moonNak.rasi_glyph} {moonNak.rasi_name_ru}</span></div>
           </div>
-          <p className="text-xs text-slate-300">
-            Джанма накшатра определяет вашу эмоциональную природу, инстинктивные реакции и связь с матерью. 
-            Накшатра Луны является основой для расчёта Вимшоттари Даша — системы предсказательных периодов.
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Джанма накшатра — это «звёздный дом» вашей Луны при рождении. Она определяет эмоциональную природу,
+            инстинктивные реакции, привязанности и связь с матерью. Именно с неё начинается расчёт
+            Вимшоттари Даша — 120-летней системы планетарных периодов. Каждые ~3 часа Луна проходит
+            через следующую накшатру — это делает джанма накшатру очень чувствительной к точному времени рождения.
           </p>
         </div>
       )}
@@ -410,6 +412,7 @@ function DashaTab({ dashas, currentDasha, currentAntar }: {
             <span className={`text-sm font-bold ${GRAHA_COLORS[currentDasha.lord]}`}>
               {currentDasha.lord_glyph} {currentDasha.lord_ru}
             </span>
+            <span className="text-[10px] text-slate-500 ml-auto">{currentDasha.years.toFixed(1)} лет цикл</span>
           </div>
           <div className="text-xs text-slate-400 mb-2">
             {currentDasha.start} — {currentDasha.end}
@@ -430,6 +433,10 @@ function DashaTab({ dashas, currentDasha, currentAntar }: {
       )}
 
       <SectionTitle>Вимшоттари Даша — 120-летний цикл</SectionTitle>
+      <div className="text-xs text-slate-500 mb-3 leading-relaxed">
+        Каждый период управляется планетой, которая освещает определённые темы жизни.
+        Нажмите на период, чтобы увидеть антардаши (под-периоды) — они уточняют события с точностью до нескольких месяцев.
+      </div>
       <div className="space-y-1.5">
         {dashas.map(d => (
           <div key={d.lord} className={`rounded-lg border transition-all ${
@@ -495,7 +502,7 @@ function YogaTab({ yogas, grahas }: { yogas: Yoga[]; grahas: Record<string, Grah
   return (
     <div className="space-y-2">
       <div className="text-xs text-slate-400 mb-3">
-        Обнаружено <span className="text-violet-300 font-semibold">{yogas.length}</span> йог
+        Обнаружено <span className="text-violet-300 font-semibold">{yogas.length}</span> йог · нажмите на йогу для подробной интерпретации
       </div>
       {yogas.map((yoga, idx) => (
         <div
@@ -638,84 +645,92 @@ function InterpretationTab({ data }: { data: JyotishResult }) {
     <div className="space-y-5">
       <div className="p-4 bg-gradient-to-br from-violet-900/40 to-slate-800/40 rounded-xl border border-violet-500/30">
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-2xl">{lagna.rasi_glyph}</span>
+          <span className="text-3xl">{lagna.rasi_glyph}</span>
           <div>
-            <div className="text-base font-bold text-white">{lagna.title}</div>
-            <div className="text-xs text-violet-300">Лагна · Аяnamша Лахири {meta.ayanamsha_lahiri.toFixed(2)}°</div>
+            <div className="text-lg font-bold text-white">{lagna.title}</div>
+            <div className="text-xs text-violet-300 mt-0.5">Лагна (Асцендент) · Аяnamша Лахири {meta.ayanamsha_lahiri.toFixed(2)}°</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Лагна — главная точка вашей карты. Она описывает личность, тело, мировосприятие и жизненный путь.</div>
           </div>
         </div>
         <p className="text-sm text-slate-200 leading-relaxed mb-3">{lagna.general}</p>
         <div className="grid grid-cols-2 gap-3 text-xs">
           {lagna.element && <div><span className="text-slate-500">Стихия:</span> <span className="text-slate-200">{lagna.element}</span></div>}
           {lagna.quality && <div><span className="text-slate-500">Качество:</span> <span className="text-slate-200">{lagna.quality}</span></div>}
-          {lagna.lord_ru && <div><span className="text-slate-500">Господин:</span> <span className="text-slate-200">{lagna.lord_ru}</span></div>}
-          {lagna.keywords && <div className="col-span-2"><span className="text-slate-500">Ключевые слова:</span> <span className="text-slate-200">{lagna.keywords}</span></div>}
+          {lagna.lord_ru && <div><span className="text-slate-500">Господин лагны:</span> <span className="text-slate-200">{lagna.lord_ru}</span></div>}
+          {lagna.keywords && <div className="col-span-2"><span className="text-slate-500">Ключевые темы:</span> <span className="text-slate-200">{lagna.keywords}</span></div>}
         </div>
       </div>
 
       {lagna.dharma && (
         <div className="p-3 bg-amber-900/20 rounded-lg border border-amber-700/30">
-          <div className="text-xs text-amber-300 font-semibold mb-1">Дхарма (жизненное предназначение):</div>
-          <p className="text-xs text-slate-300">{lagna.dharma}</p>
+          <div className="text-xs text-amber-300 font-semibold mb-1">✦ Дхарма — жизненное предназначение</div>
+          <p className="text-xs text-slate-300 leading-relaxed">{lagna.dharma}</p>
+          <p className="text-[11px] text-slate-500 mt-1.5">Дхарма активируется через осознанные действия в ключевых сферах жизни — карьере, отношениях и самовыражении.</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-3">
         {lagna.strengths && (
           <div className="p-3 bg-emerald-900/20 rounded-lg border border-emerald-700/30">
-            <div className="text-xs text-emerald-300 font-semibold mb-1">Сильные стороны:</div>
-            <p className="text-xs text-slate-300">{lagna.strengths}</p>
+            <div className="text-xs text-emerald-300 font-semibold mb-1">Природные силы и таланты</div>
+            <p className="text-xs text-slate-300 leading-relaxed">{lagna.strengths}</p>
           </div>
         )}
         {lagna.challenges && (
           <div className="p-3 bg-red-900/20 rounded-lg border border-red-700/30">
-            <div className="text-xs text-red-300 font-semibold mb-1">Вызовы к росту:</div>
-            <p className="text-xs text-slate-300">{lagna.challenges}</p>
+            <div className="text-xs text-red-300 font-semibold mb-1">Вызовы и зоны роста</div>
+            <p className="text-xs text-slate-300 leading-relaxed">{lagna.challenges}</p>
+            <p className="text-[11px] text-slate-500 mt-1.5">Вызовы — это не слабости, а точки наибольшего потенциала роста. Они прорабатываются через осознанность и правильную Дашу.</p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-2 text-xs">
+      <div className="grid grid-cols-1 gap-2">
         {lagna.career && (
-          <div className="flex gap-2">
-            <span className="text-slate-500 flex-shrink-0">Карьера:</span>
-            <span className="text-slate-300">{lagna.career}</span>
+          <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/30 text-xs">
+            <span className="text-sky-300 font-semibold block mb-1">Карьера и реализация</span>
+            <span className="text-slate-300 leading-relaxed">{lagna.career}</span>
           </div>
         )}
         {lagna.health && (
-          <div className="flex gap-2">
-            <span className="text-slate-500 flex-shrink-0">Здоровье:</span>
-            <span className="text-slate-300">{lagna.health}</span>
+          <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/30 text-xs">
+            <span className="text-green-300 font-semibold block mb-1">Здоровье и тело</span>
+            <span className="text-slate-300 leading-relaxed">{lagna.health}</span>
           </div>
         )}
         {lagna.relationships && (
-          <div className="flex gap-2">
-            <span className="text-slate-500 flex-shrink-0">Отношения:</span>
-            <span className="text-slate-300">{lagna.relationships}</span>
+          <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/30 text-xs">
+            <span className="text-pink-300 font-semibold block mb-1">Отношения и партнёрство</span>
+            <span className="text-slate-300 leading-relaxed">{lagna.relationships}</span>
           </div>
         )}
       </div>
 
       <div className="border-t border-slate-700/40 pt-4">
-        <SectionTitle>Текущий период Даша</SectionTitle>
+        <SectionTitle>Текущий период Виṁшоттари Даша</SectionTitle>
+        <div className="text-[11px] text-slate-500 mb-2">Даша — планетарный период, определяющий главные темы и события вашей жизни сейчас.</div>
         <p className="text-sm text-slate-200 leading-relaxed mb-2">{summary.current_dasha_summary}</p>
         {summary.current_antar_summary && (
-          <p className="text-xs text-slate-400 leading-relaxed">{summary.current_antar_summary}</p>
+          <div className="p-2.5 bg-slate-800/40 rounded-lg border border-slate-700/30 mt-2">
+            <div className="text-[10px] text-violet-400 font-semibold mb-1">Антардаша (под-период):</div>
+            <p className="text-xs text-slate-400 leading-relaxed">{summary.current_antar_summary}</p>
+          </div>
         )}
       </div>
 
       {summary.strong_grahas.length > 0 && (
         <div className="border-t border-slate-700/40 pt-4">
-          <SectionTitle>Анализ сильных и слабых граха</SectionTitle>
-          <div className="space-y-2 text-xs">
-            <div>
-              <span className="text-emerald-400 font-medium">Сильные граха: </span>
-              <span className="text-slate-300">{summary.strong_grahas.join(', ')}</span>
+          <SectionTitle>Планетарный баланс</SectionTitle>
+          <div className="space-y-2">
+            <div className="p-2.5 bg-emerald-900/20 rounded-lg border border-emerald-700/30 text-xs">
+              <span className="text-emerald-400 font-medium block mb-0.5">Сильные граха (благоприятны для вас):</span>
+              <span className="text-slate-300">{summary.strong_grahas.join(' · ')}</span>
             </div>
             {summary.weak_grahas.length > 0 && (
-              <div>
-                <span className="text-red-400 font-medium">Требуют усиления: </span>
-                <span className="text-slate-300">{summary.weak_grahas.join(', ')}</span>
+              <div className="p-2.5 bg-red-900/20 rounded-lg border border-red-700/30 text-xs">
+                <span className="text-red-400 font-medium block mb-0.5">Требуют внимания и усиления:</span>
+                <span className="text-slate-300">{summary.weak_grahas.join(' · ')}</span>
+                <p className="text-slate-500 mt-1">Слабые граха прорабатываются через Даша-периоды, мантры, пожертвования и осознанные действия в их сферах.</p>
               </div>
             )}
           </div>
@@ -724,12 +739,22 @@ function InterpretationTab({ data }: { data: JyotishResult }) {
 
       {yogas.length > 0 && (
         <div className="border-t border-slate-700/40 pt-4">
-          <SectionTitle>Ключевые йоги</SectionTitle>
+          <SectionTitle>Ключевые йоги карты</SectionTitle>
+          <div className="text-[11px] text-slate-500 mb-2">Йоги — особые планетарные комбинации, усиливающие определённые сферы жизни.</div>
           <div className="space-y-2">
             {yogas.slice(0, 4).map((y, i) => (
-              <div key={i} className="flex gap-2 text-xs">
-                <span className="text-violet-400 flex-shrink-0 font-semibold">{y.name_ru}:</span>
-                <span className="text-slate-400">{y.interpretation.slice(0, 120)}…</span>
+              <div key={i} className="p-2.5 bg-slate-800/30 rounded-lg border border-slate-700/30 text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-violet-400 font-semibold">{y.name_ru}</span>
+                  <span className="text-slate-500 text-[10px]">({y.name_en})</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    y.type === 'mahapurusha' ? 'bg-violet-900/50 text-violet-300' :
+                    y.type === 'rajyoga' ? 'bg-amber-900/50 text-amber-300' :
+                    y.type === 'dhana' ? 'bg-emerald-900/50 text-emerald-300' :
+                    'bg-slate-700/50 text-slate-400'
+                  }`}>{YOGA_STRENGTH_LABELS[y.strength] || y.strength}</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed">{y.interpretation}</p>
               </div>
             ))}
           </div>
@@ -756,18 +781,18 @@ interface Props {
 }
 
 const TABS = [
+  { id: 'interp', label: 'Обзор' },
   { id: 'chart',  label: 'Карта' },
-  { id: 'nakshatra', label: 'Накшатры' },
   { id: 'dasha',  label: 'Даши' },
+  { id: 'nakshatra', label: 'Накшатры' },
   { id: 'yoga',   label: 'Йоги' },
   { id: 'ashtak', label: 'Аштакаварга' },
-  { id: 'interp', label: 'Интерпретация' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
 
 export default function JyotishBlock({ birthData }: Props) {
-  const [tab, setTab] = useState<TabId>('chart');
+  const [tab, setTab] = useState<TabId>('interp');
   const [data, setData] = useState<JyotishResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -798,9 +823,10 @@ export default function JyotishBlock({ birthData }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-slate-400">
-        <span className="animate-spin mr-2 text-lg">⟳</span>
+      <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+        <span className="animate-spin text-2xl">⟳</span>
         <span className="text-sm">Вычисление джйотиш карты…</span>
+        <span className="text-xs text-slate-600">Рассчитываются граха, накшатры, даши, йоги и аштакаварга</span>
       </div>
     );
   }
@@ -884,6 +910,11 @@ export default function JyotishBlock({ birthData }: Props) {
               <div className="text-xs text-slate-500">
                 Навамша Лагна: <span className="text-slate-300">{data.navamsha_rasi_name_ru}</span>
               </div>
+              {data.lagna.keywords && (
+                <div className="text-[11px] text-slate-600 mt-1.5 italic">
+                  Ключевые темы: {data.lagna.keywords}
+                </div>
+              )}
             </div>
           </div>
 
