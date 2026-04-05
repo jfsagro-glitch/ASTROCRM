@@ -1701,20 +1701,16 @@ def main():
             print(f" {ec['date_str']}  {ec['type'].upper()} ({ec['eclipse_class']})  "
                   f"dist_node={ec['dist_node']:.1f}\u00b0")
         print("═"*60)
-        engine = "swiss_ephemeris" if _SE_OK and _se is not None and _se.is_using_se_files() else (
-            "moshier" if _SE_OK else "vsop87"
-        )
-        return {
-            "type": "ephemerides",
-            "start_date": start_date_str,
-            "time_utc": f"{hh:02d}:{mi:02d}:{sc:02d}",
-            "days": days,
-            "engine": engine,
-            "rows": rows,
-        }
+        return
+
+    if args.cmd == 'stations':
+        result = find_stations(args.planet, args.from_date, args.to_date)
+        print("═"*60)
+        print(f" STATIONS of {args.planet.upper()}  {args.from_date} → {args.to_date}")
+        print("═"*60)
         for st in result:
             print(f" {st['date_str']}  {st['type']:<22}  "
-                  f"{st['lon']:.4f}\u00b0  {st['sign']}")
+                  f"{st['lon']:.4f}°  {st['sign']}")
         print("═"*60)
         return
 
