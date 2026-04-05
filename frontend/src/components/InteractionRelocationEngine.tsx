@@ -17,6 +17,7 @@ import {
   type InteractionPersonInput, type LocationInput,
 } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
+import type { SavedPerson } from '../services/peopleService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,29 @@ interface ThemeLike {
 interface Props {
   birth: BirthInput;
   theme: ThemeLike;
+  people?: SavedPerson[];
+}
+
+interface SetupPanelProps {
+  theme: ThemeLike;
+  isDark: boolean;
+  partner: PartnerData;
+  setPartner: React.Dispatch<React.SetStateAction<PartnerData>>;
+  partnerCityName: string;
+  setPartnerCityName: (v: string) => void;
+  targetCities: Array<{ name: string; lat: number; lon: number }>;
+  setTargetCities: React.Dispatch<React.SetStateAction<Array<{ name: string; lat: number; lon: number }>>>;
+  goal: string;
+  setGoal: (v: string) => void;
+  stayDays: number;
+  setStayDays: (v: number) => void;
+  periodStart: string;
+  setPeriodStart: (v: string) => void;
+  periodEnd: string;
+  setPeriodEnd: (v: string) => void;
+  run: () => void;
+  loading: boolean;
+  people?: SavedPerson[];
 }
 
 // ── Mini helpers ──────────────────────────────────────────────────────────────
@@ -679,87 +703,14 @@ function SummaryTab({
   );
 }
 
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
+// ── SETUP PANEL (external component — prevents focus loss on re-render) ───────
 
-const TABS: { key: TabKey; icon: string; label: string }[] = [
-  { key: 'setup',     icon: '⚙️', label: 'Настройка' },
-  { key: 'scenarios', icon: '📊', label: 'Сценарии' },
-  { key: 'locations', icon: '🌍', label: 'Локации' },
-  { key: 'channels',  icon: '📡', label: 'Каналы' },
-  { key: 'summary',   icon: '📋', label: 'Сводка' },
-];
-
-const DEFAULT_PARTNER: PartnerData = {
-  name: '',
-  date: '1990-01-01',
-  time: '12:00',
-  lat: 55.7558,
-  lon: 37.6173,
-  utc: 3,
-  partnerType: 'romantic',
-  currentLat: null,
-  currentLon: null,
-};
-
-export default function InteractionRelocationEngine({ birth, theme }: Props) {
-  const isDark = theme.wheelTheme === 'dark';
-
-  // ── State ──
-  const [tab, setTab]               = useState<TabKey>('setup');
-  const [partner, setPartner]       = useState<PartnerData>(DEFAULT_PARTNER);
-  const [targetCities, setTargetCities] = useState<Array<{ name: string; lat: number; lon: number }>>([]);
-  const [goal, setGoal]             = useState('love');
-  const [stayDays, setStayDays]     = useState(90);
-  const [periodStart, setPeriodStart] = useState(new Date().toISOString().slice(0, 10));
-  const [periodEnd, setPeriodEnd]   = useState(() => {
-    const d = new Date(); d.setMonth(d.getMonth() + 3);
-    return d.toISOString().slice(0, 10);
-  });
-  const [result, setResult]         = useState<CompareResponse | null>(null);
-  const [forecastResult, setForecastResult] = useState<Record<string, unknown> | null>(null);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState<string | null>(null);
-
-  // ── Partner city picker state ──
-  const [partnerCityName, setPartnerCityName] = useState('Москва');
-
-  // ── Helpers ──
-  const pInput = useCallback((): InteractionPersonInput => ({
-    date: birth.date, time: birth.time, lat: birth.lat, lon: birth.lon, utc: birth.utc,
-    name: 'Я', houses: 'placidus', julian: false,
-  }), [birth]);
-
-  const bInput = useCallback((): InteractionPersonInput => ({
-    date: partner.date, time: partner.time, lat: partner.lat, lon: partner.lon, utc: partner.utc,
-    name: partner.name || 'Партнёр', houses: 'placidus', julian: false,
-    current_lat: partner.currentLat ?? undefined,
-    current_lon: partner.currentLon ?? undefined,
-  }), [partner]);
-
-  const run = useCallback(async () => {
-    if (!partner.date) { setError('Укажите данные партнёра'); return; }
-    setLoading(true); setError(null); setResult(null); setForecastResult(null);
-    try {
-      const locs: LocationInput[] = targetCities.map(c => ({ name: c.name, lat: c.lat, lon: c.lon }));
-      const [scenRes, forecastRes] = await Promise.allSettled([
-        compareScenarios(pInput(), bInput(), periodStart, periodEnd, locs, goal, stayDays, partner.partnerType),
-        getPersonalForecastInteraction(pInput(), bInput(), periodStart, periodEnd),
-      ]);
-      if (scenRes.status === 'fulfilled') setResult(scenRes.value as CompareResponse);
-      else throw new Error((scenRes.reason as Error).message);
-      if (forecastRes.status === 'fulfilled') setForecastResult(forecastRes.value as Record<string, unknown>);
-      setTab('scenarios');
-    } catch (e) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  }, [partner, targetCities, goal, stayDays, periodStart, periodEnd, pInput, bInput]);
-
-  const channels = useMemo(
-    () => (forecastResult?.channels as Array<Record<string, unknown>> | null) ?? [],
-    [forecastResult],
-  );
-
-  // ── Setup Panel ──────────────────────────────────────────────────────────────
-  const SetupPanel = () => (
+function SetupPanel({
+  theme, isDark, partner, setPartner, partnerCityName, setPartnerCityName,
+  targetCities, setTargetCities, goal, setGoal, stayDays, setStayDays,
+  periodStart, setPeriodStart, periodEnd, setPeriodEnd, run, loading, people,
+}: SetupPanelProps) {
+  return (
     <div className="space-y-5">
       {/* Partner block */}
       <div className={`rounded-xl border ${theme.card} p-4 space-y-4`}>
@@ -781,21 +732,50 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
               </button>
             ))}
           </div>
-          <p className={`text-[11px] mt-1.5 ${theme.text} opacity-50`}>
+          <div className={`text-[11px] mt-1.5 ${theme.text} opacity-50`}>
             {PARTNER_TYPES.find(p => p.id === partner.partnerType)?.description}
-          </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Name field with saved people picker */}
           <div>
             <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Имя партнёра</label>
-            <input
-              type="text"
-              placeholder="Имя (необязательно)"
-              value={partner.name}
-              onChange={e => setPartner(p => ({ ...p, name: e.target.value }))}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${theme.card} ${theme.text}`}
-            />
+            <div className="flex gap-1">
+              <input
+                type="text"
+                placeholder="Имя (необязательно)"
+                value={partner.name}
+                onChange={e => setPartner(p => ({ ...p, name: e.target.value }))}
+                className={`flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm ${theme.card} ${theme.text}`}
+              />
+              {people && people.length > 0 && (
+                <select
+                  title="Выбрать сохранённого пользователя"
+                  defaultValue=""
+                  onChange={e => {
+                    const person = people.find(x => x.id === e.target.value);
+                    if (person) setPartner(p => ({
+                      ...p,
+                      name: person.name,
+                      date: person.date,
+                      time: person.time,
+                      lat: person.lat,
+                      lon: person.lon,
+                      utc: person.utc,
+                    }));
+                    e.target.value = '';
+                  }}
+                  className={`w-8 px-0 py-2 rounded-lg border text-sm ${theme.card} ${theme.text} cursor-pointer`}
+                  style={{ appearance: 'auto' }}
+                >
+                  <option value="" disabled>▾</option>
+                  {people.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
           <div>
             <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Дата рождения</label>
@@ -873,9 +853,9 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
           )}
         </div>
         {targetCities.length === 0 && (
-          <p className={`text-xs ${theme.text} opacity-50`}>
+          <div className={`text-xs ${theme.text} opacity-50`}>
             Добавьте города для сравнения. Без них расчёт покажет только базовую локацию.
-          </p>
+          </div>
         )}
         {targetCities.map((city, i) => (
           <div key={i} className="flex items-end gap-2">
@@ -892,7 +872,7 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
             </div>
             <button
               onClick={() => setTargetCities(c => c.filter((_, j) => j !== i))}
-              className={`mb-0.5 p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors`}
+              className="mb-0.5 p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
             >
               ✕
             </button>
@@ -901,7 +881,7 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
 
         {/* Quick city presets */}
         <div>
-          <p className={`text-[11px] ${theme.text} opacity-50 mb-1.5`}>Быстро добавить:</p>
+          <div className={`text-[11px] ${theme.text} opacity-50 mb-1.5`}>Быстро добавить:</div>
           <div className="flex flex-wrap gap-1">
             {['Белград', 'Берлин', 'Тбилиси', 'Стамбул', 'Дубай', 'Бали', 'Лиссабон', 'Барселона'].map(cn => {
               const city = CITIES.find(c => c.nameRu === cn);
@@ -955,9 +935,9 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
               </button>
             ))}
           </div>
-          <p className={`text-[11px] mt-1.5 ${theme.text} opacity-50`}>
+          <div className={`text-[11px] mt-1.5 ${theme.text} opacity-50`}>
             {STAY_MODES.find(s => s.days === stayDays)?.effect}
-          </p>
+          </div>
         </div>
 
         {/* Period */}
@@ -989,6 +969,86 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
       </button>
     </div>
   );
+}
+
+// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
+
+const TABS: { key: TabKey; icon: string; label: string }[] = [
+  { key: 'setup',     icon: '⚙️', label: 'Настройка' },
+  { key: 'scenarios', icon: '📊', label: 'Сценарии' },
+  { key: 'locations', icon: '🌍', label: 'Локации' },
+  { key: 'channels',  icon: '📡', label: 'Каналы' },
+  { key: 'summary',   icon: '📋', label: 'Сводка' },
+];
+
+const DEFAULT_PARTNER: PartnerData = {
+  name: '',
+  date: '1990-01-01',
+  time: '12:00',
+  lat: 55.7558,
+  lon: 37.6173,
+  utc: 3,
+  partnerType: 'romantic',
+  currentLat: null,
+  currentLon: null,
+};
+
+export default function InteractionRelocationEngine({ birth, theme, people }: Props) {
+  const isDark = theme.wheelTheme === 'dark';
+
+  // ── State ──
+  const [tab, setTab]               = useState<TabKey>('setup');
+  const [partner, setPartner]       = useState<PartnerData>(DEFAULT_PARTNER);
+  const [targetCities, setTargetCities] = useState<Array<{ name: string; lat: number; lon: number }>>([]);
+  const [goal, setGoal]             = useState('love');
+  const [stayDays, setStayDays]     = useState(90);
+  const [periodStart, setPeriodStart] = useState(new Date().toISOString().slice(0, 10));
+  const [periodEnd, setPeriodEnd]   = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 3);
+    return d.toISOString().slice(0, 10);
+  });
+  const [result, setResult]         = useState<CompareResponse | null>(null);
+  const [forecastResult, setForecastResult] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+
+  // ── Partner city picker state ──
+  const [partnerCityName, setPartnerCityName] = useState('Москва');
+
+  // ── Helpers ──
+  const pInput = useCallback((): InteractionPersonInput => ({
+    date: birth.date, time: birth.time, lat: birth.lat, lon: birth.lon, utc: birth.utc,
+    name: 'Я', houses: 'placidus', julian: false,
+  }), [birth]);
+
+  const bInput = useCallback((): InteractionPersonInput => ({
+    date: partner.date, time: partner.time, lat: partner.lat, lon: partner.lon, utc: partner.utc,
+    name: partner.name || 'Партнёр', houses: 'placidus', julian: false,
+    current_lat: partner.currentLat ?? undefined,
+    current_lon: partner.currentLon ?? undefined,
+  }), [partner]);
+
+  const run = useCallback(async () => {
+    if (!partner.date) { setError('Укажите данные партнёра'); return; }
+    setLoading(true); setError(null); setResult(null); setForecastResult(null);
+    try {
+      const locs: LocationInput[] = targetCities.map(c => ({ name: c.name, lat: c.lat, lon: c.lon }));
+      const [scenRes, forecastRes] = await Promise.allSettled([
+        compareScenarios(pInput(), bInput(), periodStart, periodEnd, locs, goal, stayDays, partner.partnerType),
+        getPersonalForecastInteraction(pInput(), bInput(), periodStart, periodEnd),
+      ]);
+      if (scenRes.status === 'fulfilled') setResult(scenRes.value as CompareResponse);
+      else throw new Error((scenRes.reason as Error).message);
+      if (forecastRes.status === 'fulfilled') setForecastResult(forecastRes.value as Record<string, unknown>);
+      setTab('scenarios');
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }, [partner, targetCities, goal, stayDays, periodStart, periodEnd, pInput, bInput]);
+
+  const channels = useMemo(
+    () => (forecastResult?.channels as Array<Record<string, unknown>> | null) ?? [],
+    [forecastResult],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -1010,7 +1070,29 @@ export default function InteractionRelocationEngine({ birth, theme }: Props) {
 
       {error && <Err msg={error} />}
 
-      {tab === 'setup' && <SetupPanel />}
+      {tab === 'setup' && (
+        <SetupPanel
+          theme={theme}
+          isDark={isDark}
+          partner={partner}
+          setPartner={setPartner}
+          partnerCityName={partnerCityName}
+          setPartnerCityName={setPartnerCityName}
+          targetCities={targetCities}
+          setTargetCities={setTargetCities}
+          goal={goal}
+          setGoal={setGoal}
+          stayDays={stayDays}
+          setStayDays={setStayDays}
+          periodStart={periodStart}
+          setPeriodStart={setPeriodStart}
+          periodEnd={periodEnd}
+          setPeriodEnd={setPeriodEnd}
+          run={run}
+          loading={loading}
+          people={people}
+        />
+      )}
 
       {tab === 'scenarios' && result && (
         <ScenariosTab data={result} isDark={isDark} theme={theme} />

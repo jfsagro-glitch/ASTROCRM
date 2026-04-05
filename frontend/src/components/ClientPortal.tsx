@@ -2625,7 +2625,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
           {activeTab === 'navigation' && (
             <div>
-              <InteractionRelocationEngine birth={birth} theme={theme} />
+              <InteractionRelocationEngine birth={birth} theme={theme} people={people} />
             </div>
           )}
 
