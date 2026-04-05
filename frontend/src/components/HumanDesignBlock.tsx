@@ -303,7 +303,7 @@ export default function HumanDesignBlock({
             className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all ${theme.btn}`}
           >
             <Sparkles className="h-4 w-4" />
-            {loading ? 'Считаю Human Design...' : 'Рассчитать Human Design'}
+            <span>{loading ? 'Считаю Human Design...' : 'Рассчитать Human Design'}</span>
           </button>
         </div>
         {error ? <div className="mt-4 text-sm text-red-400">{error}</div> : null}

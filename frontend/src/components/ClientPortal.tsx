@@ -2221,7 +2221,7 @@ function AstroSummaryBlock({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
           </div>
           <button onClick={run}
             className={`px-4 py-2 rounded-lg text-sm font-semibold ${theme.btn}`}>
-            {loading ? <><Spin />Обновляю...</> : 'Обновить сводку'}
+            {loading ? <><Spin /><span>Обновляю...</span></> : <span>Обновить сводку</span>}
           </button>
         </div>
       </div>
@@ -2535,22 +2535,22 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         <div className="flex gap-3 flex-wrap">
           <button onClick={calcNatal} disabled={loading}
             className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${theme.btn} shadow-lg`}>
-            {loading ? <><Spin />{tr.calculating}</> : <><Star className="h-4 w-4 inline mr-1.5" />{tr.calcNatal}</>}
+            {loading ? <><Spin /><span>{tr.calculating}</span></> : <><Star className="h-4 w-4 inline mr-1.5" /><span>{tr.calcNatal}</span></>}
           </button>
           {natalChart && (
             <button onClick={handleExportAll} disabled={isExporting}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
               {isExporting
-                ? <><Spin />{tr.exportPdf}…</>
-                : <><Download className="h-4 w-4 inline mr-1.5" />{tr.exportPdf}</>}
+                ? <><Spin /><span>{tr.exportPdf}…</span></>
+                : <><Download className="h-4 w-4 inline mr-1.5" /><span>{tr.exportPdf}</span></>}
             </button>
           )}
           {activeTab === 'human-design' && (
             <button onClick={handleExportHumanDesign} disabled={isExporting}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
               {isExporting
-                ? <><Spin />PDF Human Design…</>
-                : <><Download className="h-4 w-4 inline mr-1.5" />PDF Human Design</>}
+                ? <><Spin /><span>PDF Human Design…</span></>
+                : <><Download className="h-4 w-4 inline mr-1.5" /><span>PDF Human Design</span></>}
             </button>
           )}
         </div>
@@ -2561,7 +2561,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           {tabs.map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${key === 'human-design' ? 'ml-6 border-2 border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : ''} ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
-              <Icon className="h-4 w-4" />{label}
+              <Icon className="h-4 w-4" /><span>{label}</span>
             </button>
           ))}
         </div>
