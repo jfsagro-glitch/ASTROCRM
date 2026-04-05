@@ -110,16 +110,29 @@ const Err = ({ msg }: { msg: string }) => (
 
 // ─── City Geocoder field ───────────────────────────────────────────────────────
 function CityField({
-  onFound, theme,
+  onFound, theme, prefill,
 }: {
   onFound: (lat: number, lon: number, utc: number) => void;
   theme: typeof chartThemes[ThemeKey];
+  prefill?: { city: string; utc: number } | null;
 }) {
   const { tr } = useLang();
   const [city, setCity] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // When parent prefills from saved person — show city + UTC without geocoding
+  const prevPrefillRef = React.useRef<typeof prefill>(null);
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill === prevPrefillRef.current) return;
+    prevPrefillRef.current = prefill;
+    setCity(prefill.city);
+    const tzSign = prefill.utc >= 0 ? '+' : '';
+    setResult(`✓ ${prefill.city} · UTC${tzSign}${prefill.utc}`);
+    setError(null);
+  }, [prefill]);
 
   const find = useCallback(async () => {
     if (!city.trim()) return;
@@ -155,8 +168,8 @@ function CityField({
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         </button>
       </div>
-      {result && <p className={`text-xs ${theme.accent} truncate`}>{result}</p>}
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {result && <div className={`text-xs ${theme.accent} truncate`}>{result}</div>}
+      {error && <div className="text-xs text-red-400">{error}</div>}
     </div>
   );
 }
@@ -176,6 +189,19 @@ function BirthForm({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [cityPrefill, setCityPrefill] = useState<{ city: string; utc: number } | null>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!dropdownRef.current?.contains(e.target as Node)) setDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
 
   useEffect(() => {
     if (!people?.length) {
@@ -187,6 +213,13 @@ function BirthForm({
     }
   }, [people, selectedPersonId]);
 
+  const loadPerson = useCallback((p: SavedPerson) => {
+    setSelectedPersonId(p.id);
+    onChange({ name: p.name, date: p.date, time: p.time, lat: p.lat, lon: p.lon, utc: p.utc });
+    if (p.location) setCityPrefill({ city: p.location, utc: p.utc });
+    setDropdownOpen(false);
+  }, [onChange]);
+
   const handleSave = useCallback(async () => {
     if (!value.name || !onSave) return;
     setSaveLoading(true); setSaveMsg(null);
@@ -197,8 +230,10 @@ function BirthForm({
     } catch { setSaveMsg('Ошибка сохранения'); }
     finally { setSaveLoading(false); }
   }, [value, onSave]);
+
   const { tr } = useLang();
   const inp = `w-full px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`;
+  const hasPeople = !!(people && people.length > 0);
 
   return (
     <div className={`p-4 rounded-xl border ${theme.card} space-y-3`}>
@@ -220,50 +255,62 @@ function BirthForm({
         )}
       </div>
 
-      {/* People picker — only if saved profiles exist */}
-      {people && people.length > 0 && (
-        <div className="space-y-1">
-          <label className={`text-xs ${theme.text} block`}>Загрузить сохранённый профиль</label>
-          <div className="flex gap-2">
-            <select
-              value={selectedPersonId}
-              onChange={e => {
-                setSelectedPersonId(e.target.value);
-                const p = people.find(x => x.id === e.target.value);
-                if (p) onChange({ name: p.name, date: p.date, time: p.time, lat: p.lat, lon: p.lon, utc: p.utc });
-              }}
-              data-people-id
-              className={`flex-1 px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
-            >
-              <option value="">— выбрать профиль —</option>
-              {people.map(p => (
-                <option key={p.id} value={p.id}>{p.name}{p.location ? ` · ${p.location}` : ''}</option>
-              ))}
-            </select>
-            {onDelete && (
-              <button
-                type="button"
-                title="Удалить выбранный профиль"
-                onClick={() => {
-                  if (selectedPersonId) onDelete(selectedPersonId);
-                }}
-                disabled={!selectedPersonId}
-                className={`px-2.5 py-2 rounded-lg border text-xs transition-colors text-red-400 border-red-400/30 hover:border-red-400/60`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Row 1: Name + Date picker */}
+      {/* Row 1: Name (with people dropdown) + Date */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.name}</label>
-          <input type="text" value={value.name ?? ''}
-            onChange={e => onChange({ ...value, name: e.target.value })}
-            className={inp} />
+          <div className="relative" ref={dropdownRef}>
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={value.name ?? ''}
+                onChange={e => { onChange({ ...value, name: e.target.value }); setSelectedPersonId(''); }}
+                className={`flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+              />
+              {hasPeople && (
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen(o => !o)}
+                  title="Выбрать сохранённый профиль"
+                  className={`px-2 py-2 rounded-lg border text-xs transition-colors ${theme.tabInactive}`}
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {dropdownOpen && hasPeople && (
+              <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl border shadow-xl overflow-hidden ${theme.card}`}>
+                <div className={`text-xs px-3 py-1.5 opacity-50 border-b ${theme.text}`}>Сохранённые профили</div>
+                <div className="max-h-48 overflow-y-auto">
+                  {people!.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => loadPerson(p)}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors ${selectedPersonId === p.id ? 'opacity-100' : 'opacity-80'}`}
+                    >
+                      <span className={`font-medium ${theme.header} truncate`}>{p.name}</span>
+                      <span className={`shrink-0 ${theme.text} opacity-50`}>
+                        {p.location ? p.location : p.date}
+                        {p.utc !== undefined ? ` · UTC${p.utc >= 0 ? '+' : ''}${p.utc}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {onDelete && selectedPersonId && (
+                  <div className="border-t px-3 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { onDelete(selectedPersonId); setSelectedPersonId(''); setDropdownOpen(false); }}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" /> Удалить профиль
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.date}</label>
@@ -273,7 +320,7 @@ function BirthForm({
         </div>
       </div>
 
-      {/* Row 2: Time picker (UTC offset auto-filled by city, hidden from UI) */}
+      {/* Row 2: Time */}
       <div className="grid grid-cols-1 gap-2">
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.time}</label>
@@ -283,13 +330,11 @@ function BirthForm({
         </div>
       </div>
 
-      {/* UTC offset, latitude, longitude are auto-populated by city search - hidden from UI */}
-      {/* _utc, lat, lon remain in state but not editable by user */}
-
-      {/* City geocoder — auto-fills lat/lon/utc. Manual coords hidden. */}
+      {/* City geocoder — auto-fills lat/lon/utc */}
       <CityField
-        onFound={(lat, lon, utc) => onChange({ ...value, lat, lon, utc })}
+        onFound={(lat, lon, utc) => { onChange({ ...value, lat, lon, utc }); setCityPrefill(null); }}
         theme={theme}
+        prefill={cityPrefill}
       />
     </div>
   );
