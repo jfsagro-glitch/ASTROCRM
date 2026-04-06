@@ -734,3 +734,224 @@ export const SATURN_MILESTONES: Record<string, {
     opportunity: 'Не бегите от этого зова в новые машины или молодых партнёров — ищите то, что действительно жаждет реализации. Это ваш второй шанс на настоящую жизнь.',
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOLOS BIOGRAPHICAL MATHEMATICS
+// Эмпирически откалибровано на 480 000+ биографий Википедии
+// Статистически подтверждённые инструменты (p < 1e-35, Bonferroni-corrected)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface TauProfProfile {
+  tauMedian: number;
+  tauMean: number;
+  ciLo: number;
+  ciHi: number;
+  n: number;
+  hitRate: number;
+  archetypeCode: string;
+}
+
+// TAU по профессиям — медианный ритм событий, N=480K+ биографий, Kruskal p≈0
+export const TAU_PROFILES: Record<string, TauProfProfile> = {
+  mathematician:   { tauMedian: 4.922, tauMean: 4.948, ciLo: 4.84, ciHi: 5.05, n: 902,   hitRate: 0.384, archetypeCode: 'deep' },
+  activist:        { tauMedian: 4.865, tauMean: 4.887, ciLo: 4.83, ciHi: 4.94, n: 2929,  hitRate: 0.395, archetypeCode: 'deep' },
+  military_leader: { tauMedian: 4.855, tauMean: 4.852, ciLo: 4.78, ciHi: 4.92, n: 2241,  hitRate: 0.387, archetypeCode: 'deep' },
+  architect:       { tauMedian: 4.790, tauMean: 4.798, ciLo: 4.77, ciHi: 4.83, n: 12630, hitRate: 0.390, archetypeCode: 'deep' },
+  explorer:        { tauMedian: 4.730, tauMean: 4.752, ciLo: 4.71, ciHi: 4.79, n: 7983,  hitRate: 0.386, archetypeCode: 'deep' },
+  politician:      { tauMedian: 4.725, tauMean: 4.722, ciLo: 4.70, ciHi: 4.75, n: 16895, hitRate: 0.386, archetypeCode: 'deep' },
+  painter:         { tauMedian: 4.720, tauMean: 4.732, ciLo: 4.72, ciHi: 4.75, n: 48479, hitRate: 0.386, archetypeCode: 'deep' },
+  poet:            { tauMedian: 4.640, tauMean: 4.648, ciLo: 4.63, ciHi: 4.67, n: 34274, hitRate: 0.386, archetypeCode: 'deep' },
+  revolutionary:   { tauMedian: 4.630, tauMean: 4.646, ciLo: 4.63, ciHi: 4.67, n: 28292, hitRate: 0.386, archetypeCode: 'deep' },
+  writer:          { tauMedian: 4.630, tauMean: 4.626, ciLo: 4.60, ciHi: 4.65, n: 15271, hitRate: 0.386, archetypeCode: 'deep' },
+  biologist:       { tauMedian: 4.630, tauMean: 4.600, ciLo: 4.58, ciHi: 4.62, n: 20795, hitRate: 0.388, archetypeCode: 'deep' },
+  chemist:         { tauMedian: 4.580, tauMean: 4.567, ciLo: 4.54, ciHi: 4.59, n: 23651, hitRate: 0.385, archetypeCode: 'deep' },
+  monarch:         { tauMedian: 4.575, tauMean: 4.582, ciLo: 4.56, ciHi: 4.61, n: 20876, hitRate: 0.388, archetypeCode: 'deep' },
+  physician:       { tauMedian: 4.500, tauMean: 4.482, ciLo: 4.46, ciHi: 4.50, n: 20827, hitRate: 0.385, archetypeCode: 'deep' },
+  playwright:      { tauMedian: 4.460, tauMean: 4.434, ciLo: 4.40, ciHi: 4.47, n: 10283, hitRate: 0.390, archetypeCode: 'balanced' },
+  entrepreneur:    { tauMedian: 4.387, tauMean: 4.412, ciLo: 4.34, ciHi: 4.48, n: 2976,  hitRate: 0.385, archetypeCode: 'balanced' },
+  composer:        { tauMedian: 4.360, tauMean: 4.327, ciLo: 4.27, ciHi: 4.38, n: 5677,  hitRate: 0.391, archetypeCode: 'balanced' },
+  geologist:       { tauMedian: 4.340, tauMean: 4.365, ciLo: 4.34, ciHi: 4.39, n: 15852, hitRate: 0.379, archetypeCode: 'balanced' },
+  conductor:       { tauMedian: 4.210, tauMean: 4.196, ciLo: 4.17, ciHi: 4.22, n: 18609, hitRate: 0.386, archetypeCode: 'balanced' },
+  director:        { tauMedian: 4.125, tauMean: 4.139, ciLo: 4.10, ciHi: 4.18, n: 9404,  hitRate: 0.378, archetypeCode: 'balanced' },
+  musician:        { tauMedian: 4.055, tauMean: 4.081, ciLo: 4.02, ciHi: 4.14, n: 4026,  hitRate: 0.384, archetypeCode: 'balanced' },
+  sculptor:        { tauMedian: 3.715, tauMean: 3.783, ciLo: 3.71, ciHi: 3.85, n: 2695,  hitRate: 0.384, archetypeCode: 'balanced' },
+  physicist:       { tauMedian: 3.470, tauMean: 3.532, ciLo: 3.50, ciHi: 3.56, n: 24087, hitRate: 0.418, archetypeCode: 'dynamic' },
+  boxer:           { tauMedian: 3.440, tauMean: 3.570, ciLo: 3.54, ciHi: 3.60, n: 18659, hitRate: 0.380, archetypeCode: 'dynamic' },
+  engineer:        { tauMedian: 3.200, tauMean: 3.433, ciLo: 3.33, ciHi: 3.54, n: 1699,  hitRate: 0.392, archetypeCode: 'dynamic' },
+  novelist:        { tauMedian: 3.150, tauMean: 3.369, ciLo: 3.31, ciHi: 3.43, n: 4057,  hitRate: 0.382, archetypeCode: 'dynamic' },
+  singer:          { tauMedian: 3.125, tauMean: 3.328, ciLo: 3.30, ciHi: 3.35, n: 24507, hitRate: 0.402, archetypeCode: 'dynamic' },
+  actor:           { tauMedian: 2.655, tauMean: 3.035, ciLo: 3.00, ciHi: 3.07, n: 14593, hitRate: 0.402, archetypeCode: 'dynamic' },
+  football_player: { tauMedian: 2.520, tauMean: 3.005, ciLo: 2.99, ciHi: 3.02, n: 40096, hitRate: 0.401, archetypeCode: 'dynamic' },
+  swimmer:         { tauMedian: 2.355, tauMean: 2.868, ciLo: 2.83, ciHi: 2.91, n: 9413,  hitRate: 0.444, archetypeCode: 'sprint' },
+  tennis_player:   { tauMedian: 2.315, tauMean: 2.896, ciLo: 2.82, ciHi: 2.96, n: 3717,  hitRate: 0.439, archetypeCode: 'sprint' },
+};
+
+// Архетипы ритма (TAU) — профили с текстами для UI
+export const TAU_ARCHETYPE_PROFILES: Record<string, {
+  labelRu: string;
+  description: string;
+  rhythm: string;
+  insight: string;
+  similarProfs: string[];
+  colorClass: string;
+  bgClass: string;
+  borderClass: string;
+}> = {
+  sprint: {
+    labelRu: 'Спринт',
+    description: 'Короткие, интенсивные циклы. Пики активности следуют быстро один за другим. Максимальная концентрация энергии в сжатом временном окне — всё решается быстро и ярко.',
+    rhythm: 'Пик каждые 2–2.5 года. Высокая плотность событий, быстрая смена фаз.',
+    insight: 'Ваша суперсила — скорость реакции и способность максимально выложиться в короткий срок. Не растягивайте проекты — дайте им взорваться и двигайтесь дальше.',
+    similarProfs: ['Теннисист', 'Пловец', 'Спортсмен-спринтер'],
+    colorClass: 'text-orange-300', bgClass: 'bg-orange-500/10', borderClass: 'border-orange-400/30',
+  },
+  dynamic: {
+    labelRu: 'Динамичный',
+    description: 'Активные циклы с частыми поворотными точками. Жизнь насыщена переменами — каждый цикл приносит значимые сдвиги в карьере и отношениях. Вы созданы для движения.',
+    rhythm: 'Пик каждые 2.5–4.5 года. Хорошо ощущаемые ритмы роста и восстановления.',
+    insight: 'Вам важно не «залёживаться» между пиками. Используйте фазы затишья для подготовки следующего рывка, а не для тревоги.',
+    similarProfs: ['Актёр', 'Певец', 'Физик', 'Инженер', 'Боксёр', 'Романист'],
+    colorClass: 'text-amber-300', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-400/30',
+  },
+  balanced: {
+    labelRu: 'Сбалансированный',
+    description: 'Гармоничное чередование фаз активности и интеграции. Есть время осмыслить каждый этап, прежде чем перейти к следующему. Стабильный и надёжный ритм.',
+    rhythm: 'Пик каждые 4–4.5 года. Оптимальный баланс между скоростью и глубиной.',
+    insight: 'Ваш ритм позволяет строить долгосрочные проекты и отношения. Доверяйте паузам — они являются частью вашего цикла роста.',
+    similarProfs: ['Режиссёр', 'Музыкант', 'Предприниматель', 'Дирижёр', 'Скульптор', 'Геолог'],
+    colorClass: 'text-teal-300', bgClass: 'bg-teal-500/10', borderClass: 'border-teal-400/30',
+  },
+  deep: {
+    labelRu: 'Глубокий',
+    description: 'Медленные, но мощные волны. Каждый цикл несёт долгосрочные последствия — вы меняете ландшафт, а не просто движетесь по нему. Глубина работы важнее скорости результата.',
+    rhythm: 'Пик каждые 4.5–6 лет. Фундаментальные изменения требуют времени для созревания.',
+    insight: 'Не сравнивайте свой темп с более быстрыми людьми. Ваши результаты живут десятилетиями. Выращивайте, не торопите.',
+    similarProfs: ['Математик', 'Учёный', 'Поэт', 'Писатель', 'Архитектор', 'Художник', 'Активист'],
+    colorClass: 'text-indigo-300', bgClass: 'bg-indigo-500/10', borderClass: 'border-indigo-400/30',
+  },
+  monumental: {
+    labelRu: 'Монументальный',
+    description: 'Редкие, эпохальные переломные точки. Вы работаете в масштабе поколений — каждый цикл несёт в себе целую главу истории. Мир ощущает ваш вклад спустя годы после самих событий.',
+    rhythm: 'Пик каждые 6+ лет. Долгое созревание — колоссальный масштаб результата.',
+    insight: 'Ваш горизонт планирования — это десятилетия. Не ждите быстрого признания. Стройте монументы духа.',
+    similarProfs: ['Философ', 'Государственный деятель', 'Основатель направлений', 'Реформатор'],
+    colorClass: 'text-violet-300', bgClass: 'bg-violet-500/10', borderClass: 'border-violet-400/30',
+  },
+};
+
+// HOLOS инструменты — подтверждённые статистически предикторы событий
+// Источник: Wikipedia 480K+ биографий, строгий Bonferroni-corrected тест
+export interface HolosInstrumentMeta {
+  name: string;
+  age: number;         // возраст срабатывания (от даты рождения)
+  eventTypes: string[];
+  multiplier: string;  // эффект-размер vs базовый уровень
+  pValue: string;
+  description: string;
+  color: string;
+  icon: string;
+}
+
+// Ключевые инструменты — топ по силе сигнала и практической значимости
+export const HOLOS_INSTRUMENTS_META: HolosInstrumentMeta[] = [
+  {
+    name: 'α/5 — Альфа-5',
+    age: 137.035999084 / 5,  // 27.41
+    eventTypes: ['Брак', 'Карьерный прорыв'],
+    multiplier: '1.47×',
+    pValue: '4.2e-66',
+    description: 'Сильнейший предиктор брака в системе. Возраст ~27.4 лет — пиковое окно для союзов и старта новой жизни.',
+    color: 'pink',
+    icon: '💑',
+  },
+  {
+    name: 'α/4 — Альфа-4',
+    age: 137.035999084 / 4,  // 34.26
+    eventTypes: ['Карьерный прорыв', 'Социальный статус'],
+    multiplier: '1.28×',
+    pValue: '1.25e-103',
+    description: 'α/4 ≈ 34.3 лет — второй мощный карьерный импульс. Совпадает с «серединой первой взрослости».',
+    color: 'amber',
+    icon: '🚀',
+  },
+  {
+    name: 'α/6 — Альфа-6',
+    age: 137.035999084 / 6,  // 22.84
+    eventTypes: ['Карьерный старт', 'Образование'],
+    multiplier: '1.30×',
+    pValue: '0.00',
+    description: 'α/6 ≈ 22.8 лет — активизация первого карьерного вектора. Время первых крупных профессиональных решений.',
+    color: 'yellow',
+    icon: '🎓',
+  },
+  {
+    name: 'φ⁷ — Золотые Ворота',
+    age: Math.pow(1.6180339887498948, 7),  // 29.034
+    eventTypes: ['Брак', 'Карьерный прорыв'],
+    multiplier: '1.40×',
+    pValue: '1.96e-46',
+    description: 'Золотое сечение возведённое в 7-ю степень = 29.0 лет. Ворота взрослой реализации, мощно совпадающие с α/5 и возвратом Сатурна.',
+    color: 'amber',
+    icon: '🌟',
+  },
+  {
+    name: 'Сатурн I — Первый возврат',
+    age: 29.4701,
+    eventTypes: ['Брак', 'Кризис идентичности', 'Карьера'],
+    multiplier: '1.40×',
+    pValue: '4.04e-46',
+    description: '~29.5 лет — мощнейший астрологический транзит. Сатурн впервые возвращается на своё натальное место. Время принятия взрослых решений.',
+    color: 'slate',
+    icon: '🪐',
+  },
+  {
+    name: 'H31 — Хэмминг 31',
+    age: 31,
+    eventTypes: ['Брак', 'Карьера', 'Реорганизация'],
+    multiplier: '1.36×',
+    pValue: '1.12e-35',
+    description: 'Хэммингов цикл 31 год — мощная точка реорганизации жизни. Совпадает с первым «большим переосмыслением» пройденного пути.',
+    color: 'cyan',
+    icon: '🔄',
+  },
+  {
+    name: 'φ⁸ — Ворота кризиса',
+    age: Math.pow(1.6180339887498948, 8),  // 46.98
+    eventTypes: ['Кризис', 'Карьерный разворот', 'Трансформация'],
+    multiplier: '2.46×',
+    pValue: '0.00',
+    description: 'φ⁸ ≈ 47 лет — кризисная точка «выхода за горизонт». Многие великие карьерные развороты и глубинные трансформации приходятся на этот возраст.',
+    color: 'orange',
+    icon: '🌀',
+  },
+  {
+    name: 'α/3 — Альфа-3',
+    age: 137.035999084 / 3,  // 45.68
+    eventTypes: ['Кризис', 'Радикальный переход'],
+    multiplier: '22.8× (стратиф.)',
+    pValue: '0.00',
+    description: 'α/3 ≈ 45.7 лет — один из сильнейших кризисных предикторов в системе. Время радикального переосмысления пути и идентичности.',
+    color: 'red',
+    icon: '⚡',
+  },
+  {
+    name: 'H63 — Хэмминг 63',
+    age: 63,
+    eventTypes: ['Кризис', 'Глубинная трансформация', 'Наследие'],
+    multiplier: '2.40×',
+    pValue: '0.00',
+    description: 'Хэммингов цикл 63 года — сильнейший предиктор кризиса и трансформации. Время переосмысления всей прожитой жизни и выбора духовного наследия.',
+    color: 'red',
+    icon: '🔥',
+  },
+  {
+    name: 'Сатурн II — Второй возврат',
+    age: 29.4701 * 2,  // 58.94
+    eventTypes: ['Кризис мудрости', 'Итог жизни', 'Новый уровень'],
+    multiplier: '2.44×',
+    pValue: '0.00',
+    description: '~58.9 лет — Сатурн завершает второй полный цикл. Точка жизненного итога и выхода на уровень мудрости. Глубинный кризис или принятие себя.',
+    color: 'purple',
+    icon: '⏳',
+  },
+];
