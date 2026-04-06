@@ -20,6 +20,7 @@ import type { RectificationEventInput } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
 import DateSegmentInput from './DateSegmentInput';
+import DailyForecastView from './DailyForecastView';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -935,6 +936,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [showInfo, setShowInfo]     = useState(false);
+  const [transitForecastPeriod, setTransitForecastPeriod] = useState<7|14|30|null>(null);
 
   // Period range state (for period mode)
   const [periodStart, setPeriodStart] = useState(new Date().toISOString().slice(0, 10));
@@ -1019,7 +1021,24 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
   const renderResult = () => {
     if (!result) return null;
     const type = result.type as string;
-    if (type === 'transits') return <TransitView result={result} theme={theme} />;
+    if (type === 'transits') {
+      const baseT = result as { transit_planets: Record<string, { lon: number; sign: string; deg_min: string; retrograde?: boolean }>; aspects: { transit_planet: string; natal_planet: string; aspect: string; orb: number; applying?: boolean }[] };
+      return (
+        <>
+          {transitForecastPeriod ? (
+            <DailyForecastView
+              baseTransits={baseT}
+              startDate={targetDate}
+              days={transitForecastPeriod}
+              birth={birth}
+              theme={theme}
+            />
+          ) : (
+            <TransitView result={result} theme={theme} />
+          )}
+        </>
+      );
+    }
     if (['secondary_progressions','solar_arc','tertiary_progressions','converse_progressions'].includes(type))
       return <ProgressionView result={result} theme={theme} />;
     if (['solar_return','lunar_return'].includes(type))
@@ -1225,7 +1244,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
             <div className="flex flex-wrap gap-2 items-end">
               <div>
                 <label className={`text-xs ${theme.text} mb-1 block`}>
-                  {tab === 'transits' ? 'На дату' : 'Целевая дата'}
+                  {tab === 'transits' ? 'На дату / старт периода' : 'Целевая дата'}
                 </label>
                 <DateSegmentInput value={targetDate} onChange={setTargetDate}
                   className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
@@ -1244,6 +1263,34 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
                 </button>
               ))}
             </div>
+
+            {/* Period forecast toggle — only for Transits tab */}
+            {tab === 'transits' && (
+              <div className="pt-1 space-y-1.5">
+                <p className={`text-[11px] font-semibold ${theme.accent}`}>
+                  📆 Расширенный прогноз по дням:
+                </p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([null, 7, 14, 30] as const).map(d => (
+                    <button
+                      key={d ?? 'off'}
+                      onClick={() => setTransitForecastPeriod(prev => prev === d ? null : d)}
+                      className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${
+                        transitForecastPeriod === d ? theme.tabActive : theme.tabInactive
+                      }`}
+                    >
+                      {d === null ? 'Один день' : d === 7 ? '7 дней' : d === 14 ? '2 недели' : '1 месяц'}
+                    </button>
+                  ))}
+                </div>
+                {transitForecastPeriod && (
+                  <p className={`text-[10px] ${theme.text} opacity-50`}>
+                    После расчёта транзитов отобразится почасовой прогноз на {transitForecastPeriod} дней
+                    начиная с {targetDate} с компенсаторикой по П. Андрееву.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
