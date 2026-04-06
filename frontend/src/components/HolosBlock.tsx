@@ -331,6 +331,114 @@ function computeCoreHash(birth: number, tau: number, now: number): string {
   return `${tauCode} · ${phiCode} · ${alphaCode} · ${satCode} · ${fibCode}`;
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+const MONTHS_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+
+function decimalToMonthYear(decYear: number): string {
+  const year = Math.floor(decYear);
+  const monthIdx = Math.round((decYear - year) * 12);
+  if (monthIdx >= 12) return `Янв ${year + 1}`;
+  return `${MONTHS_RU[monthIdx]} ${year}`;
+}
+
+function windowDates(birth: number, windowAge: number): { start: string; peak: string; end: string } {
+  const peakDec = birth + windowAge;
+  return {
+    start: decimalToMonthYear(peakDec - 1.5),
+    peak:  decimalToMonthYear(peakDec),
+    end:   decimalToMonthYear(peakDec + 1.5),
+  };
+}
+
+// ─── Per-window interpretation ────────────────────────────────────────────────
+
+const WINDOW_INTERP: Record<string, { what: string; focus: string; tip: string }> = {
+  'alpha_3': {
+    what: 'α/3 — один из мощнейших биографических предикторов. Время кардинального пересмотра идентичности: кто вы есть вне чужих ожиданий?',
+    focus: 'Освобождение от ролей, которые больше не ваши. Переосмысление направления жизни на следующие 20 лет.',
+    tip: 'Действуйте после осмысления, не в аффекте. Опасность — импульсивные разрывы, о которых потом жалеют.',
+  },
+  'alpha_4': {
+    what: 'α/4 ≈ 34.3л — второй по силе альфа-узел. Карьерный прорыв и переход в лидерскую фазу.',
+    focus: 'Инвестируйте в профессиональный рост, публичность, расширение зоны ответственности.',
+    tip: 'Это окно открывается редко — не упустите момент для решительного шага вверх.',
+  },
+  'alpha_5': {
+    what: 'α/5 ≈ 27.4л — сильнейший предиктор брака и первых серьёзных карьерных обязательств.',
+    focus: 'Выбор спутника жизни и базового профессионального пути. Решения этого периода определяют следующие 15 лет.',
+    tip: 'Не торопитесь и не медлите. Ясность намерений здесь критически важна.',
+  },
+  'alpha_6': {
+    what: 'α/6 ≈ 22.8л — первый карьерный вектор. Стартовая позиция в профессии.',
+    focus: 'Определение поля деятельности, первые серьёзные профессиональные шаги.',
+    tip: 'Широко пробуйте — это время познания, а не окончательных обязательств.',
+  },
+  'alpha_2': {
+    what: 'α/2 ≈ 68.5л — мощнейший резонанс всей биографии. Время итогов, наследия и глубочайшей трансформации.',
+    focus: 'Что вы хотите оставить миру? Кристаллизация жизненного смысла и передача опыта.',
+    tip: 'Это редкий дар — отнеситесь к нему как к финальному шедевру.',
+  },
+  'phi_7': {
+    what: 'φ⁷ ≈ 29.0л — "золотые ворота" взрослой реализации. Время первого серьёзного брака и/или карьерного становления.',
+    focus: 'Вход в полноценную взрослую жизнь. Принятие ответственности за своё будущее.',
+    tip: 'Доверяйте структуре — что заложено здесь, прорастёт через 10-15 лет.',
+  },
+  'phi_8': {
+    what: 'φ⁸ ≈ 47.0л — "ворота перерождения". Средний кризис с максимальной статистической плотностью карьерных разворотов.',
+    focus: 'Это не кризис — это линька. Готовьтесь к новой профессиональной и личной идентичности.',
+    tip: 'Не форсируйте выход. Дайте 1-2 года на осознание нового направления прежде чем действовать.',
+  },
+  'phi_9': {
+    what: 'φ⁹ ≈ 76.0л — "ворота мудрости". Время подведения итогов и передачи наследия.',
+    focus: 'Кристаллизация жизненного смысла. Ваш опыт — дар для следующих поколений.',
+    tip: 'Скажите главное. Напишите, запишите, передайте — то, что вы знаете.',
+  },
+  'saturn_1': {
+    what: 'Первый возврат Сатурна (≈29.5л) — вход в подлинную взрослость. Отброс ненастоящего.',
+    focus: 'Пересмотр всего, что было взято «по умолчанию» — отношений, работы, ценностей.',
+    tip: 'Это больно, но необходимо. Дальше строите только своё — не чужое.',
+  },
+  'saturn_2': {
+    what: 'Второй возврат Сатурна (≈59.0л) — эпохальная переоценка прожитого. Время мастерства.',
+    focus: 'Что осталось важным? Что пора отпустить? Начало нового 30-летнего цикла.',
+    tip: 'Ваш опыт уникален. Передавайте его — это ваш главный ресурс в этот период.',
+  },
+  'fibonacci_34': {
+    what: 'Фибоначчи-34 — природный кризис "одной трети жизни". Переход к зрелой идентичности.',
+    focus: 'Первое серьёзное переосмысление выбранного пути. Проверка подлинности.',
+    tip: 'Задайте себе честный вопрос: "Это моя жизнь или жизнь, которую от меня ждут?"',
+  },
+  'fibonacci_55': {
+    what: 'Фибоначчи-55 — рубеж мудрости. Накопленный опыт начинает работать на вас.',
+    focus: 'Синтез всего пережитого в систему знаний. Наставничество, преподавание, творческий итог.',
+    tip: 'Ваши "шрамы" — ваша ценность. Не скрывайте, а делитесь.',
+  },
+  'hamming_31': {
+    what: 'Хэмминг-31 — цикл перезагрузки стратегии. Глубокий разворот жизненного курса.',
+    focus: 'Перестройка ключевых жизненных систем: карьеры, отношений, места жительства.',
+    tip: 'Пришло время закрыть незакрытые главы и начать новую.',
+  },
+};
+
+function getWindowInterp(w: HolosWindow): { what: string; focus: string; tip: string } | null {
+  const key = w.type === 'alpha' ? `alpha_${w.label.replace('α/', '')}` :
+              w.type === 'phi' ? `phi_${w.label.replace('φ', '').replace(/[⁷⁸⁹]/, n => ({'⁷':'7','⁸':'8','⁹':'9'}[n]??n))}` :
+              w.type === 'saturn' ? `saturn_${w.label.replace('♄ ×', '')}` :
+              w.type === 'fibonacci' && w.age === 34 ? 'fibonacci_34' :
+              w.type === 'fibonacci' && w.age === 55 ? 'fibonacci_55' :
+              w.type === 'hamming' && w.label.startsWith('H31') ? 'hamming_31' : null;
+  return key ? WINDOW_INTERP[key] ?? null : null;
+}
+
+const TAU_PHASE_INTERP: Record<string, string> = {
+  'Старт волны':        'Новый цикл только открылся. Энергия нарастает. Время закладывать фундамент и делать первые решительные шаги.',
+  'Нарастание':         'Цикл набирает силу. Запущенные проекты начинают отдавать. Наращивайте темп — сейчас это работает.',
+  'Пик активности':     'Вы на пике своего биоритма. Максимальная эффективность и видимость. Действуйте смело — это ваше окно.',
+  'Интеграция':         'Пик позади. Время осмыслить пройденное, интегрировать опыт и передать наработанное. Не форсируйте новое.',
+  'Созревание перед пиком': 'Цикл завершается. Закрывайте незавершённое и готовьтесь к новому витку — он уже близко.',
+};
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface HolosBlockProps {
@@ -1246,14 +1354,27 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                   </div>
                 </div>
 
+                {/* Phase interpretation */}
+                {TAU_PHASE_INTERP[holosData.tauPhaseName] && (
+                  <div className="mb-3 p-2.5 rounded-lg bg-white/5 border border-white/10">
+                    <p className="text-[10px] text-white/35 uppercase tracking-wide mb-1">Что это значит сейчас</p>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      {TAU_PHASE_INTERP[holosData.tauPhaseName]}
+                    </p>
+                  </div>
+                )}
+
                 {/* Next peaks */}
                 <div className="mb-3">
                   <div className="text-[10px] text-white/40 uppercase tracking-wide mb-1.5">Следующие пики</div>
                   <div className="flex flex-wrap gap-2">
                     {holosData.tauPeaks.map((yr, i) => (
-                      <span key={i} className={`px-2.5 py-1 rounded-lg text-xs font-mono ${holosData.archetypeProfile.bgClass} border ${holosData.archetypeProfile.borderClass} ${holosData.archetypeProfile.colorClass}`}>
-                        {yr.toFixed(1)}
-                      </span>
+                      <div key={i} className={`px-2.5 py-1.5 rounded-lg text-center ${holosData.archetypeProfile.bgClass} border ${holosData.archetypeProfile.borderClass}`}>
+                        <div className={`text-xs font-mono font-bold ${holosData.archetypeProfile.colorClass}`}>
+                          {decimalToMonthYear(yr)}
+                        </div>
+                        <div className="text-[9px] text-white/30">{yr.toFixed(1)}</div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1288,18 +1409,52 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                 <div className="space-y-2">
                   {holosData.activeWindows.map((w, i) => {
                     const wc = COLOR_MAP[w.color] ?? COLOR_MAP.amber;
+                    const dates = windowDates(holosData.birth, w.age);
+                    const interp = getWindowInterp(w);
                     return (
                       <Card key={i} className={`border ${wc.border} ${wc.bg}`}>
                         <div className="flex items-start gap-3">
-                          <span className="text-xl shrink-0">{w.icon}</span>
+                          <span className="text-xl shrink-0 mt-0.5">{w.icon}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className={`text-sm font-bold ${wc.text}`}>{w.label} = {w.age}л</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${wc.bg} ${wc.text} border ${wc.border} font-mono`}>
+                            {/* Header row */}
+                            <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold ${wc.text}`}>{w.label} — {w.age}л</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${wc.bg} ${wc.text} border ${wc.border} animate-pulse`}>АКТИВНО</span>
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${wc.bg} ${wc.text} border ${wc.border} font-mono font-bold`}>
                                 {w.multiplier}
                               </span>
                             </div>
-                            <p className="text-xs text-white/60 mb-1.5 leading-relaxed">{w.description}</p>
+
+                            {/* Date range */}
+                            <div className={`text-[10px] ${wc.text} opacity-70 mb-1.5 flex items-center gap-1.5`}>
+                              <span>📅 Период окна:</span>
+                              <span className="font-medium">{dates.start} → {dates.peak} → {dates.end}</span>
+                            </div>
+
+                            {/* Base description */}
+                            <p className="text-xs text-white/65 mb-2 leading-relaxed">{w.description}</p>
+
+                            {/* Extended interpretation */}
+                            {interp && (
+                              <div className="space-y-1.5 mb-2">
+                                <div className="rounded-lg bg-white/6 border border-white/10 p-2">
+                                  <span className="text-[9px] uppercase tracking-wide text-white/35 block mb-0.5">Что происходит</span>
+                                  <p className="text-[11px] text-white/75 leading-relaxed">{interp.what}</p>
+                                </div>
+                                <div className="rounded-lg bg-white/6 border border-white/10 p-2">
+                                  <span className="text-[9px] uppercase tracking-wide text-white/35 block mb-0.5">Фокус действий</span>
+                                  <p className="text-[11px] text-white/75 leading-relaxed">{interp.focus}</p>
+                                </div>
+                                <div className={`rounded-lg p-2 ${wc.bg} border ${wc.border}`}>
+                                  <span className="text-[9px] uppercase tracking-wide text-white/35 block mb-0.5">⚡ HOLOS совет</span>
+                                  <p className={`text-[11px] ${wc.text} leading-relaxed font-medium`}>{interp.tip}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tags */}
                             <div className="flex flex-wrap gap-1">
                               {w.eventTypes.map((et, j) => (
                                 <span key={j} className={`px-2 py-0.5 rounded-full text-[10px] ${wc.bg} border ${wc.border} ${wc.text}`}>
@@ -1324,23 +1479,35 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                   {holosData.nearWindows.slice(0, 6).map((w, i) => {
                     const wc = COLOR_MAP[w.color] ?? COLOR_MAP.amber;
                     const yearsLeft = w.year - holosData.now;
+                    const dates = windowDates(holosData.birth, w.age);
+                    const interp = getWindowInterp(w);
                     return (
-                      <div key={i} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/3 px-3 py-2.5">
-                        <span className="text-base shrink-0">{w.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-xs font-bold ${wc.text}`}>{w.label}</span>
-                            <span className="text-[10px] text-white/35">возраст {w.age}л · {w.year.toFixed(1)}</span>
+                      <div key={i} className="rounded-lg border border-white/8 bg-white/3 px-3 py-2.5">
+                        <div className="flex items-center gap-3 mb-1.5">
+                          <span className="text-base shrink-0">{w.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <span className={`text-xs font-bold ${wc.text}`}>{w.label}</span>
+                              <span className="text-[10px] text-white/35">{w.age}л · пик {dates.peak}</span>
+                            </div>
+                            <div className="text-[9px] text-white/30">
+                              📅 {dates.start} → {dates.end}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-1">
-                            {w.eventTypes.slice(0, 2).map((et, j) => (
-                              <span key={j} className="text-[10px] text-white/45">{et}{j < Math.min(w.eventTypes.length, 2) - 1 ? ' ·' : ''}</span>
-                            ))}
+                          <div className="shrink-0 text-right">
+                            <div className={`text-sm font-mono font-bold ${wc.text}`}>{w.multiplier}</div>
+                            <div className="text-[10px] text-white/30">через {yearsLeft.toFixed(1)}л</div>
                           </div>
                         </div>
-                        <div className="shrink-0 text-right">
-                          <div className={`text-sm font-mono font-bold ${wc.text}`}>{w.multiplier}</div>
-                          <div className="text-[10px] text-white/30">через {yearsLeft.toFixed(1)}л</div>
+                        {interp && (
+                          <p className="text-[10px] text-white/50 leading-relaxed pl-7 border-t border-white/6 pt-1.5">
+                            {interp.what}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1 pl-7 mt-1">
+                          {w.eventTypes.slice(0, 2).map((et, j) => (
+                            <span key={j} className="text-[10px] text-white/35">{et}{j < Math.min(w.eventTypes.length, 2) - 1 ? ' ·' : ''}</span>
+                          ))}
                         </div>
                       </div>
                     );
@@ -1444,32 +1611,70 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
             </div>
 
             {/* ── Core Hash ── */}
-            <div>
-              <SectionTitle>Core Hash — Биографический отпечаток</SectionTitle>
-              <Card className={`${domColors.bg} border ${domColors.border}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">HOLOS Mathematical Identity</div>
-                  <span className="text-[10px] text-white/25">N=480,000+ биографий</span>
-                </div>
-                <div className={`font-mono text-sm font-bold ${domColors.text} tracking-wide mb-2 break-all`}>
-                  {holosData.coreHash}
-                </div>
-                <div className="grid grid-cols-5 gap-1 mt-3">
-                  {holosData.coreHash.split(' · ').map((part, i) => {
-                    const labels = ['TAU ритм', 'φ-ворота', 'α-узел', 'Сатурн', 'Фиб-возраст'];
-                    return (
-                      <div key={i} className="rounded bg-white/5 border border-white/8 px-1.5 py-1 text-center">
-                        <div className={`text-[10px] font-mono font-bold ${domColors.text}`}>{part}</div>
-                        <div className="text-[8px] text-white/30 mt-0.5">{labels[i]}</div>
+            {(() => {
+              const parts = holosData.coreHash.split(' · ');
+              const hashLabels = ['TAU ритм', 'φ-ворота', 'α-узел', 'Сатурн', 'Фиб-возраст'];
+              const hashDescriptions = [
+                `Личный биоритм τ=${holosData.tau.toFixed(1)}л — ${holosData.archetypeProfile.labelRu.toLowerCase()}. Пик каждые ${holosData.tau.toFixed(1)} лет.`,
+                `Вы ${holosData.age < Math.pow(HOLOS_PHI, 8) ? 'ещё не достигли φ⁸' : 'прошли φ⁸ (ворота перерождения)'}. Текущий φ-цикл определяет масштаб вашего горизонта.`,
+                `Ближайший α-узел — точка ${holosData.activeWindows.find(w => w.type === 'alpha') ? 'максимального биографического резонанса (АКТИВНО)' : 'следующего мощного биографического импульса'}.`,
+                `Завершено ${holosData.satReturnN} полных оборота Сатурна — ${holosData.satReturnN === 0 ? 'ещё до первого возврата, период формирования' : holosData.satReturnN === 1 ? 'опыт взрослости получен, строите зрелую жизнь' : 'мастер прошедший все испытания цикла'}.`,
+                `Следующий Фибоначчи-возраст — природный рубеж ${parts[4] ?? 'F55'}. Органический переход биографического ритма.`,
+              ];
+              const activeInterps = holosData.activeWindows
+                .map(w => getWindowInterp(w))
+                .filter(Boolean);
+              const holosAdvice = activeInterps.length > 0
+                ? activeInterps[0]!.tip
+                : holosData.nearWindows.length > 0
+                  ? `До ближайшего биографического окна (${holosData.nearWindows[0].label}) осталось ${(holosData.nearWindows[0].year - holosData.now).toFixed(1)} лет. ${getWindowInterp(holosData.nearWindows[0])?.focus ?? 'Готовьтесь заранее.'}`
+                  : 'Вы находитесь в стабильной фазе между крупными окнами. Время планомерного роста и укрепления позиций.';
+
+              return (
+                <div>
+                  <SectionTitle>Core Hash — Биографический отпечаток</SectionTitle>
+                  <Card className={`${domColors.bg} border ${domColors.border}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">HOLOS Mathematical Identity</div>
+                      <span className="text-[10px] text-white/25">N=480,000+ биографий</span>
+                    </div>
+
+                    {/* Hash string */}
+                    <div className={`font-mono text-sm font-bold ${domColors.text} tracking-wide mb-3 break-all`}>
+                      {holosData.coreHash}
+                    </div>
+
+                    {/* Component breakdown */}
+                    <div className="grid grid-cols-1 gap-1.5 mb-3">
+                      {parts.map((part, i) => (
+                        <div key={i} className="flex items-start gap-2.5 rounded-lg bg-white/4 border border-white/8 px-2.5 py-2">
+                          <div className={`font-mono text-xs font-bold ${domColors.text} shrink-0 w-16`}>{part}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[9px] text-white/35 uppercase tracking-wide mb-0.5">{hashLabels[i]}</div>
+                            <p className="text-[11px] text-white/60 leading-relaxed">{hashDescriptions[i]}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* HOLOS Advice */}
+                    <div className={`rounded-xl p-3 ${domColors.bg} border ${domColors.border}`}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-base shrink-0">🔮</span>
+                        <div>
+                          <div className={`text-[10px] font-bold uppercase tracking-wide ${domColors.text} mb-1`}>
+                            Совет HOLOS для вашего паттерна
+                          </div>
+                          <p className={`text-xs ${domColors.text} opacity-85 leading-relaxed`}>
+                            {holosAdvice}
+                          </p>
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </Card>
                 </div>
-                <p className="text-[10px] text-white/35 mt-3 leading-relaxed text-center">
-                  Уникальный биографический паттерн, рассчитанный по системе HOLOS. Откалиброван на 480,000+ биографий Wikipedia.
-                </p>
-              </Card>
-            </div>
+              );
+            })()}
 
             {/* ── Топ инструментов HOLOS ── */}
             <div>
