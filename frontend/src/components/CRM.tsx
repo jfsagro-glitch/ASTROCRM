@@ -21,6 +21,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLang } from '../i18n/LanguageContext';
+import DateSegmentInput from './DateSegmentInput';
 
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 
@@ -167,7 +168,7 @@ function AddConsultationModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                <DateSegmentInput value={date} onChange={setDate}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
               </div>
               <div>

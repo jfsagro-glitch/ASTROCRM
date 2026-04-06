@@ -19,6 +19,7 @@ import {
 import type { RectificationEventInput } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
+import DateSegmentInput from './DateSegmentInput';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -1066,9 +1067,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
             <div className="flex flex-wrap gap-2 items-end">
               <div>
                 <label className={`text-xs ${theme.text} mb-1 block`}>Начало периода</label>
-                <input
-                  type="date" value={periodStart}
-                  onChange={e => setPeriodStart(e.target.value)}
+                <DateSegmentInput value={periodStart} onChange={setPeriodStart}
                   className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`}
                 />
               </div>
@@ -1153,10 +1152,9 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
                   </div>
                   <div className="col-span-4">
                     <label className={`text-[11px] ${theme.text} mb-1 block`}>Дата</label>
-                    <input
-                      type="date"
+                    <DateSegmentInput
                       value={ev.date}
-                      onChange={e => setRectEvents(prev => prev.map((x, i) => i === idx ? { ...x, date: e.target.value } : x))}
+                      onChange={d => setRectEvents(prev => prev.map((x, i) => i === idx ? { ...x, date: d } : x))}
                       className={`w-full px-2 py-2 rounded-lg border text-xs ${theme.card}`}
                     />
                   </div>
@@ -1229,8 +1227,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
                 <label className={`text-xs ${theme.text} mb-1 block`}>
                   {tab === 'transits' ? 'На дату' : 'Целевая дата'}
                 </label>
-                <input type="date" value={targetDate}
-                  onChange={e => setTargetDate(e.target.value)}
+                <DateSegmentInput value={targetDate} onChange={setTargetDate}
                   className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
               </div>
             </div>

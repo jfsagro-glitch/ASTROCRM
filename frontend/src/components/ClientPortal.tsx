@@ -26,6 +26,7 @@ import SynastryForecast from './SynastryForecast';
 import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
 import InteractionRelocationEngine from './InteractionRelocationEngine';
+import DateSegmentInput from './DateSegmentInput';
 import InterpretationPanel from './InterpretationPanel';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -318,11 +319,10 @@ function BirthForm({
         </div>
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.date}</label>
-          <input type="date" value={value.date}
-            onChange={async e => {
-              const newDate = e.target.value;
+          <DateSegmentInput
+            value={value.date}
+            onChange={async (newDate: string) => {
               const updated: typeof value = { ...value, date: newDate };
-              // Re-resolve historical UTC offset when date changes and coordinates are set
               if (value.lat && value.lon && newDate) {
                 try {
                   const utc = await resolveHistoricalTimezone(value.lat, value.lon, newDate, value.time);
@@ -331,7 +331,8 @@ function BirthForm({
               }
               onChange(updated);
             }}
-            className={inp} />
+            className={inp}
+          />
         </div>
       </div>
 
@@ -953,7 +954,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
           <>
             <div>
               <label className={`text-xs ${theme.text} mb-1 block`}>{tr.targetDate}</label>
-              <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)}
+              <DateSegmentInput value={targetDate} onChange={setTargetDate}
                 className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
             </div>
             <div>
@@ -1491,14 +1492,12 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                 <div className="flex flex-wrap gap-3 items-end">
                   <div>
                     <label className={`text-xs ${theme.text} mb-1 block`}>С даты</label>
-                    <input type="date" value={forecastStart}
-                      onChange={e => setForecastStart(e.target.value)}
+                    <DateSegmentInput value={forecastStart} onChange={setForecastStart}
                       className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
                   </div>
                   <div>
                     <label className={`text-xs ${theme.text} mb-1 block`}>По дату</label>
-                    <input type="date" value={forecastEnd}
-                      onChange={e => setForecastEnd(e.target.value)}
+                    <DateSegmentInput value={forecastEnd} onChange={setForecastEnd}
                       className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
                   </div>
                   <button
@@ -1832,10 +1831,9 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
                 <div className="mt-3 flex flex-wrap gap-3 items-end">
                   <div>
                     <label className={`text-xs ${theme.text} mb-1 block`}>Дата транзитов</label>
-                    <input
-                      type="date"
+                    <DateSegmentInput
                       value={advancedDate}
-                      onChange={e => setAdvancedDate(e.target.value)}
+                      onChange={setAdvancedDate}
                       className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`}
                     />
                   </div>
@@ -2231,7 +2229,7 @@ function AstroSummaryBlock({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className={`text-xs ${theme.text} mb-1 block`}>База даты</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            <DateSegmentInput value={date} onChange={setDate}
               className={`px-3 py-2 rounded-lg border text-sm ${theme.card}`} />
           </div>
           <div className="flex gap-1.5">

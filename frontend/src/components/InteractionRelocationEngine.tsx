@@ -18,6 +18,7 @@ import {
 } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import type { SavedPerson } from '../services/peopleService';
+import DateSegmentInput from './DateSegmentInput';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -779,10 +780,9 @@ function SetupPanel({
           </div>
           <div>
             <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Дата рождения</label>
-            <input
-              type="date"
+            <DateSegmentInput
               value={partner.date}
-              onChange={e => setPartner(p => ({ ...p, date: e.target.value }))}
+              onChange={d => setPartner(p => ({ ...p, date: d }))}
               className={`w-full px-3 py-2 rounded-lg border text-sm ${theme.card} ${theme.text}`}
             />
           </div>
@@ -944,15 +944,13 @@ function SetupPanel({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Период с</label>
-            <input type="date" value={periodStart}
-              onChange={e => setPeriodStart(e.target.value)}
+            <DateSegmentInput value={periodStart} onChange={setPeriodStart}
               className={`w-full px-3 py-2 rounded-lg border text-sm ${theme.card} ${theme.text}`}
             />
           </div>
           <div>
             <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Период по</label>
-            <input type="date" value={periodEnd}
-              onChange={e => setPeriodEnd(e.target.value)}
+            <DateSegmentInput value={periodEnd} onChange={setPeriodEnd}
               className={`w-full px-3 py-2 rounded-lg border text-sm ${theme.card} ${theme.text}`}
             />
           </div>
