@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import ChartWheel from './ChartWheel';
 import HumanDesignBlock from './HumanDesignBlock';
 import JyotishBlock from './JyotishBlock';
+import HolosBlock from './HolosBlock';
 import SynastryForecast from './SynastryForecast';
 import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
@@ -2394,7 +2395,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'|'holos'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2498,6 +2499,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
+    { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
   return (
@@ -2648,6 +2650,19 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'holos' && (
+            <div id="pdf-section-holos">
+              {natalChart ? (
+                <HolosBlock chart={natalChart} birthDate={birth.date} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту чтобы открыть анализ HOLOS</p>
                 </div>
               )}
             </div>
