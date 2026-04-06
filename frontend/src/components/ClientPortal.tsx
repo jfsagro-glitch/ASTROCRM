@@ -30,7 +30,7 @@ import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
   getConverseProgressions, getSynastry, getCompositeChart, getDavisonChart,
-  getRelocatedChart, getEphemerides, getAstroSummary, geocodeCity,
+  getRelocatedChart, getEphemerides, getAstroSummary, geocodeCity, resolveHistoricalTimezone,
 } from '../services/astrologyService';
 import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import type { HumanDesignContentMode } from '../types/humanDesign';
@@ -110,11 +110,13 @@ const Err = ({ msg }: { msg: string }) => (
 
 // ─── City Geocoder field ───────────────────────────────────────────────────────
 function CityField({
-  onFound, theme, prefill,
+  onFound, theme, prefill, date, time,
 }: {
   onFound: (lat: number, lon: number, utc: number) => void;
   theme: typeof chartThemes[ThemeKey];
   prefill?: { city: string; utc: number } | null;
+  date?: string;
+  time?: string;
 }) {
   const { tr } = useLang();
   const [city, setCity] = useState('');
@@ -138,7 +140,8 @@ function CityField({
     if (!city.trim()) return;
     setLoading(true); setError(null); setResult(null);
     try {
-      const data = await geocodeCity(city);
+      // Pass birth date/time so geocoder returns historically-correct UTC offset (DST-aware)
+      const data = await geocodeCity(city, date, time);
       onFound(data.lat, data.lon, data.utc);
       const tzSign = data.utc >= 0 ? '+' : '';
       setResult(`✓ ${data.displayName} · UTC${tzSign}${data.utc}`);
@@ -147,7 +150,7 @@ function CityField({
     } finally {
       setLoading(false);
     }
-  }, [city, onFound, tr]);
+  }, [city, date, time, onFound, tr]);
 
   return (
     <div className="space-y-1">
@@ -315,7 +318,18 @@ function BirthForm({
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.date}</label>
           <input type="date" value={value.date}
-            onChange={e => onChange({ ...value, date: e.target.value })}
+            onChange={async e => {
+              const newDate = e.target.value;
+              const updated: typeof value = { ...value, date: newDate };
+              // Re-resolve historical UTC offset when date changes and coordinates are set
+              if (value.lat && value.lon && newDate) {
+                try {
+                  const utc = await resolveHistoricalTimezone(value.lat, value.lon, newDate, value.time);
+                  updated.utc = utc;
+                } catch { /* keep existing utc */ }
+              }
+              onChange(updated);
+            }}
             className={inp} />
         </div>
       </div>
@@ -325,7 +339,18 @@ function BirthForm({
         <div>
           <label className={`text-xs ${theme.text} mb-1 block`}>{tr.time}</label>
           <input type="time" step="1" value={value.time}
-            onChange={e => onChange({ ...value, time: e.target.value })}
+            onChange={async e => {
+              const newTime = e.target.value;
+              const updated: typeof value = { ...value, time: newTime };
+              // Re-resolve historical UTC offset when time changes and coordinates are set
+              if (value.lat && value.lon && value.date) {
+                try {
+                  const utc = await resolveHistoricalTimezone(value.lat, value.lon, value.date, newTime);
+                  updated.utc = utc;
+                } catch { /* keep existing utc */ }
+              }
+              onChange(updated);
+            }}
             className={inp} />
         </div>
       </div>
@@ -335,6 +360,8 @@ function BirthForm({
         onFound={(lat, lon, utc) => { onChange({ ...value, lat, lon, utc }); setCityPrefill(null); }}
         theme={theme}
         prefill={cityPrefill}
+        date={value.date}
+        time={value.time}
       />
     </div>
   );

@@ -2038,8 +2038,13 @@ def ephemeris_download():
 
 
 @app.get("/timezone")
-def get_timezone(lat: float, lon: float):
-    """Return IANA timezone name and current UTC offset in hours for given coordinates."""
+def get_timezone(lat: float, lon: float, date: Optional[str] = None, time: Optional[str] = None):
+    """Return IANA timezone name and HISTORICAL UTC offset for the given coordinates and date/time.
+
+    If date/time are provided, the offset is computed for that exact historical moment
+    (correctly handles DST changes, historical Soviet/USSR summer time, etc.).
+    Falls back to current offset when date is omitted.
+    """
     try:
         from timezonefinder import TimezoneFinder
         import pytz
@@ -2048,8 +2053,33 @@ def get_timezone(lat: float, lon: float):
         if not tz_name:
             return {"timezone": "UTC", "utc_offset": 0.0}
         tz = pytz.timezone(tz_name)
-        now = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(tz)
-        offset = now.utcoffset().total_seconds() / 3600
+
+        if date:
+            # Parse date and optional time to build a naive datetime at the target moment
+            try:
+                yr, mo, dy = [int(x) for x in date.split("-")]
+                if time:
+                    parts = time.replace(":", " ").split()
+                    hh = int(parts[0]) if len(parts) > 0 else 12
+                    mm = int(parts[1]) if len(parts) > 1 else 0
+                else:
+                    hh, mm = 12, 0
+                naive_dt = datetime(yr, mo, dy, hh, mm)
+                # localize with is_dst=None lets pytz raise on ambiguous times;
+                # use is_dst=False as safe fallback
+                try:
+                    local_dt = tz.localize(naive_dt, is_dst=None)
+                except Exception:
+                    local_dt = tz.localize(naive_dt, is_dst=False)
+                offset = local_dt.utcoffset().total_seconds() / 3600
+            except Exception:
+                # On parse failure fall back to current offset
+                now = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(tz)
+                offset = now.utcoffset().total_seconds() / 3600
+        else:
+            now = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(tz)
+            offset = now.utcoffset().total_seconds() / 3600
+
         return {"timezone": tz_name, "utc_offset": offset}
     except Exception:
         return {"timezone": "UTC", "utc_offset": 0.0}

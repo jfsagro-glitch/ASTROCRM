@@ -275,29 +275,21 @@ function _parseUtcOffset(s: string): number {
   return (m[1] === '+' ? 1 : -1) * (parseInt(m[2]) + parseInt(m[3]) / 60);
 }
 
-async function _resolveTimezoneViaMethods(lat: number, lon: number): Promise<number> {
-  // Method 1: GeoNames timezone lookup (Public API, works for most locations including Tiraspo)
-  try {
-    const geonamesRes = await fetchJsonWithTimeout(
-      `https://secure.geonames.org/timezoneJSON?lat=${lat}&lng=${lon}&username=demo`,
-      3000
-    );
-    if (geonamesRes.ok) {
-      const data = await geonamesRes.json();
-      if (data.dstOffset !== undefined && data.rawOffset !== undefined) {
-        // Return base offset (corrected for DST if applicable)
-        return (data.rawOffset + data.dstOffset) / 3600;
-      }
-    }
-  } catch (e) {
-    // GeoNames failed, try next method
-  }
-
-  // Method 2: Our backend timezone endpoint (if available)
+async function _resolveTimezoneViaMethods(
+  lat: number,
+  lon: number,
+  date?: string,
+  time?: string,
+): Promise<number> {
+  // Method 1: Our backend timezone endpoint — supports historical DST via pytz
+  // Prioritize this when date is provided because external APIs return current-time offset only
   const timezoneApis = getTimezoneApiCandidates();
   for (const baseUrl of timezoneApis) {
     try {
-      const tzRes = await fetchJsonWithTimeout(`${baseUrl}/timezone?lat=${lat}&lon=${lon}`, 3000);
+      let url = `${baseUrl}/timezone?lat=${lat}&lon=${lon}`;
+      if (date) url += `&date=${encodeURIComponent(date)}`;
+      if (time) url += `&time=${encodeURIComponent(time)}`;
+      const tzRes = await fetchJsonWithTimeout(url, 3000);
       if (!tzRes.ok) continue;
       const tzData = await tzRes.json();
       const parsed = Number(tzData.utc_offset);
@@ -307,7 +299,23 @@ async function _resolveTimezoneViaMethods(lat: number, lon: number): Promise<num
     }
   }
 
-  // Method 3: Open-Meteo timezone lookup (Reliable, no API key needed)
+  // Method 2: GeoNames timezone lookup (returns current-time offset — acceptable fallback)
+  try {
+    const geonamesRes = await fetchJsonWithTimeout(
+      `https://secure.geonames.org/timezoneJSON?lat=${lat}&lng=${lon}&username=demo`,
+      3000
+    );
+    if (geonamesRes.ok) {
+      const data = await geonamesRes.json();
+      if (data.dstOffset !== undefined && data.rawOffset !== undefined) {
+        return (data.rawOffset + data.dstOffset) / 3600;
+      }
+    }
+  } catch (e) {
+    // GeoNames failed, try next method
+  }
+
+  // Method 3: Open-Meteo timezone lookup (Reliable, no API key needed; returns current-time offset)
   try {
     const openMeteoRes = await fetchJsonWithTimeout(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto`,
@@ -338,9 +346,11 @@ async function _resolveTimezoneViaMethods(lat: number, lon: number): Promise<num
   return 0;
 }
 
-export async function geocodeCity(cityName: string): Promise<{
-  lat: number; lon: number; utc: number; displayName: string;
-}> {
+export async function geocodeCity(
+  cityName: string,
+  date?: string,
+  time?: string,
+): Promise<{ lat: number; lon: number; utc: number; displayName: string }> {
   const geoRes = await fetch(
     `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`,
     { headers: { 'User-Agent': 'HOLO-AstroCRM/1.0', 'Accept-Language': 'en' } },
@@ -354,8 +364,8 @@ export async function geocodeCity(cityName: string): Promise<{
   const parts = (geoData[0].display_name as string).split(',');
   const displayName = parts.slice(0, 2).join(',').trim();
 
-  // Resolve UTC offset using multiple methods for reliability
-  const utc = await _resolveTimezoneViaMethods(lat, lon);
+  // Resolve UTC offset — pass birth date/time for historically-correct DST handling
+  const utc = await _resolveTimezoneViaMethods(lat, lon, date, time);
 
   return {
     lat: Math.round(lat * 10000) / 10000,
@@ -363,6 +373,20 @@ export async function geocodeCity(cityName: string): Promise<{
     utc: Math.round(utc * 4) / 4, // Round to nearest 0.25 hours (15 min increments)
     displayName,
   };
+}
+
+/**
+ * Re-resolve the historical UTC offset for existing lat/lon coordinates when the birth
+ * date or time changes. This is the key fix for historical DST cases (e.g. USSR 1986).
+ */
+export async function resolveHistoricalTimezone(
+  lat: number,
+  lon: number,
+  date: string,
+  time: string,
+): Promise<number> {
+  const utc = await _resolveTimezoneViaMethods(lat, lon, date, time);
+  return Math.round(utc * 4) / 4;
 }
 
 // ─── Jyotish (Vedic Astrology) ────────────────────────────────────────────────
