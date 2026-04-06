@@ -10,7 +10,8 @@ import {
   CITIES, GOALS, PARTNER_TYPES, STAY_MODES, SPHERE_LABELS, SPHERE_KEYS,
   REGION_LABELS, SCENARIO_LABELS, PARTNER_TYPE_INTERPS, STAY_EFFECT_TEXT,
   scoreColor, scoreBg, scoreLabel, getGoalInterpretation,
-  type CompareResponse, type ScenarioResult,
+  rankCitiesLocally, computeLocalCityScores, SPHERE_STAY_ADVICE, CITY_SPHERE_BIAS,
+  type CompareResponse, type ScenarioResult, type LocalCityScore,
 } from '../data/interactionData';
 import {
   compareScenarios, getPersonalForecastInteraction,
@@ -36,7 +37,7 @@ interface PartnerData {
   currentLon: number | null;
 }
 
-type TabKey = 'setup' | 'scenarios' | 'locations' | 'channels' | 'summary';
+type TabKey = 'setup' | 'explore' | 'scenarios' | 'locations' | 'channels' | 'summary';
 
 interface ThemeLike {
   card: string; header: string; accent: string; text: string;
@@ -287,6 +288,25 @@ function LocationCard({
             <div className={`rounded-lg p-3 ${isDark ? 'bg-orange-900/15 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
               <p className={`text-xs font-semibold mb-1.5 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>⬅️ Через это место может уйти:</p>
               {through.leaves.map((l, i) => <p key={i} className={`text-xs ${theme.text}`}>• {l}</p>)}
+            </div>
+          )}
+
+          {/* Stay period advice */}
+          {(SPHERE_STAY_ADVICE[goal] ?? []).length > 0 && (
+            <div>
+              <p className={`text-xs font-semibold ${theme.accent} mb-2`}>⏱ Оптимальные периоды пребывания для цели «{goalInfo?.label}»:</p>
+              <div className="space-y-1.5">
+                {(SPHERE_STAY_ADVICE[goal] ?? []).map((a, i) => (
+                  <div key={i} className={`rounded-lg p-2.5 ${isDark ? 'bg-slate-800/50' : 'bg-slate-50 border border-slate-100'}`}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`text-xs font-bold ${theme.header}`}>{a.label}</span>
+                      <span className={`text-[10px] px-1.5 rounded-full ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>{a.planetaryCycle}</span>
+                    </div>
+                    <p className={`text-[11px] ${theme.text} opacity-75`}>{a.reason}</p>
+                    <p className={`text-[10px] mt-0.5 ${theme.accent} opacity-60`}>🌙 {a.optimalWindow}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -704,6 +724,226 @@ function SummaryTab({
   );
 }
 
+// ── Explore Tab (offline local scoring — no server needed) ───────────────────
+
+function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
+  const [goal, setGoal]           = useState('love');
+  const [stayDays, setStayDays]   = useState(90);
+  const [regionFilter, setRegion] = useState<string>('all');
+  const [search, setSearch]       = useState('');
+  const [selected, setSelected]   = useState<LocalCityScore | null>(null);
+
+  const ranked = useMemo(
+    () => rankCitiesLocally(goal, stayDays, 60, regionFilter === 'all' ? undefined : regionFilter),
+    [goal, stayDays, regionFilter],
+  );
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return ranked;
+    const q = search.toLowerCase();
+    return ranked.filter(r =>
+      r.city.nameRu.toLowerCase().includes(q) ||
+      r.city.name.toLowerCase().includes(q) ||
+      r.city.country.toLowerCase().includes(q),
+    );
+  }, [ranked, search]);
+
+  const goalInfo   = GOALS.find(g => g.id === goal);
+  const stayMode   = STAY_MODES.find(s => s.days === stayDays) ?? STAY_MODES[1];
+  const stayAdvice = SPHERE_STAY_ADVICE[goal] ?? [];
+
+  return (
+    <div className="space-y-4">
+      {/* Goal selector */}
+      <div className={`rounded-xl border ${theme.card} p-4 space-y-3`}>
+        <h4 className={`font-bold text-sm ${theme.header} flex items-center gap-2`}>
+          <Target className="h-4 w-4" /> Цель и длительность
+        </h4>
+        <div className="flex flex-wrap gap-1.5">
+          {GOALS.map(g => (
+            <button key={g.id} onClick={() => setGoal(g.id)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-all ${goal === g.id ? theme.tabActive : theme.tabInactive}`}>
+              <span>{g.icon}</span><span>{g.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {STAY_MODES.map(sm => (
+            <button key={sm.id} onClick={() => setStayDays(sm.days)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-all ${stayDays === sm.days ? theme.tabActive : theme.tabInactive}`}>
+              <span>{sm.icon}</span><span>{sm.label}</span>
+            </button>
+          ))}
+        </div>
+        <p className={`text-[11px] ${theme.text} opacity-50`}>{stayMode.effect}</p>
+      </div>
+
+      {/* Stay period advice for goal */}
+      {stayAdvice.length > 0 && (
+        <div className={`rounded-xl border p-4 space-y-2 ${isDark ? 'bg-indigo-900/15 border-indigo-500/25' : 'bg-indigo-50 border-indigo-200'}`}>
+          <p className={`text-xs font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-700'} mb-1`}>
+            ⏱ Рекомендуемые периоды для цели «{goalInfo?.label}»:
+          </p>
+          {stayAdvice.map((a, i) => (
+            <div key={i} className={`rounded-lg p-2.5 ${isDark ? 'bg-slate-800/60' : 'bg-white border border-slate-100'}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-xs font-bold ${theme.header}`}>{a.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>
+                  {a.planetaryCycle}
+                </span>
+              </div>
+              <p className={`text-[11px] ${theme.text} opacity-75`}>{a.reason}</p>
+              <p className={`text-[10px] mt-1 ${theme.accent} opacity-70`}>🌙 {a.optimalWindow}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Region filter + search */}
+      <div className="flex flex-wrap gap-1.5 items-center">
+        <input
+          type="text" placeholder="🔍 Поиск города..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className={`flex-1 min-w-[140px] px-3 py-1.5 rounded-lg border text-xs ${theme.card} ${theme.text}`}
+        />
+        {['all', 'cis', 'europe', 'mena', 'asia', 'americas', 'oceania', 'africa'].map(r => (
+          <button key={r} onClick={() => setRegion(r)}
+            className={`px-2.5 py-1 text-xs rounded-full border transition-all ${regionFilter === r ? theme.tabActive : theme.tabInactive}`}>
+            {r === 'all' ? '🌍 Все' : REGION_LABELS[r] ?? r}
+          </button>
+        ))}
+      </div>
+
+      {/* City list */}
+      <div className="space-y-2">
+        {filtered.map((item, idx) => {
+          const goalScore = item.sphereScores[goal] ?? 50;
+          const gi = GOALS.find(g => g.id === goal);
+          const isSel = selected?.city.name === item.city.name && selected?.city.country === item.city.country;
+          return (
+            <div key={`${item.city.name}-${item.city.country}`}
+              className={`rounded-xl border overflow-hidden transition-all cursor-pointer ${isDark ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200'} ${isSel ? (isDark ? 'ring-1 ring-indigo-500/50' : 'ring-1 ring-indigo-300') : ''}`}
+              onClick={() => setSelected(isSel ? null : item)}>
+              {/* Header row */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="shrink-0 w-6 text-center">
+                  {idx < 3
+                    ? <span className="text-sm">{['🥇','🥈','🥉'][idx]}</span>
+                    : <span className={`text-xs font-mono opacity-40 ${theme.text}`}>{idx + 1}</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-sm ${theme.header} truncate`}>{item.city.nameRu}</span>
+                    <span className={`text-[10px] opacity-40 ${theme.text}`}>{item.city.country}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="h-1.5 flex-1 rounded-full overflow-hidden bg-slate-700/30">
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${goalScore}%`, backgroundColor: gi?.sphereColor ?? '#6366f1' }} />
+                    </div>
+                    <span className={`text-xs font-bold shrink-0`} style={{ color: gi?.sphereColor }}>
+                      {goalScore}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {item.topSpheres.slice(0, 3).map(sk => (
+                    <span key={sk} className="text-sm">{SPHERE_LABELS[sk]?.icon}</span>
+                  ))}
+                </div>
+                <ChevronDown className={`h-4 w-4 opacity-40 shrink-0 transition-transform ${isSel ? 'rotate-180' : ''}`} />
+              </div>
+
+              {/* Expanded detail */}
+              {isSel && (
+                <div className={`px-4 pb-4 space-y-4 border-t ${isDark ? 'border-slate-700/40' : 'border-slate-100'}`}>
+                  {/* All spheres */}
+                  <div className="pt-3">
+                    <p className={`text-xs font-semibold ${theme.accent} mb-2`}>Все сферы жизни в этой локации:</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {SPHERE_KEYS.map(sk => {
+                        const sv = item.sphereScores[sk] ?? 50;
+                        const si = SPHERE_LABELS[sk];
+                        return (
+                          <div key={sk} className="flex items-center gap-2">
+                            <span className="text-sm w-5 text-center">{si.icon}</span>
+                            <span className={`text-[11px] flex-1 ${theme.text} opacity-70`}>{si.label}</span>
+                            <div className="w-14">
+                              <div className="h-1.5 rounded-full overflow-hidden bg-slate-700/30">
+                                <div className="h-full rounded-full" style={{ width: `${sv}%`, backgroundColor: si.color }} />
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold w-6 text-right" style={{ color: si.color }}>{sv}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stay advice for this city+goal */}
+                  {stayAdvice.length > 0 && (
+                    <div>
+                      <p className={`text-xs font-semibold ${theme.accent} mb-2`}>⏱ Сколько быть в {item.city.nameRu}?</p>
+                      <div className="space-y-2">
+                        {stayAdvice.map((a, i) => (
+                          <div key={i} className={`rounded-lg p-2.5 text-xs ${isDark ? 'bg-slate-800/50' : 'bg-slate-50 border border-slate-100'}`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`font-bold ${theme.header}`}>{a.label}</span>
+                              <span className={`text-[10px] px-1.5 rounded-full ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>
+                                {a.planetaryCycle}
+                              </span>
+                            </div>
+                            <p className={`${theme.text} opacity-75 text-[11px]`}>{a.reason}</p>
+                            <p className={`text-[10px] mt-1 opacity-60 ${theme.accent}`}>🌙 {a.optimalWindow}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* City sphere profile notes */}
+                  {CITY_SPHERE_BIAS[item.city.nameRu] && (
+                    <div className={`rounded-lg p-3 ${isDark ? 'bg-slate-800/50' : 'bg-slate-50 border border-slate-100'}`}>
+                      <p className={`text-xs font-semibold ${theme.accent} mb-1.5`}>Характер локации:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(CITY_SPHERE_BIAS[item.city.nameRu] ?? {})
+                          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                          .slice(0, 6)
+                          .map(([sk, val]) => {
+                            const si = SPHERE_LABELS[sk];
+                            if (!si) return null;
+                            const positive = (val as number) >= 0;
+                            return (
+                              <span key={sk} className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                positive
+                                  ? (isDark ? 'bg-green-900/20 border-green-500/30 text-green-300' : 'bg-green-50 border-green-200 text-green-700')
+                                  : (isDark ? 'bg-red-900/20 border-red-500/30 text-red-300' : 'bg-red-50 border-red-200 text-red-700')
+                              }`}>
+                                {si.icon} {si.label} {positive ? `+${val}` : val}
+                              </span>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className={`text-[11px] ${theme.text} opacity-40`}>
+                    UTC{item.city.utc >= 0 ? '+' : ''}{item.city.utc} · {item.city.lat.toFixed(2)}°, {item.city.lon.toFixed(2)}°
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <p className={`text-center py-8 ${theme.text} opacity-40 text-sm`}>Нет городов по вашему запросу</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── SETUP PANEL (external component — prevents focus loss on re-render) ───────
 
 function SetupPanel({
@@ -971,8 +1211,9 @@ function SetupPanel({
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
-const TABS: { key: TabKey; icon: string; label: string }[] = [
-  { key: 'setup',     icon: '⚙️', label: 'Настройка' },
+const TABS: { key: TabKey; icon: string; label: string; alwaysEnabled?: boolean }[] = [
+  { key: 'setup',     icon: '⚙️', label: 'Настройка',    alwaysEnabled: true },
+  { key: 'explore',   icon: '🔍', label: 'Исследовать',  alwaysEnabled: true },
   { key: 'scenarios', icon: '📊', label: 'Сценарии' },
   { key: 'locations', icon: '🌍', label: 'Локации' },
   { key: 'channels',  icon: '📡', label: 'Каналы' },
@@ -1058,7 +1299,7 @@ export default function InteractionRelocationEngine({ birth, theme, people }: Pr
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            disabled={t.key !== 'setup' && !result}
+            disabled={!t.alwaysEnabled && !result}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border font-medium transition-all disabled:opacity-30 ${tab === t.key ? theme.tabActive : theme.tabInactive}`}
           >
             <span>{t.icon}</span><span>{t.label}</span>
@@ -1067,6 +1308,10 @@ export default function InteractionRelocationEngine({ birth, theme, people }: Pr
       </div>
 
       {error && <Err msg={error} />}
+
+      {tab === 'explore' && (
+        <ExploreTab isDark={isDark} theme={theme} />
+      )}
 
       {tab === 'setup' && (
         <SetupPanel
