@@ -11,8 +11,11 @@ import {
   REGION_LABELS, SCENARIO_LABELS, PARTNER_TYPE_INTERPS, STAY_EFFECT_TEXT,
   scoreColor, scoreBg, scoreLabel, getGoalInterpretation,
   rankCitiesLocally, computeLocalCityScores, SPHERE_STAY_ADVICE, CITY_SPHERE_BIAS,
+  buildNatalSnapshot, buildTransitSnapshot,
   type CompareResponse, type ScenarioResult, type LocalCityScore,
+  type NatalSnapshot, type TransitSnapshot, type AcgHit,
 } from '../data/interactionData';
+import { getNatalChart, getTransits } from '../services/astrologyService';
 import {
   compareScenarios, getPersonalForecastInteraction,
   type InteractionPersonInput, type LocationInput,
@@ -724,18 +727,130 @@ function SummaryTab({
   );
 }
 
-// ── Explore Tab (offline local scoring — no server needed) ───────────────────
+// ── Explore Tab ──────────────────────────────────────────────────────────────
+// Оффлайн-рейтинг + опциональная точность: натальная карта и транзиты
 
-function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
+const PLANET_NAMES_RU: Record<string, string> = {
+  sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера', mars: 'Марс',
+  jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран', neptune: 'Нептун',
+  pluto: 'Плутон', node: 'Сев.Узел', chiron: 'Хирон', lilith: 'Лилит',
+};
+
+function AcgHitBadge({ hit, isDark }: { hit: AcgHit; isDark: boolean }) {
+  const pn = PLANET_NAMES_RU[hit.planet] ?? hit.planet;
+  const isGood = Object.values(hit.sphereImpact).some(v => (v ?? 0) > 0);
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${
+      hit.isTransit
+        ? (isDark ? 'bg-cyan-900/25 border-cyan-500/30 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-700')
+        : isGood
+          ? (isDark ? 'bg-indigo-900/25 border-indigo-500/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
+          : (isDark ? 'bg-orange-900/20 border-orange-500/25 text-orange-300' : 'bg-orange-50 border-orange-200 text-orange-600')
+    }`}>
+      {hit.isTransit ? '🌍' : '⭐'} {pn}/{hit.angle} {hit.orb.toFixed(1)}°
+    </span>
+  );
+}
+
+function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLike; birth: BirthInput }) {
   const [goal, setGoal]           = useState('love');
   const [stayDays, setStayDays]   = useState(90);
   const [regionFilter, setRegion] = useState<string>('all');
   const [search, setSearch]       = useState('');
   const [selected, setSelected]   = useState<LocalCityScore | null>(null);
 
+  // ── Точность: натальная карта ─────────────────────────────────────────────
+  const [useNatal, setUseNatal]           = useState(false);
+  const [natalSnap, setNatalSnap]         = useState<NatalSnapshot | null>(null);
+  const [natalLoading, setNatalLoading]   = useState(false);
+  const [natalError, setNatalError]       = useState<string | null>(null);
+
+  // ── Точность: транзиты ────────────────────────────────────────────────────
+  const [useTransit, setUseTransit]             = useState(false);
+  const [transitSnap, setTransitSnap]           = useState<TransitSnapshot | null>(null);
+  const [transitLoading, setTransitLoading]     = useState(false);
+  const [transitError, setTransitError]         = useState<string | null>(null);
+  const [transitDate, setTransitDate]           = useState(new Date().toISOString().slice(0, 10));
+
+  // Загрузка натальной карты
+  const loadNatal = useCallback(async () => {
+    if (!birth.date) return;
+    setNatalLoading(true); setNatalError(null);
+    try {
+      const chart = await getNatalChart(birth);
+      const snap = buildNatalSnapshot(
+        chart as Parameters<typeof buildNatalSnapshot>[0],
+        birth.lat, birth.lon,
+      );
+      setNatalSnap(snap);
+    } catch (e) {
+      setNatalError((e as Error).message);
+      setUseNatal(false);
+    } finally {
+      setNatalLoading(false);
+    }
+  }, [birth]);
+
+  // Загрузка транзитных планет
+  const loadTransit = useCallback(async (date: string) => {
+    if (!birth.date) return;
+    setTransitLoading(true); setTransitError(null);
+    try {
+      // getTransits returns transit positions keyed by planet name
+      const raw = await getTransits(birth, date) as {
+        transits?: Record<string, { transit_planet?: { lon?: number; dec?: number; retrograde?: boolean } }>;
+        transit_planets?: Record<string, { lon?: number; dec?: number; retrograde?: boolean }>;
+        planets?: Record<string, { lon?: number; dec?: number; retrograde?: boolean }>;
+      };
+      // Try to extract planet positions from various response formats
+      let planetsRaw: Record<string, { lon: number; dec?: number; retrograde?: boolean }> = {};
+      if (raw.transit_planets) {
+        for (const [k, v] of Object.entries(raw.transit_planets)) {
+          if (typeof v.lon === 'number') planetsRaw[k] = v as { lon: number; dec?: number; retrograde?: boolean };
+        }
+      } else if (raw.transits) {
+        for (const [k, v] of Object.entries(raw.transits)) {
+          if (v.transit_planet && typeof v.transit_planet.lon === 'number') {
+            planetsRaw[k] = { lon: v.transit_planet.lon, dec: v.transit_planet.dec, retrograde: v.transit_planet.retrograde };
+          }
+        }
+      } else if (raw.planets) {
+        for (const [k, v] of Object.entries(raw.planets)) {
+          if (typeof v.lon === 'number') planetsRaw[k] = v as { lon: number; dec?: number; retrograde?: boolean };
+        }
+      }
+      if (Object.keys(planetsRaw).length === 0) throw new Error('Транзитные позиции не найдены в ответе');
+      setTransitSnap(buildTransitSnapshot(date, planetsRaw));
+    } catch (e) {
+      setTransitError((e as Error).message);
+      setUseTransit(false);
+    } finally {
+      setTransitLoading(false);
+    }
+  }, [birth]);
+
+  // Реакция на чекбоксы
+  const handleNatalToggle = useCallback((checked: boolean) => {
+    setUseNatal(checked);
+    if (checked && !natalSnap) loadNatal();
+  }, [natalSnap, loadNatal]);
+
+  const handleTransitToggle = useCallback((checked: boolean) => {
+    setUseTransit(checked);
+    if (checked && !transitSnap) loadTransit(transitDate);
+  }, [transitSnap, loadTransit, transitDate]);
+
+  const activeNatal   = useNatal   && !!natalSnap;
+  const activeTransit = useTransit && !!transitSnap;
+
   const ranked = useMemo(
-    () => rankCitiesLocally(goal, stayDays, 60, regionFilter === 'all' ? undefined : regionFilter),
-    [goal, stayDays, regionFilter],
+    () => rankCitiesLocally(
+      goal, stayDays, 60,
+      regionFilter === 'all' ? undefined : regionFilter,
+      activeNatal ? natalSnap : null,
+      activeTransit ? transitSnap : null,
+    ),
+    [goal, stayDays, regionFilter, activeNatal, natalSnap, activeTransit, transitSnap],
   );
 
   const filtered = useMemo(() => {
@@ -776,6 +891,103 @@ function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
           ))}
         </div>
         <p className={`text-[11px] ${theme.text} opacity-50`}>{stayMode.effect}</p>
+      </div>
+
+      {/* ── Точность: натальная карта + транзиты ── */}
+      <div className={`rounded-xl border ${theme.card} p-4 space-y-3`}>
+        <h4 className={`font-bold text-sm ${theme.header} flex items-center gap-2`}>
+          <Zap className="h-4 w-4" /> Уточнение расчёта
+          {(activeNatal || activeTransit) && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 ${isDark ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+              ACG активен
+            </span>
+          )}
+        </h4>
+        <p className={`text-[11px] ${theme.text} opacity-50 -mt-1`}>
+          Включи для учёта астрокартографии (ACG) по натальной карте и/или транзитам — рейтинг пересчитается.
+        </p>
+
+        {/* Натальная карта */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => handleNatalToggle(!useNatal)}
+            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+              useNatal
+                ? (isDark ? 'bg-indigo-500' : 'bg-indigo-600')
+                : (isDark ? 'bg-slate-600' : 'bg-slate-300')
+            }`}
+          >
+            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${useNatal ? 'left-4' : 'left-0.5'}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className={`text-xs font-semibold ${theme.header}`}>
+              ⭐ Натальная карта {natalLoading && <Spin />}
+            </span>
+            {useNatal && natalSnap && (
+              <span className={`ml-2 text-[10px] ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                ✓ загружена · {Object.keys(natalSnap.planets).length} планет · RAMC {natalSnap.ramc.toFixed(1)}°
+              </span>
+            )}
+            {natalError && <span className="ml-2 text-[10px] text-red-400">{natalError}</span>}
+          </div>
+          {useNatal && !natalSnap && !natalLoading && (
+            <button onClick={() => loadNatal()}
+              className={`text-[10px] px-2 py-0.5 rounded-full border ${theme.tabInactive}`}>
+              Загрузить
+            </button>
+          )}
+        </label>
+        <p className={`text-[11px] ${theme.text} opacity-40 ml-12 -mt-2`}>
+          Рассчитывает, через какие планетарные линии ACG (MC/IC/ASC/DSC) проходит каждый город.
+        </p>
+
+        {/* Транзиты */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => handleTransitToggle(!useTransit)}
+            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+              useTransit
+                ? (isDark ? 'bg-cyan-500' : 'bg-cyan-600')
+                : (isDark ? 'bg-slate-600' : 'bg-slate-300')
+            }`}
+          >
+            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${useTransit ? 'left-4' : 'left-0.5'}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className={`text-xs font-semibold ${theme.header}`}>
+              🌍 Текущие транзиты {transitLoading && <Spin />}
+            </span>
+            {useTransit && transitSnap && (
+              <span className={`ml-2 text-[10px] ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                ✓ {transitSnap.date} · {Object.keys(transitSnap.planets).length} планет
+              </span>
+            )}
+            {transitError && <span className="ml-2 text-[10px] text-red-400">{transitError}</span>}
+          </div>
+        </label>
+        {useTransit && (
+          <div className="ml-12 flex items-center gap-2 -mt-1">
+            <input
+              type="date"
+              value={transitDate}
+              onChange={e => {
+                setTransitDate(e.target.value);
+                setTransitSnap(null);
+                if (useTransit) loadTransit(e.target.value);
+              }}
+              className={`px-2 py-1 rounded-lg border text-xs ${theme.card} ${theme.text}`}
+            />
+            <button
+              onClick={() => loadTransit(transitDate)}
+              disabled={transitLoading}
+              className={`text-[10px] px-2 py-1 rounded-lg border transition-all ${theme.tabInactive}`}>
+              {transitLoading ? <Spin /> : 'Обновить'}
+            </button>
+          </div>
+        )}
+        <p className={`text-[11px] ${theme.text} opacity-40 ml-12 -mt-2`}>
+          Добавляет ACG-слой транзитных планет — показывает, какие города усилены здесь и сейчас.
+        </p>
       </div>
 
       {/* Stay period advice for goal */}
@@ -820,6 +1032,8 @@ function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
           const goalScore = item.sphereScores[goal] ?? 50;
           const gi = GOALS.find(g => g.id === goal);
           const isSel = selected?.city.name === item.city.name && selected?.city.country === item.city.country;
+          // Top ACG hits for compact display
+          const topHits = item.acgHits.filter(h => h.orb <= 8).slice(0, 4);
           return (
             <div key={`${item.city.name}-${item.city.country}`}
               className={`rounded-xl border overflow-hidden transition-all cursor-pointer ${isDark ? 'bg-slate-900/60 border-slate-700/60' : 'bg-white border-slate-200'} ${isSel ? (isDark ? 'ring-1 ring-indigo-500/50' : 'ring-1 ring-indigo-300') : ''}`}
@@ -846,6 +1060,12 @@ function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
                       {goalScore}
                     </span>
                   </div>
+                  {/* Compact ACG hits on list row */}
+                  {topHits.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {topHits.map((h, i) => <AcgHitBadge key={i} hit={h} isDark={isDark} />)}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-1 shrink-0">
                   {item.topSpheres.slice(0, 3).map(sk => (
@@ -858,17 +1078,76 @@ function ExploreTab({ isDark, theme }: { isDark: boolean; theme: ThemeLike }) {
               {/* Expanded detail */}
               {isSel && (
                 <div className={`px-4 pb-4 space-y-4 border-t ${isDark ? 'border-slate-700/40' : 'border-slate-100'}`}>
+
+                  {/* Full ACG hits */}
+                  {item.acgHits.length > 0 && (
+                    <div className="pt-3">
+                      <p className={`text-xs font-semibold ${theme.accent} mb-2`}>
+                        🗺 ACG — планетарные линии через город:
+                      </p>
+                      <div className="space-y-1.5">
+                        {item.acgHits.slice(0, 10).map((h, i) => {
+                          const pn = PLANET_NAMES_RU[h.planet] ?? h.planet;
+                          const topImpact = Object.entries(h.sphereImpact)
+                            .filter(([,v]) => (v ?? 0) !== 0)
+                            .sort((a, b) => Math.abs(b[1] ?? 0) - Math.abs(a[1] ?? 0))
+                            .slice(0, 3);
+                          return (
+                            <div key={i} className={`rounded-lg p-2.5 flex items-start gap-3 ${
+                              h.isTransit
+                                ? (isDark ? 'bg-cyan-900/15 border border-cyan-500/20' : 'bg-cyan-50 border border-cyan-100')
+                                : (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')
+                            }`}>
+                              <div className="shrink-0 text-center w-16">
+                                <div className={`text-[11px] font-bold ${h.isTransit ? (isDark ? 'text-cyan-300' : 'text-cyan-700') : (isDark ? 'text-indigo-300' : 'text-indigo-700')}`}>
+                                  {pn}/{h.angle}
+                                </div>
+                                <div className={`text-[10px] ${theme.text} opacity-50`}>{h.orb.toFixed(1)}° орбис</div>
+                                <div className={`text-[9px] mt-0.5 ${h.isTransit ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-500')}`}>
+                                  {h.isTransit ? 'транзит' : 'натал'}
+                                </div>
+                              </div>
+                              <div className="flex-1 flex flex-wrap gap-1">
+                                {topImpact.map(([sk, v]) => {
+                                  const si = SPHERE_LABELS[sk];
+                                  if (!si) return null;
+                                  const pos = (v ?? 0) > 0;
+                                  return (
+                                    <span key={sk} className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                                      pos
+                                        ? (isDark ? 'bg-green-900/20 border-green-500/25 text-green-300' : 'bg-green-50 border-green-200 text-green-700')
+                                        : (isDark ? 'bg-red-900/20 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-700')
+                                    }`}>
+                                      {si.icon} {pos ? '+' : ''}{v}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* All spheres */}
-                  <div className="pt-3">
+                  <div className={item.acgHits.length > 0 ? '' : 'pt-3'}>
                     <p className={`text-xs font-semibold ${theme.accent} mb-2`}>Все сферы жизни в этой локации:</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                       {SPHERE_KEYS.map(sk => {
-                        const sv = item.sphereScores[sk] ?? 50;
-                        const si = SPHERE_LABELS[sk];
+                        const sv  = item.sphereScores[sk] ?? 50;
+                        const si  = SPHERE_LABELS[sk];
+                        const na  = (item.natalAcgBonus[sk as keyof typeof item.natalAcgBonus] ?? 0) as number;
+                        const ta  = (item.transitAcgBonus[sk as keyof typeof item.transitAcgBonus] ?? 0) as number;
                         return (
                           <div key={sk} className="flex items-center gap-2">
                             <span className="text-sm w-5 text-center">{si.icon}</span>
                             <span className={`text-[11px] flex-1 ${theme.text} opacity-70`}>{si.label}</span>
+                            {(Math.abs(na) >= 1 || Math.abs(ta) >= 1) && (
+                              <span className={`text-[9px] ${na + ta > 0 ? (isDark ? 'text-green-400' : 'text-green-600') : (isDark ? 'text-orange-400' : 'text-orange-600')}`}>
+                                {na + ta > 0 ? '+' : ''}{Math.round(na + ta)}
+                              </span>
+                            )}
                             <div className="w-14">
                               <div className="h-1.5 rounded-full overflow-hidden bg-slate-700/30">
                                 <div className="h-full rounded-full" style={{ width: `${sv}%`, backgroundColor: si.color }} />
@@ -1310,7 +1589,7 @@ export default function InteractionRelocationEngine({ birth, theme, people }: Pr
       {error && <Err msg={error} />}
 
       {tab === 'explore' && (
-        <ExploreTab isDark={isDark} theme={theme} />
+        <ExploreTab isDark={isDark} theme={theme} birth={birth} />
       )}
 
       {tab === 'setup' && (

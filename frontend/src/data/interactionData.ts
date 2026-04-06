@@ -674,9 +674,294 @@ export const PARTNER_TYPE_FACTOR: Record<string, number> = {
   mentor: 0.8,
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── ACG (ASTROCARTOGRAPHY) ENGINE ─────────────────────────────────────────────
+// Точный расчёт линий MC/IC/ASC/DSC для каждой планеты натальной карты
+// и транзитных планет на заданную дату.
+//
+// Математика:
+//   RAMC = RA Середины Неба (из MC натальной карты)
+//   MC-линия планеты: geo_lon = RA_planet − RAMC_natal + natal_lon
+//   IC-линия: MC_lon + 180°
+//   ASC-линия: geo_lon = RA_planet − H − RAMC_natal + natal_lon
+//     где H = arccos(−tan(φ_observer) · tan(δ_planet)) — часовой угол восхода
+//   DSC-линия: RA_planet + H − RAMC_natal + natal_lon
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _DEG = Math.PI / 180;
+const _OBLIQUITY = 23.4367; // наклон эклиптики, градусы
+
+function _toRad(d: number) { return d * _DEG; }
+function _toDeg(r: number) { return r / _DEG; }
+
+/** Нормализует угол в диапазон −180…+180 */
+function _normAngle(a: number): number {
+  let r = ((a % 360) + 360) % 360;
+  if (r > 180) r -= 360;
+  return r;
+}
+
+/** Эклиптическая долгота → экваториальные RA (0..360), Dec (−90..90) */
+function _eclToEq(lon: number, lat = 0): { ra: number; dec: number } {
+  const l = _toRad(lon);
+  const b = _toRad(lat);
+  const e = _toRad(_OBLIQUITY);
+  const sinDec = Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l);
+  const dec = _toDeg(Math.asin(Math.max(-1, Math.min(1, sinDec))));
+  const cosD = Math.cos(_toRad(dec));
+  let ra = 0;
+  if (cosD > 1e-10) {
+    const cosRA = (Math.cos(l) * Math.cos(b)) / cosD;
+    const sinRA = (Math.sin(l) * Math.cos(b) * Math.cos(e) - Math.sin(b) * Math.sin(e)) / cosD;
+    ra = _toDeg(Math.atan2(sinRA, cosRA));
+  }
+  return { ra: ((ra % 360) + 360) % 360, dec };
+}
+
+/** Географическая долгота MC-линии планеты */
+function _mcLineLon(planetRA: number, ramc: number, natalLon: number): number {
+  return _normAngle(planetRA - ramc + natalLon);
+}
+
+/** Географическая долгота ASC-линии планеты на широте observerLat.
+ *  Возвращает null, если планета всегда выше/ниже горизонта (приполярная). */
+function _ascLineLon(
+  planetRA: number, planetDec: number,
+  ramc: number, natalLon: number, observerLat: number,
+): number | null {
+  const cosH = -Math.tan(_toRad(observerLat)) * Math.tan(_toRad(planetDec));
+  if (Math.abs(cosH) > 1) return null;
+  const H = _toDeg(Math.acos(cosH));
+  return _normAngle(planetRA - H - ramc + natalLon);
+}
+
+function _dscLineLon(
+  planetRA: number, planetDec: number,
+  ramc: number, natalLon: number, observerLat: number,
+): number | null {
+  const cosH = -Math.tan(_toRad(observerLat)) * Math.tan(_toRad(planetDec));
+  if (Math.abs(cosH) > 1) return null;
+  const H = _toDeg(Math.acos(cosH));
+  return _normAngle(planetRA + H - ramc + natalLon);
+}
+
+// ── Планетарные веса по углам → сферы ────────────────────────────────────────
+// Каждая планета на каждом угле карты (MC/IC/ASC/DSC) усиливает свои сферы.
+// Числа — максимальный бонус при нулевом орбисе (орбис масштабирует от 0 до 1).
+
+const _PLANET_ANGLE_WEIGHTS: Record<string, Record<string, Partial<SphereBias>>> = {
+  sun: {
+    MC:  { career: 15, social: 6, stability: 4 },
+    IC:  { stability: 10, spirit: 5, health: 4 },
+    ASC: { career: 10, health: 8, social: 5 },
+    DSC: { love: 8, social: 7, stability: 4 },
+  },
+  moon: {
+    MC:  { career: 5, love: 7, social: 8 },
+    IC:  { stability: 14, love: 10, health: 8 },
+    ASC: { health: 12, love: 9, creativity: 5 },
+    DSC: { love: 13, stability: 8, spirit: 6 },
+  },
+  mercury: {
+    MC:  { career: 8, social: 12, creativity: 6 },
+    IC:  { stability: 5, social: 7, spirit: 4 },
+    ASC: { social: 13, creativity: 9, career: 5 },
+    DSC: { social: 10, creativity: 7, love: 4 },
+  },
+  venus: {
+    MC:  { love: 10, creativity: 11, social: 8, money: 5 },
+    IC:  { love: 9, stability: 10, health: 6 },
+    ASC: { love: 16, creativity: 11, health: 7 },
+    DSC: { love: 14, stability: 8, money: 7 },
+  },
+  mars: {
+    MC:  { career: 14, health: 6, money: 4 },
+    IC:  { stability: 4, health: 9, spirit: -3 },
+    ASC: { health: 13, career: 11, social: 4 },
+    DSC: { love: 6, social: 5, health: 5 },
+  },
+  jupiter: {
+    MC:  { career: 13, money: 11, social: 9 },
+    IC:  { stability: 11, money: 8, spirit: 9 },
+    ASC: { money: 13, health: 8, spirit: 7 },
+    DSC: { love: 8, money: 7, social: 11 },
+  },
+  saturn: {
+    MC:  { career: 16, stability: 10, money: 6 },
+    IC:  { stability: 15, health: -4, spirit: 5 },
+    ASC: { career: 11, stability: 9, health: 4 },
+    DSC: { stability: 10, love: -4, money: 8 },
+  },
+  uranus: {
+    MC:  { career: 7, creativity: 12, social: 8 },
+    IC:  { stability: -6, spirit: 9, creativity: 8 },
+    ASC: { creativity: 13, social: 9, health: 4 },
+    DSC: { social: 11, creativity: 9, love: 4 },
+  },
+  neptune: {
+    MC:  { spirit: 13, creativity: 11, career: -3 },
+    IC:  { spirit: 16, stability: -5, health: 5 },
+    ASC: { spirit: 14, creativity: 11, health: 5 },
+    DSC: { love: 11, spirit: 13, creativity: 8 },
+  },
+  pluto: {
+    MC:  { career: 10, money: 9, spirit: 8 },
+    IC:  { spirit: 13, stability: 5, health: 6 },
+    ASC: { health: 8, spirit: 11, career: 7 },
+    DSC: { love: 8, money: 11, spirit: 9 },
+  },
+  node: {
+    MC:  { career: 8, social: 9, spirit: 9 },
+    IC:  { stability: 8, spirit: 8, health: 5 },
+    ASC: { spirit: 11, social: 9, health: 5 },
+    DSC: { love: 9, spirit: 9, social: 9 },
+  },
+  chiron: {
+    MC:  { career: 5, spirit: 8, health: 9 },
+    IC:  { health: 13, spirit: 11, stability: 5 },
+    ASC: { health: 13, spirit: 9, creativity: 5 },
+    DSC: { love: 7, health: 9, spirit: 9 },
+  },
+  lilith: {
+    MC:  { career: 5, creativity: 8, spirit: 7 },
+    IC:  { spirit: 10, stability: -4, creativity: 7 },
+    ASC: { creativity: 10, spirit: 8, love: 6 },
+    DSC: { love: 10, spirit: 8, creativity: 7 },
+  },
+};
+
+// ── Snapshot-интерфейсы ────────────────────────────────────────────────────────
+
+/** Предварительно подготовленный снимок натальной карты для ACG-расчётов */
+export interface NatalSnapshot {
+  /** RAMC натальной карты (градусы, 0..360) */
+  ramc: number;
+  /** Натальная долгота рождения */
+  natalLon: number;
+  /** Натальная широта рождения */
+  natalLat: number;
+  /** Планеты с предвычисленными RA/Dec */
+  planets: Record<string, { ra: number; dec: number; retro: boolean; lon: number }>;
+  /** MC долгота эклиптики (для отображения) */
+  mcLon: number;
+}
+
+/** Снимок транзитных планет на дату/период */
+export interface TransitSnapshot {
+  date: string;
+  planets: Record<string, { ra: number; dec: number; retro: boolean; lon: number }>;
+}
+
+/** Одно попадание планеты на угол карты (ACG-хит) */
+export interface AcgHit {
+  planet: string;
+  angle: 'MC' | 'IC' | 'ASC' | 'DSC';
+  /** Расстояние от линии до города, градусы */
+  orb: number;
+  isNatal: boolean;
+  isTransit: boolean;
+  sphereImpact: Partial<Record<string, number>>;
+}
+
+/** Строит NatalSnapshot из данных NatalChart (из getRelocatedChart/getNatalChart).
+ *  Принимает объект с полями planets: Record<string, {lon, dec, retrograde}> и houses: Record<string, {lon}> */
+export function buildNatalSnapshot(
+  chart: {
+    planets: Record<string, { lon: number; dec: number; retrograde?: boolean }>;
+    houses:  Record<string, { lon: number }>;
+    metadata?: { lat?: number; lon?: number };
+  },
+  natalLat: number,
+  natalLon: number,
+): NatalSnapshot {
+  const mcLon = chart.houses?.['10']?.lon ?? 0;
+  const ramc  = _eclToEq(mcLon).ra;
+  const planets: NatalSnapshot['planets'] = {};
+  for (const [name, pd] of Object.entries(chart.planets)) {
+    const eq = _eclToEq(pd.lon, 0);
+    // Use backend dec if available and reasonable, else compute from ecliptic
+    const dec = (typeof pd.dec === 'number' && Math.abs(pd.dec) <= 90) ? pd.dec : eq.dec;
+    planets[name] = { ra: eq.ra, dec, retro: pd.retrograde ?? false, lon: pd.lon };
+  }
+  return { ramc, natalLon, natalLat, planets, mcLon };
+}
+
+/** Строит TransitSnapshot из ответа /predictive/transits или аналогичного.
+ *  Принимает date и словарь {planet: {lon, dec?, retrograde?}} */
+export function buildTransitSnapshot(
+  date: string,
+  rawPlanets: Record<string, { lon: number; dec?: number; retrograde?: boolean }>,
+): TransitSnapshot {
+  const planets: TransitSnapshot['planets'] = {};
+  for (const [name, pd] of Object.entries(rawPlanets)) {
+    if (typeof pd.lon !== 'number') continue;
+    const eq  = _eclToEq(pd.lon, 0);
+    const dec = (typeof pd.dec === 'number' && Math.abs(pd.dec) <= 90) ? pd.dec : eq.dec;
+    planets[name] = { ra: eq.ra, dec, retro: pd.retrograde ?? false, lon: pd.lon };
+  }
+  return { date, planets };
+}
+
+// ── Основная функция вычисления ACG-бонуса ────────────────────────────────────
+
+function _computeAcgBonus(
+  planets: Record<string, { ra: number; dec: number }>,
+  ramc: number,
+  natalLon: number,
+  cityLat: number,
+  cityLon: number,
+  transitFactor: number,   // 1.0 для натальных, 0.55 для транзитных
+  hitsOut: AcgHit[],
+  isTransit: boolean,
+): Partial<SphereBias> {
+  const bonus: Partial<SphereBias> = {};
+
+  for (const [pname, pd] of Object.entries(planets)) {
+    const angleWeights = _PLANET_ANGLE_WEIGHTS[pname];
+    if (!angleWeights) continue;
+
+    const mcLon  = _mcLineLon(pd.ra, ramc, natalLon);
+    const icLon  = _normAngle(mcLon + 180);
+    const ascLon = _ascLineLon(pd.ra, pd.dec, ramc, natalLon, cityLat);
+    const dscLon = ascLon !== null ? _normAngle(ascLon + 180) : null;
+
+    const checks: Array<['MC' | 'IC' | 'ASC' | 'DSC', number | null]> = [
+      ['MC', mcLon], ['IC', icLon], ['ASC', ascLon], ['DSC', dscLon],
+    ];
+
+    for (const [angle, lineLon] of checks) {
+      if (lineLon === null) continue;
+      // Угловое расстояние между долготой города и долготой линии
+      const diff = Math.abs(_normAngle(cityLon - lineLon));
+      if (diff > 15) continue;
+
+      // Орбис: плавный спад через 3°, 8°, 15°
+      const orbFactor = diff <= 3 ? 1.0 : diff <= 8 ? 1.0 - (diff - 3) / 8 : (15 - diff) / 28;
+      const weights = angleWeights[angle] ?? {};
+
+      const sphereImpact: Partial<Record<string, number>> = {};
+      for (const [sk, w] of Object.entries(weights)) {
+        const contrib = Math.round((w as number) * orbFactor * transitFactor);
+        if (Math.abs(contrib) < 1) continue;
+        bonus[sk as keyof SphereBias] = (bonus[sk as keyof SphereBias] ?? 0) + contrib;
+        sphereImpact[sk] = contrib;
+      }
+
+      if (Object.keys(sphereImpact).length > 0) {
+        hitsOut.push({
+          planet: pname, angle, orb: Math.round(diff * 10) / 10,
+          isNatal: !isTransit, isTransit, sphereImpact,
+        });
+      }
+    }
+  }
+  return bonus;
+}
+
 // ── LOCAL OFFLINE SCORE ENGINE ────────────────────────────────────────────────
-// Рассчитывает сферные баллы по городу без обращения к серверу
-// Используется в "Исследовать" вкладке и как резервный fallback
+// Рассчитывает сферные баллы по городу.
+// Базовый слой: city bias + широта + долгота.
+// Точный слой (опционально): ACG от натальной карты + транзиты.
 
 export interface LocalCityScore {
   city: CityEntry;
@@ -684,35 +969,32 @@ export interface LocalCityScore {
   overallScore: number;
   stayAdvice: StayPeriodAdvice[];
   topSpheres: string[];
+  /** ACG-попадания если переданы снимки натальной/транзитной карты */
+  acgHits: AcgHit[];
+  /** Суммарный ACG-бонус от натала (для отображения) */
+  natalAcgBonus: Partial<SphereBias>;
+  /** Суммарный ACG-бонус от транзитов */
+  transitAcgBonus: Partial<SphereBias>;
+  /** Флаг: использована ли точная натальная карта */
+  usedNatal: boolean;
+  /** Флаг: использованы ли транзиты */
+  usedTransit: boolean;
 }
 
-/**
- * Латitudinal health/spirit modifier:
- * Тропики (±23°) → здоровье+5, дух+3
- * Средиземноморье (35–45°) → любовь+4, творчество+3
- * Северная Европа (>55°) → стабильность+4, духовность+5
- */
-function latModifier(lat: number): SphereBias {
+function _latModifier(lat: number): SphereBias {
   const absLat = Math.abs(lat);
-  if (absLat < 23.5)  return { health: 5, spirit: 3, love: 3 };
-  if (absLat < 35)    return { love: 4, creativity: 3, health: 3 };
-  if (absLat < 45)    return { love: 4, creativity: 3, spirit: 2 };
-  if (absLat < 55)    return { stability: 3, health: 2, career: 2 };
+  if (absLat < 23.5) return { health: 5, spirit: 3, love: 3 };
+  if (absLat < 35)   return { love: 4, creativity: 3, health: 3 };
+  if (absLat < 45)   return { love: 4, creativity: 3, spirit: 2 };
+  if (absLat < 55)   return { stability: 3, health: 2, career: 2 };
   return { stability: 4, spirit: 5, health: -2 };
 }
 
-/**
- * Longitude proximity to meridians: purely a symbolic layer for ACG analogy.
- * Планеты расположены приблизительно по долготам (упрощённая модель ACG).
- * В реальном ACG нужны эфемериды; здесь используем смещения для UX.
- */
-function lonPlanetBonus(lon: number): SphereBias {
-  // Very simplified: western hemisphere ↔ Венера/Юпитер → love/money boost
-  // Eastern hemisphere ↔ Сатурн/Марс → career/stability boost
-  if (lon < -60)  return { love: 3, money: 2 };
-  if (lon < 0)    return { love: 2, creativity: 2 };
-  if (lon < 60)   return { spirit: 2, stability: 2 };
-  if (lon < 120)  return { career: 3, money: 2 };
+function _lonPlanetBonus(lon: number): SphereBias {
+  if (lon < -60) return { love: 3, money: 2 };
+  if (lon < 0)   return { love: 2, creativity: 2 };
+  if (lon < 60)  return { spirit: 2, stability: 2 };
+  if (lon < 120) return { career: 3, money: 2 };
   return { career: 2, social: 2 };
 }
 
@@ -720,28 +1002,59 @@ export function computeLocalCityScores(
   city: CityEntry,
   goal: string,
   stayDays: number,
+  natal?: NatalSnapshot | null,
+  transit?: TransitSnapshot | null,
 ): LocalCityScore {
   const base = 50;
   const bias = CITY_SPHERE_BIAS[city.nameRu] ?? {};
-  const lm   = latModifier(city.lat);
-  const lp   = lonPlanetBonus(city.lon);
+  const lm   = _latModifier(city.lat);
+  const lp   = _lonPlanetBonus(city.lon);
 
   // Stay multiplier: longer stay → biases more pronounced
   const stayMult = stayDays <= 14 ? 0.35 : stayDays <= 90 ? 0.65 : stayDays <= 240 ? 0.85 : 1.0;
 
+  const acgHits: AcgHit[] = [];
+  const natalAcgBonus: Partial<SphereBias>   = {};
+  const transitAcgBonus: Partial<SphereBias> = {};
+
+  // Натальный ACG-слой (вес 1.0)
+  if (natal && Object.keys(natal.planets).length > 0) {
+    const b = _computeAcgBonus(
+      natal.planets, natal.ramc, natal.natalLon,
+      city.lat, city.lon, 1.0, acgHits, false,
+    );
+    for (const [k, v] of Object.entries(b)) {
+      natalAcgBonus[k as keyof SphereBias] = (natalAcgBonus[k as keyof SphereBias] ?? 0) + (v ?? 0);
+    }
+  }
+
+  // Транзитный ACG-слой (вес 0.55)
+  if (transit && Object.keys(transit.planets).length > 0) {
+    const b = _computeAcgBonus(
+      transit.planets, natal?.ramc ?? 0, natal?.natalLon ?? city.lon,
+      city.lat, city.lon, 0.55, acgHits, true,
+    );
+    for (const [k, v] of Object.entries(b)) {
+      transitAcgBonus[k as keyof SphereBias] = (transitAcgBonus[k as keyof SphereBias] ?? 0) + (v ?? 0);
+    }
+  }
+
   const sphereScores: Record<string, number> = {};
   for (const sk of Object.keys(SPHERE_LABELS)) {
-    const b  = (bias[sk as keyof SphereBias] ?? 0);
-    const l  = (lm[sk as keyof SphereBias] ?? 0);
-    const lp2 = (lp[sk as keyof SphereBias] ?? 0);
-    // Goal bonus: the selected goal sphere gets extra +8 boost
+    const b   = (bias[sk as keyof SphereBias] ?? 0);
+    const l   = (lm[sk as keyof SphereBias]  ?? 0);
+    const lp2 = (lp[sk as keyof SphereBias]  ?? 0);
     const goalBonus = sk === goal ? 8 : 0;
-    const raw = base + (b + l + lp2 + goalBonus) * stayMult;
+    // Базовый слой масштабируется на stayMult
+    const baseLayer = base + (b + l + lp2 + goalBonus) * stayMult;
+    // ACG-слои уже несут реальные значения; добавляем без дополнительного масштабирования
+    const natalAcg   = (natalAcgBonus[sk as keyof SphereBias]   ?? 0) * stayMult;
+    const transitAcg = (transitAcgBonus[sk as keyof SphereBias] ?? 0);
+    const raw = baseLayer + natalAcg + transitAcg;
     sphereScores[sk] = Math.round(Math.min(99, Math.max(10, raw)));
   }
 
   const goalScore = sphereScores[goal] ?? 50;
-  // Overall: weighted average, goal sphere has 3× weight
   const total = Object.values(sphereScores).reduce((a, v) => a + v, 0);
   const overallScore = Math.round((total + goalScore * 2) / (Object.keys(SPHERE_LABELS).length + 2));
 
@@ -753,20 +1066,28 @@ export function computeLocalCityScores(
   const stayAdvice = (SPHERE_STAY_ADVICE[goal] ?? SPHERE_STAY_ADVICE['career'])
     .filter(a => stayDays >= a.minDays * 0.5 || stayDays <= a.maxDays * 2);
 
-  return { city, sphereScores, overallScore, stayAdvice, topSpheres };
+  // Сортируем хиты по орбису
+  acgHits.sort((a, b) => a.orb - b.orb);
+
+  return {
+    city, sphereScores, overallScore, stayAdvice, topSpheres,
+    acgHits, natalAcgBonus, transitAcgBonus,
+    usedNatal: !!natal, usedTransit: !!transit,
+  };
 }
 
 /**
- * Ранжирует все города по цели и длительности без запроса к серверу.
- * Возвращает top-N городов.
+ * Ранжирует все города по цели и длительности.
+ * Принимает опциональные снимки натальной/транзитной карты.
  */
 export function rankCitiesLocally(
   goal: string,
   stayDays: number,
   limit = 30,
   regionFilter?: string,
+  natal?: NatalSnapshot | null,
+  transit?: TransitSnapshot | null,
 ): LocalCityScore[] {
-  // Deduplicate cities by name before ranking
   const seen = new Set<string>();
   const uniqueCities = CITIES.filter(c => {
     if (seen.has(c.name + c.country)) return false;
@@ -775,7 +1096,7 @@ export function rankCitiesLocally(
   });
   return uniqueCities
     .filter(c => !regionFilter || c.region === regionFilter)
-    .map(c => computeLocalCityScores(c, goal, stayDays))
+    .map(c => computeLocalCityScores(c, goal, stayDays, natal, transit))
     .sort((a, b) => b.sphereScores[goal] - a.sphereScores[goal])
     .slice(0, limit);
 }
