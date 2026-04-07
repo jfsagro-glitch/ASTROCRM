@@ -269,13 +269,24 @@ function LocationCard({
           {/* Key planet activations */}
           {loc.key_planet_activations.length > 0 && (
             <div>
-              <p className={`text-xs font-semibold ${theme.accent} mb-2`}>Планеты на углах карты:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {loc.key_planet_activations.map((ka, i) => (
-                  <span key={i} className={`text-xs px-2 py-1 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-500/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>
-                    {ka.planet} на {ka.angle} ({ka.orb}°)
-                  </span>
-                ))}
+              <p className={`text-xs font-semibold ${theme.accent} mb-2`}>🗺 Планеты на углах карты (ACG):</p>
+              <div className="space-y-1.5">
+                {loc.key_planet_activations.map((ka, i) => {
+                  const kaInterp = getAcgInterp(ka.planet.toLowerCase(), ka.angle.toUpperCase());
+                  return (
+                    <div key={i} className={`rounded-lg p-2.5 ${isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[11px] font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                          {ka.planet} / {ka.angle}
+                        </span>
+                        <span className={`text-[10px] ${theme.text} opacity-40`}>{ka.orb}° орбис</span>
+                      </div>
+                      {kaInterp && (
+                        <p className={`text-[11px] leading-relaxed ${theme.text} opacity-65`}>{kaInterp}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -736,6 +747,81 @@ const PLANET_NAMES_RU: Record<string, string> = {
   pluto: 'Плутон', node: 'Сев.Узел', chiron: 'Хирон', lilith: 'Лилит',
 };
 
+// ── ACG интерпретации: планета × угол ────────────────────────────────────────
+// Ключ: "<planet>_<angle>" (нижний регистр), значение: краткая интерпретация на русском
+const ACG_INTERP: Record<string, string> = {
+  // SUN
+  sun_mc:  'Место признания и карьерного сияния. Личность раскрывается публично — высокая видимость, репутационный рост.',
+  sun_ic:  'Глубокое ощущение "своей земли". Укоренение, семейное тепло, но меньше внешней заметности.',
+  sun_asc: 'Личность светит ярко. Жизненная энергия и уверенность в себе заметно усиливаются.',
+  sun_dsc: 'Притягивает ярких и влиятельных партнёров. Союзы и совместные проекты выходят на первый план.',
+  // MOON
+  moon_mc:  'Публичный образ связан с эмоциями и заботой. Высокая популярность, чуткость к запросам аудитории.',
+  moon_ic:  'Сильная эмоциональная связь с местом — ощущение "второго дома". Благоприятно для семьи и частной жизни.',
+  moon_asc: 'Обострённая интуиция и чувствительность к среде. Окружение реагирует на эмоциональную открытость.',
+  moon_dsc: 'Нежные, поддерживающие партнёрства. Связи строятся на эмоциональной близости и взаимной заботе.',
+  // MERCURY
+  mercury_mc:  'Карьера в коммуникациях, медиа или образовании. Интеллект и речь работают на репутацию.',
+  mercury_ic:  'Умственная работа дома. Удалённая деятельность, переговоры, обучение — всё это процветает.',
+  mercury_asc: 'Остроумие и слово — главный инструмент влияния. Среда стимулирует быстрый обмен идеями.',
+  mercury_dsc: 'Интеллектуальные партнёрства. Общение и совместный поиск истины — основа союзов.',
+  // VENUS
+  venus_mc:  'Признание через красоту, дипломатию или искусство. Харизма работает на публичный успех.',
+  venus_ic:  'Уютный, гармоничный дом. Место для отдыха, эстетики и восстановления.',
+  venus_asc: 'Обаяние и магнетизм усилены. Высокий потенциал романтических знакомств в этом месте.',
+  venus_dsc: 'Гармоничные любовные союзы. Место благоприятствует романтике, браку и творческим партнёрствам.',
+  // MARS
+  mars_mc:  'Амбиции и активность в карьере. Конкуренция, лидерство, готовность идти на риск.',
+  mars_ic:  'Энергия дома высока. Хорошо для спорта и ремёсел, но возможны напряжения в семейном быту.',
+  mars_asc: 'Среда насыщена энергией и напором. Личная инициатива даёт быстрый отклик, но важен самоконтроль.',
+  mars_dsc: 'Страстные, решительные партнёры. Высокая химия притяжения, иногда — конкуренция в паре.',
+  // JUPITER
+  jupiter_mc:  'Расширение карьеры, удача и рост репутации. Отличное место для бизнеса и публичной деятельности.',
+  jupiter_ic:  'Ощущение изобилия и поддержки дома. Семья и окружение приносят возможности.',
+  jupiter_asc: 'Оптимизм, везение и рост личных возможностей. Среда щедра и открыта к сотрудничеству.',
+  jupiter_dsc: 'Партнёры привносят удачу и расширение горизонтов. Благоприятные деловые и личные союзы.',
+  // SATURN
+  saturn_mc:  'Строгая карьерная дисциплина. Медленный, но надёжный профессиональный рост и авторитет.',
+  saturn_ic:  'Ответственность за семью и дом. Структура и стабильность, но возможно ощущение бремени.',
+  saturn_asc: 'Среда требует серьёзности и терпения. Подходит для долгосрочных структурных проектов.',
+  saturn_dsc: 'Стабильные, надёжные партнёры. Отношения строятся медленно, но выдерживают испытания временем.',
+  // URANUS
+  uranus_mc:  'Неожиданные карьерные перемены, инновации. Место для революционных идей и нестандартных ролей.',
+  uranus_ic:  'Нестандартный образ жизни. Неожиданные перемены в семье и бытовом укладе.',
+  uranus_asc: 'Среда непредсказуема и стимулирующа. Оригинальность и эксцентричность — сила, не недостаток.',
+  uranus_dsc: 'Нестандартные партнёры и неожиданные встречи. Отношения могут быть яркими, но непостоянными.',
+  // NEPTUNE
+  neptune_mc:  'Творческое вдохновение и духовность в карьере. Важно не терять почву под ногами — сильны иллюзии.',
+  neptune_ic:  'Мистическая связь с домом. Духовные практики процветают, но нужны чёткие границы.',
+  neptune_asc: 'Высокая чувствительность и интуиция. Творчество и духовный рост — главные усилители среды.',
+  neptune_dsc: 'Идеализация партнёров. Духовные связи глубоки, но важно видеть реальность без иллюзий.',
+  // PLUTO
+  pluto_mc:  'Трансформация карьеры и репутации. Мощная тяга к власти, кризисы ведут к перерождению.',
+  pluto_ic:  'Глубокая трансформация уклада жизни. Процессы подземны и интенсивны — место кардинальных перемен.',
+  pluto_asc: 'Интенсивная среда, притягивает сильных людей. Личность трансформируется через встречи и вызовы.',
+  pluto_dsc: 'Трансформирующие партнёрства. Глубокие, иногда болезненные связи, ведущие к переосмыслению себя.',
+  // NODE (Северный Узел)
+  node_mc:  'Кармическое призвание через публичность и карьеру. Место, где раскрывается жизненная миссия.',
+  node_ic:  'Кармические корни в этом месте. Связь с предназначением через семью и внутренний мир.',
+  node_asc: 'Место судьбоносных знакомств. Кармические союзники появляются именно здесь.',
+  node_dsc: 'Кармические партнёрства — встречи, меняющие жизнь. Судьбоносные союзы.',
+  // CHIRON
+  chiron_mc:  'Исцеление через профессиональную реализацию. Работа с чужими ранами даёт карьерный смысл.',
+  chiron_ic:  'Место для исцеления глубинных травм и семейных паттернов. Внутренняя работа здесь наиболее эффективна.',
+  chiron_asc: 'Особая уязвимость и открытость. Среда способствует трансформации через принятие своей раны.',
+  chiron_dsc: 'Исцеляющие партнёрства. Встречи с людьми, помогающими расти через боль и уязвимость.',
+  // LILITH
+  lilith_mc:  'Тёмная сила и индивидуальность — на виду. Провокационная карьера или роль аутсайдера в системе.',
+  lilith_ic:  'Тёмные семейные паттерны выходят на поверхность. Место для их осознания и трансформации.',
+  lilith_asc: 'Магнетизм и тёмное притяжение усилены. Среда интенсивна, провокационна, полна скрытых сил.',
+  lilith_dsc: 'Интенсивные, страстные связи с тёмным оттенком. Партнёры пробуждают архетипические силы.',
+};
+
+function getAcgInterp(planet: string, angle: string): string | null {
+  const key = `${planet.toLowerCase()}_${angle.toLowerCase()}`;
+  return ACG_INTERP[key] ?? null;
+}
+
 function AcgHitBadge({ hit, isDark }: { hit: AcgHit; isDark: boolean }) {
   const pn = PLANET_NAMES_RU[hit.planet] ?? hit.planet;
   const isGood = Object.values(hit.sphereImpact).some(v => (v ?? 0) > 0);
@@ -1085,44 +1171,57 @@ function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLik
                       <p className={`text-xs font-semibold ${theme.accent} mb-2`}>
                         🗺 ACG — планетарные линии через город:
                       </p>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {item.acgHits.slice(0, 10).map((h, i) => {
                           const pn = PLANET_NAMES_RU[h.planet] ?? h.planet;
                           const topImpact = Object.entries(h.sphereImpact)
                             .filter(([,v]) => (v ?? 0) !== 0)
                             .sort((a, b) => Math.abs(b[1] ?? 0) - Math.abs(a[1] ?? 0))
                             .slice(0, 3);
+                          const interp = getAcgInterp(h.planet, h.angle);
+                          const isGoodHit = topImpact.some(([,v]) => (v ?? 0) > 0);
                           return (
-                            <div key={i} className={`rounded-lg p-2.5 flex items-start gap-3 ${
+                            <div key={i} className={`rounded-lg p-3 ${
                               h.isTransit
                                 ? (isDark ? 'bg-cyan-900/15 border border-cyan-500/20' : 'bg-cyan-50 border border-cyan-100')
-                                : (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')
+                                : isGoodHit
+                                  ? (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')
+                                  : (isDark ? 'bg-orange-900/10 border border-orange-500/15' : 'bg-orange-50 border border-orange-100')
                             }`}>
-                              <div className="shrink-0 text-center w-16">
-                                <div className={`text-[11px] font-bold ${h.isTransit ? (isDark ? 'text-cyan-300' : 'text-cyan-700') : (isDark ? 'text-indigo-300' : 'text-indigo-700')}`}>
-                                  {pn}/{h.angle}
+                              {/* Header row: planet/angle + orb + type + sphere chips */}
+                              <div className="flex items-start gap-3">
+                                <div className="shrink-0 text-center w-16">
+                                  <div className={`text-[11px] font-bold ${h.isTransit ? (isDark ? 'text-cyan-300' : 'text-cyan-700') : isGoodHit ? (isDark ? 'text-indigo-300' : 'text-indigo-700') : (isDark ? 'text-orange-300' : 'text-orange-700')}`}>
+                                    {pn}/{h.angle}
+                                  </div>
+                                  <div className={`text-[10px] ${theme.text} opacity-50`}>{h.orb.toFixed(1)}° орбис</div>
+                                  <div className={`text-[9px] mt-0.5 ${h.isTransit ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-500')}`}>
+                                    {h.isTransit ? 'транзит' : 'натал'}
+                                  </div>
                                 </div>
-                                <div className={`text-[10px] ${theme.text} opacity-50`}>{h.orb.toFixed(1)}° орбис</div>
-                                <div className={`text-[9px] mt-0.5 ${h.isTransit ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-500')}`}>
-                                  {h.isTransit ? 'транзит' : 'натал'}
+                                <div className="flex-1 flex flex-wrap gap-1 items-start">
+                                  {topImpact.map(([sk, v]) => {
+                                    const si = SPHERE_LABELS[sk];
+                                    if (!si) return null;
+                                    const pos = (v ?? 0) > 0;
+                                    return (
+                                      <span key={sk} className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                                        pos
+                                          ? (isDark ? 'bg-green-900/20 border-green-500/25 text-green-300' : 'bg-green-50 border-green-200 text-green-700')
+                                          : (isDark ? 'bg-red-900/20 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-700')
+                                      }`}>
+                                        {si.icon} {pos ? '+' : ''}{v}
+                                      </span>
+                                    );
+                                  })}
                                 </div>
                               </div>
-                              <div className="flex-1 flex flex-wrap gap-1">
-                                {topImpact.map(([sk, v]) => {
-                                  const si = SPHERE_LABELS[sk];
-                                  if (!si) return null;
-                                  const pos = (v ?? 0) > 0;
-                                  return (
-                                    <span key={sk} className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
-                                      pos
-                                        ? (isDark ? 'bg-green-900/20 border-green-500/25 text-green-300' : 'bg-green-50 border-green-200 text-green-700')
-                                        : (isDark ? 'bg-red-900/20 border-red-500/25 text-red-300' : 'bg-red-50 border-red-200 text-red-700')
-                                    }`}>
-                                      {si.icon} {pos ? '+' : ''}{v}
-                                    </span>
-                                  );
-                                })}
-                              </div>
+                              {/* Interpretation text */}
+                              {interp && (
+                                <p className={`mt-2 text-[11px] leading-relaxed ${theme.text} opacity-70`}>
+                                  {interp}
+                                </p>
+                              )}
                             </div>
                           );
                         })}

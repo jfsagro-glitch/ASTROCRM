@@ -841,6 +841,9 @@ export default function DailyForecastView({
   const bestDay = forecasts.reduce((best, d) => d.energyScore > best.energyScore ? d : best, forecasts[0]);
   const worstDay = forecasts.reduce((worst, d) => d.energyScore < worst.energyScore ? d : worst, forecasts[0]);
   const voidDays = forecasts.filter(d => d.voidOfCourse).length;
+  const compDays = forecasts.filter(d => d.compensatorics.length > 0).length;
+  // Top 3 days for "best windows"
+  const topDays = [...forecasts].sort((a, b) => b.energyScore - a.energyScore).slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -854,7 +857,7 @@ export default function DailyForecastView({
             { label: 'Благоприятных', value: goodDays, icon: '🟢', color: '#22c55e' },
             { label: 'Сложных', value: toughDays, icon: '🔴', color: '#ef4444' },
             { label: 'Без курса Луны', value: voidDays, icon: '⚫', color: '#94a3b8' },
-            { label: 'Лучший день', value: bestDay?.dayLabel ?? '—', icon: '⭐', color: '#f59e0b' },
+            { label: 'Компенсаторика', value: compDays, icon: '⚡', color: '#f97316' },
           ].map(s => (
             <div key={s.label} className={`rounded-xl p-3 text-center ${isDark ? 'bg-slate-800/60' : 'bg-white border border-slate-100'}`}>
               <div className="text-xl mb-1">{s.icon}</div>
@@ -863,10 +866,26 @@ export default function DailyForecastView({
             </div>
           ))}
         </div>
-        {bestDay && (
-          <p className={`text-[11px] mt-3 ${theme.text} opacity-60`}>
-            ⭐ Пиковый день: <b>{bestDay.dayLabel} ({bestDay.weekday})</b> — {bestDay.energyLabel} ({bestDay.energyScore}/100)
-            {worstDay && worstDay.date !== bestDay.date && ` · ⚠ Осторожно: ${worstDay.dayLabel} (${worstDay.energyScore}/100)`}
+
+        {/* Best windows highlight */}
+        {topDays.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <p className={`text-[11px] font-semibold ${theme.accent} mb-1`}>⭐ Лучшие дни периода:</p>
+            {topDays.map((d, i) => (
+              <div key={d.date} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${isDark ? 'bg-slate-800/50' : 'bg-white border border-slate-100'}`}>
+                <span className={`text-xs font-bold w-4 text-center ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>{i + 1}</span>
+                <span className={`text-[11px] font-semibold ${theme.header} w-16 shrink-0`}>{d.dayLabel} {d.weekday.slice(0,2)}</span>
+                <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: d.energyColor }} />
+                <span className={`text-[10px] font-semibold`} style={{ color: d.energyColor }}>{d.energyLabel}</span>
+                <span className={`text-[10px] ${theme.text} opacity-55 flex-1 min-w-0 truncate`}>{d.headline}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {worstDay && worstDay.date !== bestDay?.date && (
+          <p className={`text-[11px] mt-1 ${theme.text} opacity-50`}>
+            ⚠ Осторожно: <b>{worstDay.dayLabel} ({worstDay.weekday})</b> — {worstDay.energyLabel} ({worstDay.energyScore}/100)
           </p>
         )}
         <p className={`text-[10px] mt-1.5 ${theme.text} opacity-40`}>
