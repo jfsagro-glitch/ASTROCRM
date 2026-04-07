@@ -1527,6 +1527,7 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                     const wc = COLOR_MAP[w.color] ?? COLOR_MAP.slate;
                     const isPassed = w.status === 'passed';
                     const isActive = w.status === 'active';
+                    const calYear = decimalToMonthYear(holosData.birth + w.age);
                     return (
                       <div
                         key={i}
@@ -1541,10 +1542,15 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                         {/* Status indicator */}
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? wc.dot : isPassed ? 'bg-white/20' : `${wc.dot} opacity-50`}`} />
 
-                        {/* Age */}
-                        <span className={`text-xs font-mono w-12 shrink-0 ${isActive ? wc.text : isPassed ? 'text-white/30' : 'text-white/55'}`}>
-                          {w.age.toFixed(0)}л
-                        </span>
+                        {/* Age + calendar year */}
+                        <div className="shrink-0 w-16 text-right">
+                          <div className={`text-xs font-mono font-bold leading-none ${isActive ? wc.text : isPassed ? 'text-white/30' : 'text-white/55'}`}>
+                            {w.age.toFixed(0)}л
+                          </div>
+                          <div className={`text-[9px] mt-0.5 ${isActive ? wc.text + ' opacity-60' : 'text-white/20'}`}>
+                            {calYear}
+                          </div>
+                        </div>
 
                         {/* Icon + label */}
                         <span className="text-sm shrink-0">{w.icon}</span>
@@ -1553,7 +1559,7 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                         </span>
 
                         {/* Event types */}
-                        <span className={`text-[10px] shrink-0 ${isActive ? wc.text + ' opacity-80' : 'text-white/30'}`}>
+                        <span className={`text-[10px] shrink-0 hidden sm:inline ${isActive ? wc.text + ' opacity-80' : 'text-white/30'}`}>
                           {w.eventTypes[0]}
                         </span>
 
@@ -1568,47 +1574,94 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
             </div>
 
             {/* ── Планетарные фазы ── */}
-            <div>
-              <SectionTitle>Планетарные фазы сейчас</SectionTitle>
-              <Card>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: '♄ Сатурн', phase: holosData.satPhase, color: 'slate', returnN: holosData.satReturnN, nextYear: holosData.nextSatYear },
-                    { label: '♃ Юпитер', phase: holosData.jupPhase, color: 'indigo', returnN: null, nextYear: holosData.nextJupYear },
-                    { label: '☽ Лунный 9.3л', phase: holosData.lunar9Phase, color: 'sky', returnN: null, nextYear: null },
-                    { label: '☊ Узловой 18.6л', phase: holosData.nodePhase, color: 'violet', returnN: null, nextYear: null },
-                  ].map((item) => {
-                    const pc = COLOR_MAP[item.color] ?? COLOR_MAP.slate;
-                    const phasePct = Math.round(item.phase * 100);
-                    const phaseLabel = phasePct < 25 ? 'Начало' : phasePct < 50 ? 'Рост' : phasePct < 75 ? 'Пик' : 'Завершение';
-                    return (
-                      <div key={item.label} className="rounded-lg bg-white/4 border border-white/8 p-2.5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className={`text-xs font-bold ${pc.text}`}>{item.label}</span>
-                          {item.returnN !== null && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${pc.bg} ${pc.text} border ${pc.border}`}>
-                              Цикл {item.returnN + 1}
-                            </span>
-                          )}
-                        </div>
-                        <div className="h-1 rounded-full bg-white/10 overflow-hidden mb-1.5">
-                          <div className={`h-full rounded-full ${pc.dot}`} style={{ width: `${phasePct}%` }} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-white/40">{phaseLabel}</span>
-                          <span className={`text-[10px] font-mono ${pc.text}`}>{phasePct}%</span>
-                        </div>
-                        {item.nextYear && (
-                          <div className="text-[10px] text-white/30 mt-0.5">
-                            Следующий цикл: {item.nextYear.toFixed(1)}
+            {(() => {
+              const { birth, age, satPhase, jupPhase, lunar9Phase, nodePhase, satReturnN, nextSatYear, nextJupYear } = holosData;
+              const nextLunar9Year = birth + HOLOS_LUNAR9 * (Math.floor(age / HOLOS_LUNAR9) + 1);
+              const nextNodeYear   = birth + HOLOS_NODE   * (Math.floor(age / HOLOS_NODE)   + 1);
+
+              const PLANET_PHASE_INTERP: Record<string, { start: string; growth: string; peak: string; end: string }> = {
+                saturn: {
+                  start:  'Новый 29-летний цикл. Время закладывать фундамент, брать новые обязательства.',
+                  growth: 'Сатурн набирает силу. Структурируйте жизнь, стройте долгосрочное.',
+                  peak:   'Оппозиция Сатурна — кризис середины цикла. Оценка: правильно ли вы идёте?',
+                  end:    'Цикл завершается. Закрывайте незаконченное, отпускайте отжившее.',
+                },
+                jupiter: {
+                  start:  'Новый 12-летний цикл расширения. Удача открывается там, где вы искренни.',
+                  growth: 'Юпитер растёт — возможности множатся. Принимайте их, не откладывайте.',
+                  peak:   'Пик Юпитера — максимум удачи и расширения. Самое время для больших шагов.',
+                  end:    'Юпитер завершает цикл. Собирайте урожай, готовьтесь к следующему витку.',
+                },
+                lunar9: {
+                  start:  'Лунный ритм обновляется. Эмоциональная перезагрузка, новые привязанности.',
+                  growth: 'Внутренний мир стабилизируется. Ощущение безопасности растёт.',
+                  peak:   'Пик лунного цикла — максимальная эмоциональная насыщенность.',
+                  end:    'Лунный цикл на спаде. Отпускайте то, что перестало питать.',
+                },
+                node: {
+                  start:  'Новый узловой цикл. Кармические темы обновляются, судьбоносные встречи.',
+                  growth: 'Северный Узел набирает силу — двигайтесь в его направлении, это путь роста.',
+                  peak:   'Узловая оппозиция. Прошлое и будущее встречаются лицом к лицу.',
+                  end:    'Узловой цикл на финише. Что вы приняли? Что пора отпустить?',
+                },
+              };
+
+              const planets = [
+                { key: 'saturn', label: '♄ Сатурн', period: HOLOS_SAT, phase: satPhase, color: 'slate', cycleN: satReturnN + 1, nextYear: nextSatYear },
+                { key: 'jupiter', label: '♃ Юпитер', period: HOLOS_JUP, phase: jupPhase, color: 'indigo', cycleN: null, nextYear: nextJupYear },
+                { key: 'lunar9', label: '☽ Лунный 9.3л', period: HOLOS_LUNAR9, phase: lunar9Phase, color: 'sky', cycleN: null, nextYear: nextLunar9Year },
+                { key: 'node', label: '☊ Узловой 18.6л', period: HOLOS_NODE, phase: nodePhase, color: 'violet', cycleN: null, nextYear: nextNodeYear },
+              ];
+
+              return (
+                <div>
+                  <SectionTitle>Планетарные фазы сейчас</SectionTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {planets.map(item => {
+                      const pc = COLOR_MAP[item.color] ?? COLOR_MAP.slate;
+                      const pct = Math.round(item.phase * 100);
+                      const phaseKey = pct < 25 ? 'start' : pct < 50 ? 'growth' : pct < 75 ? 'peak' : 'end';
+                      const phaseLabel = pct < 25 ? 'Начало цикла' : pct < 50 ? 'Нарастание' : pct < 75 ? 'Пик / Оппозиция' : 'Завершение';
+                      const interp = PLANET_PHASE_INTERP[item.key][phaseKey];
+                      const cycleStart = decimalToMonthYear(item.nextYear - item.period);
+                      const cycleEnd   = decimalToMonthYear(item.nextYear);
+                      return (
+                        <div key={item.key} className={`rounded-xl border p-3 ${pc.bg} ${pc.border}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-xs font-bold ${pc.text}`}>{item.label}</span>
+                            {item.cycleN && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pc.bg} ${pc.text} border ${pc.border}`}>
+                                Цикл {item.cycleN}
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                          {/* Phase bar */}
+                          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1.5">
+                            <div className={`h-full rounded-full ${pc.dot} transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-[10px] font-semibold ${pc.text}`}>{phaseLabel}</span>
+                            <span className={`text-[10px] font-mono ${pc.text}`}>{pct}%</span>
+                          </div>
+
+                          {/* Interpretation */}
+                          <p className="text-[11px] text-white/65 leading-relaxed mb-2">{interp}</p>
+
+                          {/* Cycle dates */}
+                          <div className="flex items-center gap-1 text-[9px] text-white/30">
+                            <span>📅 Цикл:</span>
+                            <span>{cycleStart}</span>
+                            <span>→</span>
+                            <span className={`font-medium ${pc.text} opacity-70`}>{cycleEnd}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </Card>
-            </div>
+              );
+            })()}
 
             {/* ── Core Hash ── */}
             {(() => {
@@ -1716,11 +1769,14 @@ export default function HolosBlock({ chart, birthDate }: HolosBlockProps) {
                         </div>
                       </div>
                       <div className="shrink-0 text-right ml-2">
-                        <div className={`text-xs font-mono ${isActive ? ic.text : isPast ? 'text-white/25' : 'text-white/50'}`}>
+                        <div className={`text-xs font-mono font-bold ${isActive ? ic.text : isPast ? 'text-white/25' : 'text-white/50'}`}>
                           {nodeAge.toFixed(1)}л
                         </div>
-                        <div className="text-[10px] text-white/25">
-                          {isPast ? `было` : isActive ? '≈сейчас' : `через ${yearsLeft.toFixed(1)}л`}
+                        <div className={`text-[10px] ${isActive ? ic.text + ' opacity-70' : 'text-white/25'}`}>
+                          {decimalToMonthYear(holosData.birth + nodeAge)}
+                        </div>
+                        <div className="text-[9px] text-white/20 mt-0.5">
+                          {isPast ? 'прошло' : isActive ? '≈сейчас' : `через ${yearsLeft.toFixed(1)}л`}
                         </div>
                       </div>
                     </div>
