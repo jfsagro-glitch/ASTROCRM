@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Aperture, Cpu, Fingerprint, GitBranch, Sparkles } from 'lucide-react';
 import type { BirthInput } from '../types/astro';
-import type { HumanDesignContentMode, HumanDesignResult } from '../types/humanDesign';
+import type { HumanDesignCenter, HumanDesignChannel, HumanDesignContentMode, HumanDesignHangingGate, HumanDesignResult } from '../types/humanDesign';
 import { getHumanDesign } from '../services/humanDesignService';
 
 type ThemeLike = {
@@ -13,6 +13,7 @@ type ThemeLike = {
   tabActive: string;
   tabInactive: string;
   symbol: string;
+  wheelTheme?: string;
 };
 
 const HD_MODE_OPTIONS: Array<{ key: HumanDesignContentMode; label: string; subtitle: string }> = [
@@ -28,6 +29,213 @@ type ReaderSphere = {
   risks: string;
   compensation: string;
 };
+
+// ─── Bodygraph SVG ─────────────────────────────────────────────────────────────
+
+function normalizeCenterKey(s: string): string {
+  const t = s.toLowerCase().replace(/[\s\-_]/g, '').replace('center', '');
+  if (t.startsWith('head')) return 'head';
+  if (t.startsWith('ajna')) return 'ajna';
+  if (t.startsWith('throat')) return 'throat';
+  if (t === 'g' || t.startsWith('gcent') || t.startsWith('self') || t.startsWith('iident')) return 'g';
+  if (t.startsWith('ego') || t.startsWith('heart') || t.startsWith('will')) return 'ego';
+  if (t.startsWith('sacral')) return 'sacral';
+  if (t.startsWith('solar') || t.startsWith('emotion') || t.startsWith('solarplexus')) return 'solar';
+  if (t.startsWith('spleen') || t.startsWith('selen')) return 'spleen';
+  if (t.startsWith('root')) return 'root';
+  return t;
+}
+
+const BG_POS: Record<string, [number, number]> = {
+  head:   [190, 40],
+  ajna:   [190, 108],
+  throat: [190, 186],
+  g:      [142, 268],
+  ego:    [272, 224],
+  sacral: [190, 348],
+  solar:  [272, 318],
+  spleen: [104, 318],
+  root:   [190, 422],
+};
+
+const BG_SZ: Record<string, { w: number; h: number; diamond?: boolean }> = {
+  head:   { w: 54, h: 34 },
+  ajna:   { w: 54, h: 34 },
+  throat: { w: 66, h: 40 },
+  g:      { w: 60, h: 60, diamond: true },
+  ego:    { w: 54, h: 36 },
+  sacral: { w: 68, h: 44 },
+  solar:  { w: 56, h: 40 },
+  spleen: { w: 56, h: 40 },
+  root:   { w: 68, h: 38 },
+};
+
+const BG_CLR: Record<string, { light: string; dark: string; stroke: string }> = {
+  head:   { light: '#fbbf24', dark: '#f59e0b', stroke: '#b45309' },
+  ajna:   { light: '#a78bfa', dark: '#8b5cf6', stroke: '#6d28d9' },
+  throat: { light: '#f97316', dark: '#fb923c', stroke: '#c2410c' },
+  g:      { light: '#fde047', dark: '#fbbf24', stroke: '#b45309' },
+  ego:    { light: '#f87171', dark: '#f87171', stroke: '#b91c1c' },
+  sacral: { light: '#f87171', dark: '#ef4444', stroke: '#991b1b' },
+  solar:  { light: '#fb923c', dark: '#f97316', stroke: '#c2410c' },
+  spleen: { light: '#4ade80', dark: '#4ade80', stroke: '#166534' },
+  root:   { light: '#a16207', dark: '#a16207', stroke: '#78350f' },
+};
+
+const BG_NAME: Record<string, string> = {
+  head: 'ГОЛОВА', ajna: 'АДЖНА', throat: 'ГОРЛО',
+  g: 'Я-ЦЕН', ego: 'ЭГО', sacral: 'САКРАЛ',
+  solar: 'СП', spleen: 'СЕЛЕЗ', root: 'КОРЕНЬ',
+};
+
+const BG_EDGES: [string, string][] = [
+  ['head','ajna'], ['ajna','throat'],
+  ['throat','g'], ['throat','ego'], ['throat','solar'], ['throat','sacral'], ['throat','spleen'],
+  ['g','ego'], ['g','spleen'], ['g','sacral'],
+  ['ego','solar'],
+  ['sacral','solar'], ['sacral','spleen'], ['sacral','root'],
+  ['spleen','root'],
+];
+
+function BodygraphSVG({
+  centers, channels, isDark,
+}: {
+  centers: HumanDesignCenter[];
+  channels: HumanDesignChannel[];
+  isDark: boolean;
+}) {
+  const definedKeys = new Set(centers.filter(c => c.defined).map(c => normalizeCenterKey(c.key)));
+
+  const activeEdges = new Set<string>();
+  for (const ch of channels) {
+    const k1 = normalizeCenterKey(ch.centers[0]);
+    const k2 = normalizeCenterKey(ch.centers[1]);
+    activeEdges.add([k1, k2].sort().join('|'));
+  }
+  const isActive = (a: string, b: string) => activeEdges.has([a,b].sort().join('|'));
+
+  const openFill   = isDark ? '#1e293b' : '#f1f5f9';
+  const openStroke = isDark ? '#475569' : '#94a3b8';
+  const openText   = isDark ? '#64748b' : '#94a3b8';
+  const edgeOff    = isDark ? '#334155' : '#d1d5db';
+  const edgeOn     = '#6366f1';
+  const bg         = isDark ? '#0f172a' : '#f8fafc';
+
+  return (
+    <svg viewBox="0 0 380 462" className="w-full max-w-[260px] mx-auto select-none">
+      <rect width="380" height="462" fill={bg} rx="14" />
+
+      {BG_EDGES.map(([a, b]) => {
+        const [ax, ay] = BG_POS[a] ?? [0,0];
+        const [bx, by] = BG_POS[b] ?? [0,0];
+        const on = isActive(a, b);
+        return (
+          <line key={`${a}-${b}`}
+            x1={ax} y1={ay} x2={bx} y2={by}
+            stroke={on ? edgeOn : edgeOff}
+            strokeWidth={on ? 11 : 2}
+            strokeLinecap="round"
+            opacity={on ? 0.88 : 0.38}
+          />
+        );
+      })}
+
+      {Object.entries(BG_POS).map(([key, [cx, cy]]) => {
+        const sz   = BG_SZ[key]; if (!sz) return null;
+        const def  = definedKeys.has(key);
+        const clr  = BG_CLR[key];
+        const fill = def ? (isDark ? clr.dark : clr.light) : openFill;
+        const strk = def ? clr.stroke : openStroke;
+        const txtC = def ? (key === 'root' ? '#fef3c7' : '#1e293b') : openText;
+        const lbl  = BG_NAME[key] ?? key.toUpperCase();
+
+        if (sz.diamond) {
+          const d = sz.w / 2;
+          return (
+            <g key={key}>
+              <polygon
+                points={`${cx},${cy-d} ${cx+d},${cy} ${cx},${cy+d} ${cx-d},${cy}`}
+                fill={fill} stroke={strk} strokeWidth={2.5}
+              />
+              <text x={cx} y={cy+4} textAnchor="middle" fontSize="9" fontWeight="900"
+                fontFamily="system-ui,sans-serif" fill={txtC}>
+                {lbl}
+              </text>
+            </g>
+          );
+        }
+
+        return (
+          <g key={key}>
+            <rect x={cx-sz.w/2} y={cy-sz.h/2} width={sz.w} height={sz.h}
+              rx={5} fill={fill} stroke={strk} strokeWidth={2.5}
+            />
+            <text x={cx} y={cy+4} textAnchor="middle" fontSize="9" fontWeight="900"
+              fontFamily="system-ui,sans-serif" fill={txtC}>
+              {lbl}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Hanging Gates Section ─────────────────────────────────────────────────────
+
+function HangingGatesSection({
+  gates, theme, isDark,
+}: {
+  gates: HumanDesignHangingGate[];
+  theme: ThemeLike;
+  isDark: boolean;
+}) {
+  if (gates.length === 0) return null;
+  return (
+    <div className={`rounded-2xl border ${theme.card} p-5`}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-lg">🔗</span>
+        <h3 className={`text-lg font-semibold ${theme.header}`}>Висячие ворота</h3>
+        <span className={`text-xs px-2 py-0.5 rounded-full border ${theme.tabInactive}`}>{gates.length}</span>
+      </div>
+      <p className={`text-xs ${theme.text} opacity-50 mb-4`}>
+        Активные ворота без второй половины канала. Ищут партнёра для завершения связи — через человека, место или время.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+        {gates.map(g => (
+          <div key={g.gate} className={`rounded-xl border ${theme.card} p-3`}>
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className={`text-base font-black ${theme.header}`}>{g.gate}</span>
+                <div className="flex gap-1">
+                  {g.sides.map(s => (
+                    <span key={s} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                      s === 'personality'
+                        ? (isDark ? 'bg-sky-900/30 border-sky-500/30 text-sky-300' : 'bg-sky-50 border-sky-200 text-sky-700')
+                        : (isDark ? 'bg-red-900/30 border-red-500/30 text-red-300' : 'bg-red-50 border-red-200 text-red-700')
+                    }`}>
+                      {s === 'personality' ? 'Л' : 'Д'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {g.partner_gate && (
+                <span className={`text-[9px] ${theme.text} opacity-40 shrink-0`}>→ {g.partner_gate}</span>
+              )}
+            </div>
+            <p className={`text-xs font-semibold ${theme.accent} mb-0.5`}>{g.name}</p>
+            <p className={`text-[11px] ${theme.text} opacity-60 leading-relaxed mb-1.5`}>{g.keynote}</p>
+            {g.partner_gate && (
+              <p className={`text-[10px] ${theme.text} opacity-40`}>
+                Ищет ворота <b className={theme.accent}>{g.partner_gate}</b> для завершения канала
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StatCard({ title, value, subtitle, theme }: { title: string; value: string; subtitle?: string; theme: ThemeLike }) {
   return (
@@ -333,6 +541,68 @@ export default function HumanDesignBlock({
             <StatCard title="Определённость" value={result.overview.definition} subtitle={`Сигнатура: ${result.overview.signature} · Не-я: ${result.overview.not_self}`} theme={theme} />
           </div>
 
+          {/* ─── Bodygraph visual ───────────────────────────────────────────── */}
+          <div className={`rounded-2xl border ${theme.card} p-5`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Aperture className={`h-5 w-5 ${theme.symbol}`} />
+              <h3 className={`text-lg font-semibold ${theme.header}`}>Бодиграф</h3>
+              <div className="flex gap-3 ml-auto text-[10px] flex-wrap">
+                <span className={`flex items-center gap-1 ${theme.text} opacity-60`}>
+                  <span className="inline-block w-3 h-3 rounded-sm bg-amber-400" /> Определён
+                </span>
+                <span className={`flex items-center gap-1 ${theme.text} opacity-60`}>
+                  <span className={`inline-block w-3 h-3 rounded-sm border ${theme.card}`} style={{backgroundColor: 'transparent'}} /> Открыт
+                </span>
+                <span className={`flex items-center gap-1 ${theme.text} opacity-60`}>
+                  <span className="inline-block w-8 h-1.5 rounded-full bg-indigo-500" /> Канал
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <div className="w-full sm:w-64 shrink-0">
+                <BodygraphSVG centers={result.centers} channels={result.channels} isDark={theme.wheelTheme === 'dark'} />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                {/* Center legend */}
+                <div className={`text-[10px] uppercase tracking-widest ${theme.text} opacity-40 mb-1`}>Центры</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {result.centers.map(c => (
+                    <div key={c.key} className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
+                      c.defined
+                        ? (theme.wheelTheme === 'dark' ? 'bg-indigo-900/20 border-indigo-500/25' : 'bg-indigo-50 border-indigo-200')
+                        : theme.card
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${c.defined ? 'bg-indigo-400' : 'bg-slate-500/40'}`} />
+                      <span className={`text-[11px] font-medium truncate ${c.defined ? (theme.wheelTheme === 'dark' ? 'text-indigo-200' : 'text-indigo-700') : theme.text}`}>
+                        {c.name}
+                      </span>
+                      <span className={`text-[9px] ml-auto shrink-0 ${theme.text} opacity-40`}>
+                        {c.defined ? 'опр' : 'откр'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {result.channels.length > 0 && (
+                  <div className="mt-2">
+                    <div className={`text-[10px] uppercase tracking-widest ${theme.text} opacity-40 mb-1`}>
+                      Активные каналы ({result.channels.length})
+                    </div>
+                    <div className="space-y-1">
+                      {result.channels.slice(0, 6).map(ch => (
+                        <div key={ch.label} className={`text-[11px] ${theme.text} opacity-70`}>
+                          <span className="font-bold">{ch.label}</span> — {ch.name}
+                        </div>
+                      ))}
+                      {result.channels.length > 6 && (
+                        <div className={`text-[10px] ${theme.text} opacity-40`}>+{result.channels.length - 6} ещё</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className={`rounded-2xl border ${theme.card} p-5`}>
             <h3 className={`text-lg font-semibold ${theme.header}`}>Ваш Хьюман Дизайн: разбор по ключевым блокам</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -543,6 +813,14 @@ export default function HumanDesignBlock({
               <ActivationTable title="Активации личности (сознательное)" items={result.activations.personality} theme={theme} />
               <ActivationTable title="Активации дизайна (бессознательное)" items={result.activations.design} theme={theme} />
             </div>
+          ) : null}
+
+          {!isReaderMode && result.hanging_gates && result.hanging_gates.length > 0 ? (
+            <HangingGatesSection
+              gates={result.hanging_gates}
+              theme={theme}
+              isDark={theme.wheelTheme === 'dark'}
+            />
           ) : null}
 
           <div className={`rounded-2xl border ${theme.card} p-5`}>
