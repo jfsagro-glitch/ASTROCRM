@@ -1,1466 +1,1022 @@
 /**
- * LifeSphereReports.tsx
- * Detailed life-sphere reports in the style of Pavel Andreev's school.
- * Spheres: Финансы · Здоровье · Профессия · Энергия · Жизненный план
+ * LifeSphereReports.tsx — v2
+ * Отчёты по сферам в методе Павла Андреева.
+ * Конкретика, факты, без воды.
  */
 
 import React, { useState, useMemo } from 'react';
-import type { NatalChart, PlanetData } from '../types/astro';
+import type { NatalChart } from '../types/astro';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   chart: NatalChart;
   name?: string;
   theme: 'dark' | 'light';
-  birthDate?: string; // YYYY-MM-DD for life-plan age calculations
+  birthDate?: string; // YYYY-MM-DD
 }
 
 type SphereKey = 'finance' | 'health' | 'career' | 'energy' | 'plan';
 
-// ─── Sign metadata ────────────────────────────────────────────────────────────
-const SIGNS: Record<string, {
-  ru: string; element: string; mode: string; keyword: string;
-  body_zone: string; body_desc: string;
-}> = {
-  aries:       { ru: 'Овен',      element: 'Огонь', mode: 'Кардинальный', keyword: 'Инициатива',
-    body_zone: 'Голова, мозг, лицо', body_desc: 'склонность к головным болям, сосудистым реакциям, риск переутомления из-за импульсивности' },
-  taurus:      { ru: 'Телец',     element: 'Земля', mode: 'Фиксированный', keyword: 'Ресурс',
-    body_zone: 'Горло, шея, щитовидная железа', body_desc: 'уязвимость горла и голоса, гормональный баланс, важна умеренность в питании' },
-  gemini:      { ru: 'Близнецы',  element: 'Воздух', mode: 'Мутабельный', keyword: 'Коммуникация',
-    body_zone: 'Лёгкие, руки, нервная система', body_desc: 'склонность к нервному истощению, бронхиту, важна разгрузка информационного потока' },
-  cancer:      { ru: 'Рак',       element: 'Вода', mode: 'Кардинальный', keyword: 'Защита',
-    body_zone: 'Желудок, грудь, лимфатическая система', body_desc: 'психосоматика ЖКТ, иммунитет реагирует на эмоциональное состояние' },
-  leo:         { ru: 'Лев',       element: 'Огонь', mode: 'Фиксированный', keyword: 'Творчество',
-    body_zone: 'Сердце, позвоночник, спина', body_desc: 'нагрузка на сердечно-сосудистую систему, спину; важен режим и умеренная активность' },
-  virgo:       { ru: 'Дева',      element: 'Земля', mode: 'Мутабельный', keyword: 'Анализ',
-    body_zone: 'Кишечник, пищеварение, поджелудочная', body_desc: 'чувствительное пищеварение, склонность к тревожным расстройствам, помогают распорядок и диета' },
-  libra:       { ru: 'Весы',      element: 'Воздух', mode: 'Кардинальный', keyword: 'Баланс',
-    body_zone: 'Почки, поясница, кожа', body_desc: 'уязвимость почек и поясницы, важен водный баланс и равновесие в отношениях' },
-  scorpio:     { ru: 'Скорпион',  element: 'Вода', mode: 'Фиксированный', keyword: 'Трансформация',
-    body_zone: 'Репродуктивная система, детокс-органы', body_desc: 'гормональные циклы, детоксикация, важны практики выхода из стресса' },
-  sagittarius: { ru: 'Стрелец',   element: 'Огонь', mode: 'Мутабельный', keyword: 'Расширение',
-    body_zone: 'Бёдра, печень, седалищный нерв', body_desc: 'печень и ишиас, склонность к перееданию и излишествам, помогает движение' },
-  capricorn:   { ru: 'Козерог',   element: 'Земля', mode: 'Кардинальный', keyword: 'Структура',
-    body_zone: 'Кости, суставы, кожа, зубы', body_desc: 'суставы и скелет, склонность к хроническим заболеваниям от перегрузки, важен отдых' },
-  aquarius:    { ru: 'Водолей',   element: 'Воздух', mode: 'Фиксированный', keyword: 'Инновация',
-    body_zone: 'Голени, лодыжки, кровообращение', body_desc: 'кровеносная и нервная система, склонность к спазмам, важны прогулки и дыхательные практики' },
-  pisces:      { ru: 'Рыбы',      element: 'Вода', mode: 'Мутабельный', keyword: 'Растворение',
-    body_zone: 'Стопы, лимфатическая система, иммунитет', body_desc: 'психосоматика, чувствительность к токсинам и алкоголю, важна защита личных границ' },
+// ─── Constants ────────────────────────────────────────────────────────────────
+const SRU: Record<string, string> = {
+  aries:'Овен', taurus:'Телец', gemini:'Близнецы', cancer:'Рак', leo:'Лев',
+  virgo:'Дева', libra:'Весы', scorpio:'Скорпион', sagittarius:'Стрелец',
+  capricorn:'Козерог', aquarius:'Водолей', pisces:'Рыбы',
+};
+const PCOLOR: Record<string, string> = {
+  sun:'#d4a853', moon:'#9ab5d4', mercury:'#88c4a8', venus:'#d48aaa', mars:'#d45b5b',
+  jupiter:'#d4a04a', saturn:'#8899bb', uranus:'#5bbbcc', neptune:'#7788dd',
+  pluto:'#bb77aa', node:'#ccaa44', chiron:'#66aabb', lilith:'#9966aa',
+};
+const PRU: Record<string, string> = {
+  sun:'Солнце', moon:'Луна', mercury:'Меркурий', venus:'Венера', mars:'Марс',
+  jupiter:'Юпитер', saturn:'Сатурн', uranus:'Уран', neptune:'Нептун',
+  pluto:'Плутон', node:'С.Узел', chiron:'Хирон', lilith:'Лилит',
+};
+const PGLYPH: Record<string, string> = {
+  sun:'☉', moon:'☽', mercury:'☿', venus:'♀', mars:'♂', jupiter:'♃',
+  saturn:'♄', uranus:'⛢', neptune:'♆', pluto:'♇', node:'☊', chiron:'⚷', lilith:'⚸',
+};
+const HRU: Record<number, string> = {
+  1:'Личность', 2:'Ресурс', 3:'Коммуникации', 4:'Дом/Род', 5:'Творчество',
+  6:'Труд/Тело', 7:'Партнёр', 8:'Трансформация', 9:'Экспансия', 10:'Статус/Карьера',
+  11:'Сообщество', 12:'Скрытое',
+};
+// Modern rulers
+const RULER: Record<string, string> = {
+  aries:'mars', taurus:'venus', gemini:'mercury', cancer:'moon', leo:'sun',
+  virgo:'mercury', libra:'venus', scorpio:'pluto', sagittarius:'jupiter',
+  capricorn:'saturn', aquarius:'uranus', pisces:'neptune',
+};
+const ELEMENT: Record<string, string> = {
+  aries:'Огонь', taurus:'Земля', gemini:'Воздух', cancer:'Вода', leo:'Огонь',
+  virgo:'Земля', libra:'Воздух', scorpio:'Вода', sagittarius:'Огонь',
+  capricorn:'Земля', aquarius:'Воздух', pisces:'Вода',
+};
+const BODY: Record<string, { zones: string; note: string }> = {
+  aries:       { zones: 'Голова, сосуды мозга', note: 'Мигрени, сосудистые реакции, риск перегрева. Избегайте перегрузок головы.' },
+  taurus:      { zones: 'Горло, щитовидка, шея', note: 'Голос и гормональный баланс — чувствительные точки. Следите за щитовидной железой.' },
+  gemini:      { zones: 'Лёгкие, нервная система, руки', note: 'Нервное истощение при информационной перегрузке. Бронхи, туннельный синдром запястья.' },
+  cancer:      { zones: 'Желудок, грудная клетка, лимфа', note: 'ЖКТ реагирует на эмоциональный фон. Психосоматика — через стресс в желудок.' },
+  leo:         { zones: 'Сердце, позвоночник, спина', note: 'Сердечно-сосудистая нагрузка при перенапряжении. Поясница — при сидячей работе.' },
+  virgo:       { zones: 'Кишечник, поджелудочная', note: 'Чувствительное пищеварение, склонность к тревожным расстройствам. Режим питания критичен.' },
+  libra:       { zones: 'Почки, поясница, кожа', note: 'Почечные реакции на дисбаланс и конфликты. Водный баланс важен.' },
+  scorpio:     { zones: 'Репродуктивная система, детокс', note: 'Гормональные циклы, интоксикации. Регулярный детокс и работа со стрессом — необходимость.' },
+  sagittarius: { zones: 'Печень, бёдра, седалищный нерв', note: 'Печень и ишиас — зоны контроля. Умеренность в еде и алкоголе.' },
+  capricorn:   { zones: 'Кости, суставы, кожа, зубы', note: 'Хронические суставные и костные проблемы при перегрузке. Профилактика важнее лечения.' },
+  aquarius:    { zones: 'Голени, кровообращение, нервы', note: 'Спазмы сосудов, нервные тики. Движение и дыхательные практики — ежедневно.' },
+  pisces:      { zones: 'Стопы, иммунитет, лимфа', note: 'Чувствительность к токсинам и алкоголю. Открытые границы = накапливание чужого стресса.' },
 };
 
-// ─── Planet metadata ──────────────────────────────────────────────────────────
-const PLANETS: Record<string, { ru: string; color: string; key: string }> = {
-  sun:     { ru: 'Солнце',   color: '#d4a853', key: '☉' },
-  moon:    { ru: 'Луна',     color: '#9ab5d4', key: '☽' },
-  mercury: { ru: 'Меркурий', color: '#88c4a8', key: '☿' },
-  venus:   { ru: 'Венера',   color: '#d48aaa', key: '♀' },
-  mars:    { ru: 'Марс',     color: '#d45b5b', key: '♂' },
-  jupiter: { ru: 'Юпитер',   color: '#d4a04a', key: '♃' },
-  saturn:  { ru: 'Сатурн',   color: '#8899bb', key: '♄' },
-  uranus:  { ru: 'Уран',     color: '#5bbbcc', key: '⛢' },
-  neptune: { ru: 'Нептун',   color: '#7788dd', key: '♆' },
-  pluto:   { ru: 'Плутон',   color: '#bb77aa', key: '♇' },
-  node:    { ru: 'С.Узел',   color: '#ccaa44', key: '☊' },
-  chiron:  { ru: 'Хирон',    color: '#66aabb', key: '⚷' },
-};
-
-const HOUSES: Record<number, { name: string; theme: string }> = {
-  1:  { name: 'Дом Я',             theme: 'личность и тело' },
-  2:  { name: 'Дом ресурса',       theme: 'деньги и ценности' },
-  3:  { name: 'Дом ближнего',      theme: 'коммуникации' },
-  4:  { name: 'Дом рода',          theme: 'семья и корни' },
-  5:  { name: 'Дом творчества',    theme: 'самовыражение' },
-  6:  { name: 'Дом службы',        theme: 'работа и здоровье' },
-  7:  { name: 'Дом партнёра',      theme: 'партнёрства' },
-  8:  { name: 'Дом трансформации', theme: 'чужие ресурсы' },
-  9:  { name: 'Дом экспертизы',    theme: 'знание и смысл' },
-  10: { name: 'Дом статуса',       theme: 'карьера и репутация' },
-  11: { name: 'Дом аудитории',     theme: 'сообщество и цели' },
-  12: { name: 'Дом тайного',       theme: 'скрытое и кармическое' },
-};
-
-// Ruler of a house by sign on its cusp (traditional + outer co-rulers)
-const SIGN_RULER: Record<string, string> = {
-  aries: 'mars', taurus: 'venus', gemini: 'mercury', cancer: 'moon',
-  leo: 'sun', virgo: 'mercury', libra: 'venus', scorpio: 'pluto',
-  sagittarius: 'jupiter', capricorn: 'saturn', aquarius: 'uranus', pisces: 'neptune',
-};
-const SIGN_TRAD_RULER: Record<string, string> = {
-  aries: 'mars', taurus: 'venus', gemini: 'mercury', cancer: 'moon',
-  leo: 'sun', virgo: 'mercury', libra: 'venus', scorpio: 'mars',
-  sagittarius: 'jupiter', capricorn: 'saturn', aquarius: 'saturn', pisces: 'jupiter',
-};
-
-function getHouseSign(chart: NatalChart, houseNum: number): string | null {
-  const key = String(houseNum);
-  return chart.houses[key]?.sign ?? null;
+// ─── House key helpers (API uses h1..h12) ─────────────────────────────────────
+function hSign(chart: NatalChart, n: number): string | null {
+  return (chart.houses as Record<string, { sign?: string }>)[`h${n}`]?.sign ?? null;
 }
-
-function getHouseRuler(chart: NatalChart, houseNum: number): string | null {
-  const sign = getHouseSign(chart, houseNum);
-  return sign ? (SIGN_RULER[sign] ?? null) : null;
+function hRuler(chart: NatalChart, n: number): string | null {
+  const s = hSign(chart, n);
+  return s ? (RULER[s] ?? null) : null;
 }
-
-function getPlanetsInHouse(chart: NatalChart, houseNum: number): Array<[string, PlanetData]> {
-  return Object.entries(chart.planets).filter(([, p]) => p.house === houseNum);
+function planetsIn(chart: NatalChart, n: number): Array<{ name: string; sign: string; house: number; retrograde: boolean }> {
+  return Object.entries(chart.planets)
+    .filter(([, p]) => p.house === n)
+    .map(([name, p]) => ({ name, sign: p.sign, house: p.house, retrograde: p.retrograde }));
 }
-
-function getRulerData(chart: NatalChart, houseNum: number): PlanetData | null {
-  const ruler = getHouseRuler(chart, houseNum);
-  return ruler ? (chart.planets[ruler] ?? null) : null;
+function dignity(chart: NatalChart, p: string): string | null {
+  return chart.dignities?.[p]?.dignity ?? null;
 }
-
-function signRu(sign: string | null | undefined): string {
-  return sign ? (SIGNS[sign]?.ru ?? sign) : '—';
-}
-
-function planetRu(name: string): string {
-  return PLANETS[name]?.ru ?? name;
-}
-
-function dignityBadge(d: string | null | undefined): string {
-  if (!d) return '';
-  if (d === 'domicile') return ' ⭐ в домициле';
-  if (d === 'exaltation') return ' ⬆ в экзальтации';
-  if (d === 'detriment') return ' ⬇ в изгнании';
-  if (d === 'fall') return ' ⬇ в падении';
+function isStrong(dg: string | null): boolean { return dg === 'domicile' || dg === 'exaltation'; }
+function isWeak(dg: string | null): boolean   { return dg === 'detriment' || dg === 'fall'; }
+function dgBadge(dg: string | null): string {
+  if (dg === 'domicile') return ' ⭐';
+  if (dg === 'exaltation') return ' ↑';
+  if (dg === 'detriment') return ' ↓';
+  if (dg === 'fall') return ' ⬇';
   return '';
 }
+function sRu(s: string | null | undefined): string { return s ? (SRU[s] ?? s) : '—'; }
+function pLabel(name: string, sign: string | null, house: number, retro: boolean, chart: NatalChart): string {
+  const dg = dignity(chart, name);
+  return `${PGLYPH[name] ?? ''} ${PRU[name] ?? name} ${sRu(sign)} · ${house}H${retro ? ' Rx' : ''}${dgBadge(dg)}`;
+}
+function tightAspects(chart: NatalChart, pName: string, maxOrb = 3) {
+  return (chart.aspects ?? [])
+    .filter(a => (a.p1 === pName || a.p2 === pName) && a.orb <= maxOrb)
+    .slice(0, 3);
+}
+function aspectTone(type: string): 'good' | 'tense' | 'neutral' {
+  if (['trine','sextile'].includes(type)) return 'good';
+  if (['square','opposition','quincunx'].includes(type)) return 'tense';
+  return 'neutral';
+}
+const ASPECT_RU: Record<string, string> = {
+  conjunction:'☌ соед', trine:'△ трин', sextile:'⚹ секс', square:'□ кв',
+  opposition:'☍ оппоз', quincunx:'⬡ квинк',
+};
 
-function planetBadge(name: string, p: PlanetData, chart: NatalChart): string {
-  const dg = chart.dignities?.[name]?.dignity;
-  const retro = p.retrograde ? ' Rx' : '';
-  return `${PLANETS[name]?.key ?? ''} ${planetRu(name)} в ${signRu(p.sign)} · ${p.house} дом${retro}${dignityBadge(dg)}`;
+// ─── Age helpers ──────────────────────────────────────────────────────────────
+function calcAge(birthDate?: string): number {
+  if (!birthDate) return 35;
+  const parts = birthDate.split('-');
+  if (parts.length !== 3) return 35;
+  const birth = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (isNaN(birth.getTime())) return 35;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+  ) age--;
+  return age;
 }
 
-// ─── Aspect helpers ───────────────────────────────────────────────────────────
-function getAspectsTo(chart: NatalChart, planetName: string): typeof chart.aspects {
-  return (chart.aspects || []).filter(a => a.p1 === planetName || a.p2 === planetName);
+function saturnPhase(age: number) {
+  const P = 29.5;
+  const cycleNum = Math.floor(age / P) + 1;
+  const yr = age % P;
+  const prev = Math.round(Math.floor(age / P) * P);
+  const next = Math.round(prev + P);
+  type Phase = { label: string; desc: string; color: string };
+  const phases: Phase[] = cycleNum === 1
+    ? [
+        { label: 'Становление (0–7 цикла)', color: '#34d399',
+          desc: 'Закладывается психологический и социальный фундамент. Паттерны этого периода определяют базовые стратегии.' },
+        { label: 'Первое освоение (7–14)', color: '#60a5fa',
+          desc: 'Первые серьёзные социальные роли, испытание своих сил реальностью.' },
+        { label: 'Кризис выбора (14–21)', color: '#f59e0b',
+          desc: 'Столкновение с ограничениями, первый серьёзный выбор направления жизни.' },
+        { label: 'Строительство взрослости (21–29)', color: '#a78bfa',
+          desc: 'Первое самостоятельное строительство карьеры, отношений, статуса. Подготовка к возврату Сатурна.' },
+      ]
+    : cycleNum === 2
+    ? [
+        { label: 'Перезапуск после 1-го возврата', color: '#34d399',
+          desc: 'Жизнь перестроена с нуля на осознанном фундаменте. Период быстрого нового строительства.' },
+        { label: 'Профессиональный расцвет (36–43)', color: '#60a5fa',
+          desc: 'Максимальная продуктивность и влияние. Компетентность доказана, статус растёт.' },
+        { label: 'Переоценка зрелости (43–51)', color: '#f59e0b',
+          desc: 'Совпадает с оппозицией Урана (~42) и приближением Хирон-возврата (~50). Глубокий внутренний сдвиг: зачем и для кого я это делаю?' },
+        { label: 'Итоги 2-го цикла (51–59)', color: '#a78bfa',
+          desc: 'Оформление репутации, передача опыта, подготовка к 2-му возврату Сатурна.' },
+      ]
+    : [
+        { label: 'После 2-го возврата', color: '#c084fc',
+          desc: 'Освобождение от социальных масок. Аутентичная роль, мудрость, наследие.' },
+        { label: 'Мудрость', color: '#c084fc', desc: 'Передача накопленного. Внутренняя свобода.' },
+        { label: 'Мудрость', color: '#c084fc', desc: 'Передача накопленного. Внутренняя свобода.' },
+        { label: 'Мудрость', color: '#c084fc', desc: 'Передача накопленного. Внутренняя свобода.' },
+      ];
+  const idx = yr < 7 ? 0 : yr < 14 ? 1 : yr < 21 ? 2 : 3;
+  const ph = phases[idx];
+  return { ...ph, cycleNum, yr: Math.floor(yr), prev, next };
 }
 
-function describeAspect(type: string): { tone: 'good' | 'tense' | 'neutral'; short: string } {
-  const map: Record<string, { tone: 'good' | 'tense' | 'neutral'; short: string }> = {
-    trine:       { tone: 'good',    short: 'трин — природная поддержка' },
-    sextile:     { tone: 'good',    short: 'секстиль — возможности при усилии' },
-    conjunction: { tone: 'neutral', short: 'соединение — слияние тем' },
-    opposition:  { tone: 'tense',   short: 'оппозиция — напряжение и поляризация' },
-    square:      { tone: 'tense',   short: 'квадрат — вызов, генератор энергии' },
-    quincunx:    { tone: 'tense',   short: 'квинконс — хроническое напряжение' },
-  };
-  return map[type] ?? { tone: 'neutral', short: type };
+function jupiterPhase(age: number) {
+  const yr = age % 12;
+  if (yr < 2)   return { label: 'Новый цикл (удача)', color: '#fbbf24', desc: 'Юпитер вернулся на ваш Юпитер. Открываются новые возможности и двери.' };
+  if (yr < 4)   return { label: 'Рост', color: '#34d399', desc: 'Начала цикла приносят первые плоды. Хорошее время для расширения.' };
+  if (yr < 6)   return { label: 'Коррекция', color: '#f59e0b', desc: 'Нужно скорректировать стратегию. Квадрат Юпитера ставит вопросы.' };
+  if (yr < 8)   return { label: 'Кульминация', color: '#818cf8', desc: 'Оппозиция Юпитера — пик видимости и результатов. Максимум отдачи от начатого 6 лет назад.' };
+  if (yr < 10)  return { label: 'Пожинание', color: '#60a5fa', desc: 'Собираете урожай. Период признания и получения заслуженного.' };
+  return { label: 'Завершение цикла', color: '#94a3b8', desc: 'Отпустить отжившее, приготовиться к новому 12-летнему циклу.' };
 }
 
-// ─── UI helpers ──────────────────────────────────────────────────────────────
-function useDark(theme: 'dark' | 'light') { return theme === 'dark'; }
+// ─── Interpretation knowledge base ───────────────────────────────────────────
 
-function Card({ children, isDark, accent = '#818cf8' }: {
-  children: React.ReactNode; isDark: boolean; accent?: string;
+// 2H ruler by house — откуда деньги
+const MONEY_FROM_HOUSE: Record<number, string> = {
+  1:  'Личный бренд и прямые продажи себя. Деньги = ваша узнаваемость и энергия присутствия.',
+  2:  'Собственные активы и инвестиции. Деньги делают деньги — пассивный доход реален.',
+  3:  'Слово, информация, посредничество. Тексты, курсы, агентские схемы в ближнем окружении.',
+  4:  'Недвижимость, семейный бизнес, работа из дома. Родина и корни как источник.',
+  5:  'Творчество, развлечения, коучинг, смелые ставки на себя как продукт.',
+  6:  'Наёмный труд и сервисный бизнес. Деньги — обмен рабочего времени на качество.',
+  7:  'Партнёрства. Каждый значимый деловой партнёр прямо влияет на доход.',
+  8:  'Инвестиции, чужие деньги, кризис-менеджмент, трансформационные услуги или наследство.',
+  9:  'Экспертиза, преподавание, международный рынок, издательство и публичная философия.',
+  10: 'Карьера и репутация — ваша главная финансовая валюта. Статус = доход.',
+  11: 'Сети, платформы, подписки, коллективные проекты и технологии.',
+  12: 'Скрытый труд: исследования, психологические или духовные услуги, работа за кулисами.',
+};
+
+// Planets in 2H — прямые модификаторы
+const PLANET_IN_2H: Record<string, string> = {
+  sun:     'Самооценка = зарплата напрямую. Получаете столько, сколько себя цените в моменте. Деньги через личный авторитет и узнаваемость.',
+  moon:    'Доход циклически колышется. Интуиция на рынок и запросы аудитории — сильная. Работа с женской аудиторией или в сфере заботы/питания — денежный канал.',
+  mercury: 'Несколько источников дохода одновременно — норма. Деньги через информацию, переговоры, посредничество.',
+  venus:   'Деньги приходят с относительной лёгкостью через сферу красоты, удовольствия, эстетики. Склонность к импульсивным тратам.',
+  mars:    'Агрессивное зарабатывание: быстро зарабатывает — быстро тратит. Конкурентная среда, предпринимательство, скорость.',
+  jupiter: 'Один из самых сильных финансовых показателей. Деньги расширяются. Риск — переоценить возможности и перерасходовать.',
+  saturn:  'Медленный, но надёжный финансовый рост. После 35–38 — финансовая стабилизация. До этого — ограничения и дисциплина.',
+  uranus:  'Нестабильные, нестандартные источники: IT, стартапы, фриланс. Скачки вверх и вниз.',
+  neptune: 'Деньги сквозь пальцы — не потому что мало зарабатывает, а потому что сложно удержать: идеализм в оценке своего труда, склонность к щедрости без расчёта, риск обмана. Поток открывается через творчество, духовные практики или работу с воображением.',
+  pluto:   'Трансформации в деньгах: потеря и восстановление капитала — неоднократно. Потенциал крупных денег через кризисные отрасли или инвестиции.',
+  chiron:  'Рана самоценности. Пока не принята — деньги уходят. После проработки — открывается мощный финансовый поток через помощь другим в этой же теме.',
+};
+
+// MC sign — профессиональный архетип
+const MC_ARCHETYPE: Record<string, string> = {
+  aries:       'Архетип первопроходца. Карьера через инициативу, запуск нового, конкуренцию. Предпринимательство, спорт, кризис-менеджмент, военное дело.',
+  taurus:      'Архетип строителя ценностей. Репутация через надёжность и долгосрочное качество. Финансы, искусство, архитектура, сельское хозяйство, luxury.',
+  gemini:      'Архетип коммуникатора. Незаменимы там, где нужно говорить, писать, координировать. Несколько ролей одновременно — норма. Медиа, IT, торговля, образование.',
+  cancer:      'Архетип хранителя. Профессиональная сила — эмпатия и создание безопасной среды. Медицина, психология, недвижимость, кулинария, семейный бизнес.',
+  leo:         'Архетип лидера и творца. Рождены быть видимыми. Карьера требует сцены. Шоу-бизнес, управление, политика, образование, медиа.',
+  virgo:       'Архетип аналитика и мастера. Репутация строится на безупречной точности работы. Медицина, наука, финансовый анализ, редактура, здоровье.',
+  libra:       'Архетип дипломата и эстета. Деньги и статус через партнёрства и баланс. Право, дизайн, PR, медиация, психология отношений.',
+  scorpio:     'Архетип трансформатора. Работают там, куда другие боятся зайти: глубинная психология, хирургия, кризис-менеджмент, финансы, детективная работа.',
+  sagittarius: 'Архетип эксперта с горизонтом. Международный масштаб, высшее образование, право, религия, туризм. Репутация через мудрость и экспансию.',
+  capricorn:   'Архетип руководителя. Рождены для иерархии — и оказываются на её вершине со временем. Государственная служба, строительство, управление.',
+  aquarius:    'Архетип реформатора. Меняют системы, создают будущее. IT, наука, НКО, электронные технологии, социальные инновации.',
+  pisces:      'Архетип целителя и художника. Искусство, духовные практики, кино, психотерапия, социальная работа. Репутация через сострадание и вдохновение.',
+};
+
+// MC ruler by house — откуда приходит карьерный успех
+const CAREER_FROM_HOUSE: Record<number, string> = {
+  1:  'Успех через личный бренд — вы сами и есть бизнес. Всё строится вокруг вашей персоны.',
+  2:  'Карьера через управление ресурсами — финансы, активы, собственное мастерство как капитал.',
+  3:  'Успех через коммуникации, репутацию в ближнем кругу, тексты, обучение.',
+  4:  'Карьера от корней — семейный бизнес, недвижимость, работа из дома или в родном городе.',
+  5:  'Успех через творчество, шоу, коучинг, дети, смелость себя проявить.',
+  6:  'Карьера через безупречное ежедневное исполнение. Репутация = качество работы.',
+  7:  'Успех через партнёров. Правильный человек рядом — катализатор карьеры.',
+  8:  'Карьера через трансформацию — чужих, ситуаций, финансовых потоков. Психология, инвестиции.',
+  9:  'Успех через экспертизу и публичную мудрость. Преподавание, международная аудитория.',
+  10: 'Карьера как основная тема жизни. Управитель MC в 10-м — сверхконцентрация на профессиональной реализации.',
+  11: 'Успех через сети и аудиторию. Платформа, сообщество, технологии, коллективные цели.',
+  12: 'Карьера через скрытый труд — исследование, духовная практика, работа за кулисами.',
+};
+
+// Sun in sign — энергетический профиль
+const SUN_ENERGY_PROFILE: Record<string, { charge: string; drain: string; restore: string }> = {
+  aries:       { charge:'Новые проекты, соревнование, первопроходство', drain:'Рутина и ожидание', restore:'Физическая нагрузка, новый вызов' },
+  taurus:      { charge:'Сенсорное удовольствие, медленный созидательный труд', drain:'Форс-мажор и спешка', restore:'Природа, вкусная еда, тишина' },
+  gemini:      { charge:'Новые идеи, разнообразие, общение', drain:'Монотонность и изоляция', restore:'Смена деятельности, чтение, разговоры' },
+  cancer:      { charge:'Близкие, дом, эмоциональная безопасность', drain:'Конфликты, чужие проблемы', restore:'Уединение дома, вода, близкие люди' },
+  leo:         { charge:'Признание, сцена, творческая самореализация', drain:'Игнорирование, рутинный труд без аплодисментов', restore:'Творчество, игра, восхищение' },
+  virgo:       { charge:'Порядок, чёткая задача, ощутимый результат', drain:'Хаос, неопределённость, критика без конструктива', restore:'Режим, уединение, чистота' },
+  libra:       { charge:'Гармоничная среда, красота, равноправный диалог', drain:'Конфликты, несправедливость', restore:'Красивое пространство, музыка, общение 1-на-1' },
+  scorpio:     { charge:'Глубина, трансформация, власть над ситуацией', drain:'Поверхностность, ложь, потеря контроля', restore:'Уединение, вода, интенсивные практики' },
+  sagittarius: { charge:'Путешествия, новые горизонты, большая идея', drain:'Клетка обязательств без смысла', restore:'Движение, природа, философия' },
+  capricorn:   { charge:'Конкретная цель с измеримым результатом', drain:'Хаотичная трата времени и ресурсов', restore:'Структурированный отдых, природа, сон' },
+  aquarius:    { charge:'Нестандартная задача, единомышленники, будущее', drain:'Принуждение к конформизму', restore:'Одиночество, необычные занятия, технологии' },
+  pisces:      { charge:'Творчество, духовная практика, помощь', drain:'Чужой стресс, токсичная среда', restore:'Вода, музыка, медитация, тишина' },
+};
+
+// Mars in sign — физическая воля
+const MARS_PROFILE: Record<string, string> = {
+  aries:       'В домициле. Воля прямая, немедленная, без полутонов. Инициатива — рефлекс. Риск — сжигает себя быстрее, чем задуманное выполнено.',
+  taurus:      'Медленный старт, но нерушимое упорство. Не отступит никогда. Эффективен в долгих кампаниях, слабее в спринте.',
+  gemini:      'Воля через слово и скорость мысли. Несколько фронтов одновременно. Сильнее в переговорах, чем в прямом противостоянии.',
+  cancer:      'Воля активируется через защиту близких и своей территории. Прямой конфликт — не ваш инструмент; косвенные стратегии работают лучше. Иммунная система реагирует на эмоциональный стресс физическими симптомами.',
+  leo:         'Воля с достоинством и огнём. Конкуренция — топливо. Нужна сцена. Ослабевает без признания.',
+  virgo:       'Точная, методичная, неустанная работа. Мощь в деталях и улучшении процессов. Критикует себя жёстче других.',
+  libra:       'Воля через переговоры, эстетику и компромисс. Сильнее в дипломатии, чем в прямом противостоянии.',
+  scorpio:     'В домициле. Стратегическая, терпеливая, неотвратимая воля. Умеет ждать нужного момента. Полное погружение или полный выход.',
+  sagittarius: 'Воля через экспансию и веру в идею. Энергия мощная, но рассеивается при потере смысла.',
+  capricorn:   'В экзальтации. Дисциплинированная, долгосрочная, строит. Умеет откладывать вознаграждение ради результата.',
+  aquarius:    'Революционная воля. Эффективен в коллективных, нестандартных задачах. Личный конфликт — не его формат.',
+  pisces:      'Воля тонкая, интуитивная, через образ и растворение. Сила — в творчестве, сострадании, духовной практике. Прямое давление — невыносимо.',
+};
+
+// ASC ruler by house — как тело связано с жизнедеятельностью
+const ASC_RULER_HOUSE: Record<number, string> = {
+  1:  'Управитель АСЦ в 1-м: конституция подчёркнута — тело — главный инструмент. Самочувствие = производительность.',
+  2:  'Управитель АСЦ в 2-м: здоровье связано с финансовым состоянием и едой. Ресурс тела = ресурс денег.',
+  3:  'Управитель АСЦ в 3-м: нервная система — главная уязвимость. Информационная перегрузка = физические симптомы.',
+  4:  'Управитель АСЦ в 4-м: тело реагирует на домашнюю/семейную атмосферу. Уют дома = здоровье.',
+  5:  'Управитель АСЦ в 5-м: тело расцветает при творчестве и радости. Депрессия физически проявляется.',
+  6:  'Управитель АСЦ в 6-м: здоровье напрямую связано с рабочим режимом. Дисциплина тела = успех.',
+  7:  'Управитель АСЦ в 7-м: партнёрские отношения влияют на здоровье сильнее всего. Конфликты — болезни.',
+  8:  'Управитель АСЦ в 8-м: регенеративный потенциал высокий. Организм трансформируется через кризисы.',
+  9:  'Управитель АСЦ в 9-м: здоровье поддерживается движением, путешествиями, философией жизни.',
+  10: 'Управитель АСЦ в 10-м: статус и карьера напрямую влияют на самочувствие. Провалы в карьере = болезни.',
+  11: 'Управитель АСЦ в 11-м: социальная среда влияет на здоровье. Единомышленники = иммунитет.',
+  12: 'Управитель АСЦ в 12-м: скрытые хронические процессы. Симптомы появляются поздно — важна профилактика.',
+};
+
+// ─── UI components ────────────────────────────────────────────────────────────
+function VerdictBanner({ text, tone, isDark }: {
+  text: string; tone: 'strong' | 'mixed' | 'challenging'; isDark: boolean;
 }) {
-  return (
-    <div style={{
-      borderRadius: 14, border: `1px solid ${accent}33`,
-      background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-      padding: '16px 18px', marginBottom: 14,
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function SectionHead({ icon, title, sub, accent = '#818cf8', isDark }: {
-  icon: string; title: string; sub?: string; accent?: string; isDark: boolean;
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <span style={{ fontSize: 22 }}>{icon}</span>
-        <span style={{ fontWeight: 700, fontSize: 16, color: accent }}>{title}</span>
-      </div>
-      {sub && <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', marginLeft: 32 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function Tag({ label, color, isDark }: { label: string; color: string; isDark: boolean }) {
-  void isDark;
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 20,
-      fontSize: 11, fontWeight: 600, marginRight: 6, marginBottom: 4,
-      background: color + '22', color, border: `1px solid ${color}44`,
-    }}>{label}</span>
-  );
-}
-
-function Callout({ children, color = '#818cf8', isDark }: {
-  children: React.ReactNode; color?: string; isDark: boolean;
-}) {
-  return (
-    <div style={{
-      borderLeft: `3px solid ${color}`, paddingLeft: 12, margin: '10px 0',
-      color: isDark ? '#cbd5e1' : '#374151', fontSize: 13, lineHeight: 1.7,
-    }}>{children}</div>
-  );
-}
-
-function Pill({ label, tone, isDark }: { label: string; tone: 'good' | 'tense' | 'neutral'; isDark: boolean }) {
-  void isDark;
-  const colors = { good: '#22c55e', tense: '#f87171', neutral: '#fbbf24' };
+  const colors = { strong: '#22c55e', mixed: '#f59e0b', challenging: '#f87171' };
+  const bgs = { strong: 'rgba(34,197,94,0.08)', mixed: 'rgba(245,158,11,0.08)', challenging: 'rgba(248,113,113,0.08)' };
   const c = colors[tone];
   return (
+    <div style={{
+      padding: '12px 16px', borderRadius: 10, marginBottom: 18,
+      background: bgs[tone], border: `1px solid ${c}44`,
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+    }}>
+      <span style={{ fontSize: 16, marginTop: 1 }}>
+        {tone === 'strong' ? '✦' : tone === 'mixed' ? '◈' : '⚠'}
+      </span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: c, lineHeight: 1.5 }}>{text}</span>
+    </div>
+  );
+}
+
+function FactCard({ icon, title, text, accent = '#818cf8', isDark, highlight }: {
+  icon: string; title: string; text: string; accent?: string;
+  isDark: boolean; highlight?: string;
+}) {
+  return (
+    <div style={{
+      marginBottom: 12, borderRadius: 10, overflow: 'hidden',
+      border: `1px solid ${accent}2a`,
+      background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
+        borderBottom: `1px solid ${accent}1a`,
+        background: `${accent}0d`,
+      }}>
+        <span style={{ fontSize: 15 }}>{icon}</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: accent }}>{title}</span>
+      </div>
+      <div style={{ padding: '10px 14px' }}>
+        <p style={{ margin: 0, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.65 }}>{text}</p>
+        {highlight && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px', borderRadius: 6,
+            background: `${accent}14`, borderLeft: `3px solid ${accent}`,
+            fontSize: 12, color: accent, lineHeight: 1.5,
+          }}>{highlight}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AspectChips({ chart, planetName, isDark }: {
+  chart: NatalChart; planetName: string; isDark: boolean;
+}) {
+  const aspects = tightAspects(chart, planetName, 3);
+  if (!aspects.length) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      {aspects.map((a, i) => {
+        const other = a.p1 === planetName ? a.p2 : a.p1;
+        const tone = aspectTone(a.aspect);
+        const color = tone === 'good' ? '#22c55e' : tone === 'tense' ? '#f87171' : '#fbbf24';
+        return (
+          <span key={i} style={{
+            padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+            background: `${color}1a`, color, border: `1px solid ${color}33`,
+          }}>
+            {ASPECT_RU[a.aspect] ?? a.aspect} {PGLYPH[other] ?? ''}{PRU[other] ?? other} {a.orb.toFixed(1)}°
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function ActionList({ items, accent, isDark }: {
+  items: string[]; accent: string; isDark: boolean;
+}) {
+  return (
+    <div style={{
+      marginTop: 4, borderRadius: 10,
+      border: `1px solid ${accent}2a`,
+      background: `${accent}0a`,
+      padding: '12px 14px',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: accent, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        Что делать
+      </div>
+      {items.map((it, i) => (
+        <div key={i} style={{
+          display: 'flex', gap: 8, marginBottom: 8, fontSize: 13,
+          color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.5,
+          alignItems: 'flex-start',
+        }}>
+          <span style={{ color: accent, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>→</span>
+          <span>{it}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlanetBadge({ name, sign, house, retro, chart }: {
+  name: string; sign: string; house: number; retro: boolean; chart: NatalChart;
+}) {
+  const dg = dignity(chart, name);
+  const c = PCOLOR[name] ?? '#94a3b8';
+  return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600,
-      background: c + '22', color: c, border: `1px solid ${c}44`,
-    }}>{label}</span>
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+      background: `${c}1a`, color: c, border: `1px solid ${c}33`,
+    }}>
+      {PGLYPH[name]} {PRU[name]} {sRu(sign)} · {house}H{retro ? ' Rx' : ''}{dgBadge(dg)}
+    </span>
   );
 }
 
-// ─── Finance planet keywords for 2nd house ────────────────────────────────────
-const PLANET_MONEY_STYLE: Record<string, string> = {
-  sun:     'Зарабатывает через личный авторитет, лидерство, узнаваемость. Финансы связаны с самооценкой и признанием. Важно делать то, что «зажигает» — иначе деньги не идут.',
-  moon:    'Доход непостоянен, колышется как прилив — но интуиция на рынок отличная. Финансовое самочувствие зависит от эмоционального состояния. Хорошо зарабатывает на заботе, еде, недвижимости.',
-  mercury: 'Деньги через слово, информацию, посредничество. Несколько потоков дохода одновременно. Умеет перераспределять ресурсы и находить выгодные сделки.',
-  venus:   'Природный талант к созданию ценности и красоты. Привлекает деньги с лёгкостью, через удовольствие и эстетику. Риск — транжирство.',
-  mars:    'Зарабатывает активно, быстро, напористо. Финансы требуют действия и конкуренции. Может импульсивно тратить. Хорошо в предпринимательстве.',
-  jupiter: 'Щедрость Юпитера притягивает изобилие. Финансовая удача, но риск переоценить возможности. Хорошие деньги от образования, консалтинга, экспансии.',
-  saturn:  'Деньги приходят медленно, но надёжно — через дисциплину и структуру. Сатурн во 2 доме — Мидас с задержкой. После 30 финансы укрепляются.',
-  uranus:  'Нестандартные источники дохода, скачки и неожиданности. Финансовая независимость важнее стабильности. IT, стартапы, инновации.',
-  neptune: 'Творчество, духовные практики, помогающие профессии. Границы размыты — важна финансовая грамотность. Риск обмана и идеализации.',
-  pluto:   'Трансформационная сила в деньгах: теряет и восстанавливает капитал несколько раз. Интерес к инвестициям, кризис-менеджменту, чужим деньгам.',
-  chiron:  'Рана вокруг самоценности и ресурса. Научившись ценить себя — открывает мощный финансовый поток. Консультирует других по деньгам лучше всех.',
-};
-
-const SIGN_MONEY_STYLE: Record<string, string> = {
-  aries:       'Финансовая энергия напористая и быстрая. Деньги приходят через инициативу и первопроходство. Риск — импульсивные траты.',
-  taurus:      'Финансовая зона усилена — Телец здесь как дома. Деньги через терпение, материальные ценности, чувственный опыт. Умеет копить.',
-  gemini:      'Несколько источников, гибкость, торговля идеями. Доход через коммуникации, обучение, посредничество. Нужна финансовая систематизация.',
-  cancer:      'Интуитивное чутьё на деньги. Хорошо инвестирует в недвижимость и семейный бизнес. Эмоциональная связь с ресурсом.',
-  leo:         'Деньги любят этого человека — и он любит деньги. Щедрость и риск. Финансы связаны с признанием и статусом.',
-  virgo:       'Аналитический подход к деньгам. Умеет оптимизировать расходы. Риск — недооценивать свои услуги.',
-  libra:       'Деньги через партнёрства и сотрудничество. Красота и дипломатия как ресурс. Важно научиться говорить о деньгах прямо.',
-  scorpio:     'Глубокое понимание финансовых потоков. Умеет работать с чужими ресурсами, инвестициями. Риск — всё или ничего.',
-  sagittarius: 'Деньги через знание, международные связи, философию. Оптимизм притягивает финансовую удачу, но нужна дисциплина расходов.',
-  capricorn:   'Деловая хватка и долгосрочное мышление. Финансы растут со временем. Иногда слишком осторожен — упускает возможности.',
-  aquarius:    'Нестандартные финансовые стратегии. Деньги через инновации, сообщество, технологии. Независимость важнее богатства.',
-  pisces:      'Творческий и духовный доход. Границы с деньгами размыты — важна финансовая структура. Интуиция на инвестиции развита.',
-};
-
-// ─── Career sign/house keywords ──────────────────────────────────────────────
-const MC_SIGN_CAREER: Record<string, string> = {
-  aries:       'Карьера первопроходца. Вы созданы начинать новое, вести за собой, конкурировать. Идеально: предпринимательство, спорт, военное дело, кризис-менеджмент. Публичный образ — решительный и энергичный.',
-  taurus:      'Карьера строителя. Ваша репутация — надёжность и профессиональное мастерство. Сфера: финансы, искусство, архитектура, продовольствие, роскошь. Медленный, но устойчивый рост.',
-  gemini:      'Карьера коммуникатора. Вы незаменимы там, где нужно говорить, писать, координировать. Журналистика, PR, торговля, образование, IT. Несколько ролей одновременно — норма.',
-  cancer:      'Карьера хранителя. Ваша профессиональная сила — эмпатия и забота. Медицина, психология, недвижимость, семейный бизнес, кулинария. Репутация строится на доверии.',
-  leo:         'Карьера лидера и творца. Вы рождены быть заметным — на сцене, в руководстве, в медиа. Шоу-бизнес, управление, политика, образование. Репутация = личная харизма.',
-  virgo:       'Карьера аналитика и специалиста. Репутация строится на безупречном качестве работы. Медицина, наука, редактура, бухгалтерия, здоровый образ жизни. Детали решают всё.',
-  libra:       'Карьера дипломата и эстета. Вы профессионально умеете находить баланс. Право, медиация, дизайн, PR, психология отношений. Репутация через партнёрства.',
-  scorpio:     'Карьера трансформатора. Вы работаете с тем, что другие боятся. Психология, хирургия, детективная работа, финансы, исследования. Репутация через глубину и непреклонность.',
-  sagittarius: 'Карьера эксперта и путешественника. Международный масштаб, философия, образование, туризм, право. Репутация через мудрость и экспансию.',
-  capricorn:   'Карьера руководителя. Вы рождены для иерархии — и со временем оказываетесь на её вершине. Управление, государственная служба, строительство. Репутация через дисциплину.',
-  aquarius:    'Карьера реформатора. Вы меняете системы и создаёте будущее. IT, наука, социальные инновации, НКО, электронные технологии. Репутация через независимость.',
-  pisces:      'Карьера целителя и творца. Искусство, духовные практики, медицина, кино, социальная работа. Репутация через сострадание и вдохновение.',
-};
-
-// ─── Energy / Sun keywords ────────────────────────────────────────────────────
-const SUN_ENERGY: Record<string, string> = {
-  aries:       'Взрывной энергетический потенциал. Заряжаетесь от новых вызовов и быстрых старта. Риск выгорания при однообразии.',
-  taurus:      'Мощная, устойчивая энергия. Долго «раскачиваетесь», но в ресурсе — неутомимы. Восстановление через природу, тело, удовольствия.',
-  gemini:      'Нервная, рассеянная энергия. Быстро загораетесь и переключаетесь. Восстановление через смену деятельности, общение и чтение.',
-  cancer:      'Цикличная, лунная энергия. Пики активности чередуются со спадами. Восстановление через дом, уединение, заботу о близких.',
-  leo:         'Солнечная, щедрая энергия. Горите, когда вас видят и ценят. Нужны сцена и аплодисменты. Восстановление через творчество и игру.',
-  virgo:       'Тихая, работающая энергия. Продуктивны в деталях, но устаёте от хаоса. Восстановление через режим, чистоту и уединение.',
-  libra:       'Социальная энергия, зависящая от гармонии. Нужна красивая среда и приятные люди. Конфликты истощают быстро.',
-  scorpio:     'Интенсивная, трансформационная энергия. Полное погружение или полная пустота. Восстановление через воду, тишину, глубокие практики.',
-  sagittarius: 'Экспансивная, оптимистическая энергия. Заряжаетесь от движения, путешествий, новых идей. Риск перерасхода сил.',
-  capricorn:   'Экономная, стратегическая энергия. Работаете долго и без шума. Восстановление через структуру, сон, природу.',
-  aquarius:    'Нелинейная, вспышечная энергия. Озарения чередуются с отстранённостью. Восстановление через одиночество и нестандартные занятия.',
-  pisces:      'Чуткая, впитывающая энергия. Легко перегружаетесь чужими эмоциями. Восстановление через воду, музыку, медитацию.',
-};
-
-const MARS_ENERGY: Record<string, string> = {
-  aries:       'Марс дома — максимальная боевая готовность. Действуете первым и напористо.',
-  taurus:      'Энергия упорная и медленная, но нерушимая. Не спешите, но и не сдаётесь.',
-  gemini:      'Энергия разлетается в стороны. Сильны в коротких спринтах и переговорах.',
-  cancer:      'Защитная энергия. Сила активируется ради близких. Косвенные действия эффективнее лобовых.',
-  leo:         'Энергия лидера. Действуете с огнём и достоинством. Конкуренция — топливо.',
-  virgo:       'Точная, методичная энергия. Мощь в деталях и совершенствовании процессов.',
-  libra:       'Энергия в балансировании — сильны в переговорах, слабее в открытом противостоянии.',
-  scorpio:     'Марс в силе. Стратегическая, неотвратимая энергия. Умеете ждать нужного момента.',
-  sagittarius: 'Энергия приключений и расширения. Мощь через целеустремлённость и веру.',
-  capricorn:   'Дисциплинированная, долгосрочная энергия. Марс строит карьеру шаг за шагом.',
-  aquarius:    'Революционная энергия. Лучшие результаты — в нестандартных, коллективных задачах.',
-  pisces:      'Тонкая, интуитивная энергия. Сила через творчество, сострадание, духовные практики.',
-};
-
-// ─── Saturn life plan phases ──────────────────────────────────────────────────
-function getSaturnPhase(ageNow: number): {
-  phase: string; desc: string; keywords: string; nextReturn: number; color: string;
-} {
-  const cycle = ageNow % 29.5;
-  const saturnReturn = Math.floor(ageNow / 29.5) * 29.5 + 29.5;
-  const nextReturn = Math.round(saturnReturn - ageNow);
-
-  if (cycle < 7)   return { phase: 'Посев (0–7)',     color: '#34d399',
-    desc: 'Период формирования фундамента. Идёт закладка базовых структур — физических, психологических, социальных.',
-    keywords: 'начало, потенциал, обучение', nextReturn };
-  if (cycle < 14)  return { phase: 'Рост (7–14)',     color: '#60a5fa',
-    desc: 'Активное освоение мира. Испытание первых принципов реальностью, поиск своего пути.',
-    keywords: 'расширение, эксперименты, рост', nextReturn };
-  if (cycle < 21)  return { phase: 'Кризис (14–21)',  color: '#f59e0b',
-    desc: 'Столкновение с ограничениями и необходимостью выбора. Первый серьёзный кризис идентичности.',
-    keywords: 'выбор, трудности, взросление', nextReturn };
-  if (cycle < 29.5) return { phase: 'Зрелость (21–29)', color: '#a78bfa',
-    desc: 'Период строительства реальной взрослой жизни. Подготовка к первому возврату Сатурна.',
-    keywords: 'ответственность, карьера, самостоятельность', nextReturn };
-  return { phase: 'Возврат Сатурна', color: '#f87171',
-    desc: 'Ключевая точка переосмысления. Сатурн требует итогов и начала нового цикла.',
-    keywords: 'итоги, перестройка, новый уровень', nextReturn };
-}
-
-function getJupiterPhase(ageNow: number): { phase: string; desc: string; color: string } {
-  const cycle = ageNow % 12;
-  if (cycle < 2)   return { phase: 'Юпитерианский Новый год', color: '#fbbf24',
-    desc: 'Посев намерений и новые возможности открываются. Период удачи и расширения.', };
-  if (cycle < 4)   return { phase: 'Рост удачи', color: '#34d399',
-    desc: 'Инициативы 2 года назад приносят первые плоды. Хорошее время для экспансии.' };
-  if (cycle < 6)   return { phase: 'Первый квадрат', color: '#f59e0b',
-    desc: 'Необходимо скорректировать курс. Вызовы, требующие адаптации стратегии.' };
-  if (cycle < 9)   return { phase: 'Юпитерианская кульминация', color: '#818cf8',
-    desc: 'Пик цикла. Максимум видимости и результатов. Всё посеянное в начале цикла созревает.' };
-  if (cycle < 11)  return { phase: 'Подведение итогов', color: '#94a3b8',
-    desc: 'Завершение цикла. Время отпустить то, что отжило, и готовиться к новому началу.' };
-  return { phase: 'Предновогодний период', color: '#c084fc',
-    desc: 'Глубокая рефлексия перед новым юпитерианским циклом. Внутренний поворот.' };
-}
-
-// ─── Sphere tabs config ────────────────────────────────────────────────────────
-const SPHERES: Array<{ key: SphereKey; icon: string; label: string; color: string }> = [
-  { key: 'finance', icon: '💰', label: 'Финансы',        color: '#d4a853' },
-  { key: 'health',  icon: '🌿', label: 'Здоровье',       color: '#34d399' },
-  { key: 'career',  icon: '🏆', label: 'Профессия',      color: '#818cf8' },
-  { key: 'energy',  icon: '⚡', label: 'Энергия',        color: '#f59e0b' },
-  { key: 'plan',    icon: '🗺️', label: 'Жизненный план', color: '#60a5fa' },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── FINANCE SPHERE ───────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── FINANCE ─────────────────────────────────────────────────────────────────
 function FinanceSphere({ chart, isDark }: { chart: NatalChart; isDark: boolean }) {
-  const c = '#d4a853';
-  const house2Sign = getHouseSign(chart, 2);
-  const house2Ruler = getHouseRuler(chart, 2);
-  const house2RulerData = getRulerData(chart, 2);
-  const house8Sign = getHouseSign(chart, 8);
-  const planetsIn2 = getPlanetsInHouse(chart, 2);
-  const planetsIn8 = getPlanetsInHouse(chart, 8);
-  const venus = chart.planets.venus;
-  const jupiter = chart.planets.jupiter;
-  const arabicFort = chart.arabic_parts?.fortune;
+  const ac = '#d4a853';
+  const h2s = hSign(chart, 2);
+  const h2r = hRuler(chart, 2);
+  const h2rP = h2r ? chart.planets[h2r] : null;
+  const h8s = hSign(chart, 8);
+  const h8r = hRuler(chart, 8);
+  const h8rP = h8r ? chart.planets[h8r] : null;
+  const inH2 = planetsIn(chart, 2);
+  const inH8 = planetsIn(chart, 8);
+  const jup = chart.planets.jupiter;
+  const ven = chart.planets.venus;
+  const pof = chart.arabic_parts?.fortune;
 
-  // Assess financial power
-  const rulerDignity = house2Ruler ? chart.dignities?.[house2Ruler]?.dignity : null;
-  const isRulerStrong = rulerDignity === 'domicile' || rulerDignity === 'exaltation';
-  const isRulerWeak   = rulerDignity === 'detriment' || rulerDignity === 'fall';
+  const h2rDg = h2r ? dignity(chart, h2r) : null;
+  const tone: 'strong' | 'mixed' | 'challenging' =
+    isStrong(h2rDg) ? 'strong' : isWeak(h2rDg) ? 'challenging' : 'mixed';
 
-  const jupDignity = chart.dignities?.jupiter?.dignity;
-  const jupStrong = jupDignity === 'domicile' || jupDignity === 'exaltation';
-
-  const venDignity = chart.dignities?.venus?.dignity;
-  const venStrong = venDignity === 'domicile' || venDignity === 'exaltation';
-
-  // Score
-  let score = 5;
-  if (isRulerStrong) score += 2;
-  if (isRulerWeak) score -= 2;
-  if (jupStrong) score += 1;
-  if (venStrong) score += 1;
-  if (planetsIn2.length > 0) score += 1;
-  score = Math.max(1, Math.min(10, score));
-
-  const rulerAspects = house2Ruler ? getAspectsTo(chart, house2Ruler).slice(0, 4) : [];
+  const verdictText = h2r && h2rP
+    ? `Финансовый поток — через тему ${HRU[h2rP.house] ?? `${h2rP.house}H`} (управитель 2-го дома ${PRU[h2r]} в ${h2rP.house}-м). ${isStrong(h2rDg) ? 'Управитель в силе — деньги идут с меньшим трением.' : isWeak(h2rDg) ? 'Управитель ослаблен — требует осознанной стратегии.' : 'Управитель в нейтральной позиции.'}`
+    : `2-й дом в ${sRu(h2s)} — стиль дохода формируется через ${ELEMENT[h2s ?? ''] ?? '...'}.`;
 
   return (
     <div>
-      <SectionHead icon="💰" title="Финансовый потенциал" isDark={isDark} accent={c}
-        sub="Анализ 2-го дома, его управителя, 8-го дома и значимых денежных точек" />
+      <VerdictBanner text={verdictText} tone={tone} isDark={isDark} />
 
-      {/* Score bar */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <span style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280' }}>Финансовый потенциал карты:</span>
-          <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)' }}>
-            <div style={{ width: `${score * 10}%`, height: '100%', borderRadius: 4, background: c }} />
-          </div>
-          <span style={{ fontWeight: 700, color: c, fontSize: 15 }}>{score}/10</span>
-        </div>
-        <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280' }}>
-          {score >= 8 ? 'Карта показывает высокую природную способность к накоплению и росту материального благополучия.' :
-           score >= 5 ? 'Средний потенциал: деньги приходят через усилия, дисциплину и осознанность.' :
-           'Финансовая сфера требует особого внимания и выработки стратегии — это зона роста.'}
-        </div>
-      </Card>
-
-      {/* 2nd house */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 10 }}>
-          2-й дом (Личные деньги и ценности) — {signRu(house2Sign)}
-        </div>
-        {house2Sign && (
-          <Callout color={c} isDark={isDark}>
-            {SIGN_MONEY_STYLE[house2Sign] ?? `Куспид 2-го дома в ${signRu(house2Sign)} — особый стиль обращения с ресурсами.`}
-          </Callout>
-        )}
-        {planetsIn2.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Планеты во 2-м доме:</div>
-            {planetsIn2.map(([name, p]) => (
-              <div key={name} style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8,
-                background: 'rgba(255,255,255,0.03)', fontSize: 13,
-                color: isDark ? '#cbd5e1' : '#374151' }}>
-                <span style={{ color: PLANETS[name]?.color ?? '#fff', fontWeight: 600, marginRight: 6 }}>
-                  {PLANETS[name]?.key} {planetRu(name)}
-                </span>
-                в {signRu(p.sign)}{p.retrograde ? ' Rx' : ''} —{' '}
-                {PLANET_MONEY_STYLE[name] ?? `Планета усиливает тему 2-го дома.`}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Ruler of 2nd */}
-      {house2Ruler && house2RulerData && (
-        <Card isDark={isDark} accent={c}>
-          <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 10 }}>
-            Управитель 2-го дома — {planetBadge(house2Ruler, house2RulerData, chart)}
-          </div>
-          <Callout color={isRulerStrong ? '#22c55e' : isRulerWeak ? '#f87171' : '#d4a853'} isDark={isDark}>
-            {isRulerStrong
-              ? `${planetRu(house2Ruler)} в силе — финансовый управитель работает мощно. Деньги приходят с меньшими усилиями.`
-              : isRulerWeak
-              ? `${planetRu(house2Ruler)} ослаблен — финансовый управитель требует сознательной работы. Деньги есть, но дорогой ценой.`
-              : `${planetRu(house2Ruler)} в нейтральной позиции — финансы стабильны при грамотном управлении.`
-            }
-          </Callout>
-          {house2RulerData.house !== 2 && (
-            <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', marginTop: 6 }}>
-              Управитель 2-го дома находится в <b>{house2RulerData.house}-м доме</b> ({HOUSES[house2RulerData.house]?.name}) —
-              деньги тесно связаны с темой «{HOUSES[house2RulerData.house]?.theme}».
-            </div>
-          )}
-          {rulerAspects.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Аспекты управителя:</div>
-              {rulerAspects.map((a, i) => {
-                const other = a.p1 === house2Ruler ? a.p2 : a.p1;
-                const info = describeAspect(a.aspect);
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Pill label={info.short} tone={info.tone} isDark={isDark} />
-                    <span style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280' }}>
-                      с {PLANETS[other]?.key} {planetRu(other)} · орб {a.orb.toFixed(1)}°
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+      {h2s && (
+        <FactCard icon="🏦" title={`2-й дом — ${sRu(h2s)}: стиль обращения с деньгами`} accent={ac} isDark={isDark}
+          text={
+            h2s === 'aries'       ? 'Деньги через инициативу и скорость. Зарабатывает быстро — и тратит быстро. Лучший сценарий: предпринимательство и самостоятельные решения.' :
+            h2s === 'taurus'      ? 'Деньги через терпение и материальное мастерство. Умеет копить и строить капитал. Расстаётся с деньгами тяжело — это работает в плюс.' :
+            h2s === 'gemini'      ? 'Несколько потоков дохода — норма. Деньги через информацию и посредничество. Нужна финансовая систематизация, иначе много всего и ничего конкретного.' :
+            h2s === 'cancer'      ? 'Доход интуитивный, связан с семьёй или женской аудиторией. Финансовое самочувствие зависит от эмоционального состояния напрямую.' :
+            h2s === 'leo'         ? 'Деньги через признание и творческую смелость. Умеет зарабатывать на публику. Риск — тратить на статусность больше, чем нужно.' :
+            h2s === 'virgo'       ? 'Аналитический подход к деньгам. Умеет оптимизировать расходы. Главный враг — недооценивать стоимость своих услуг.' :
+            h2s === 'libra'       ? 'Деньги через партнёрства и сотрудничество. Умеет привлекать ресурсы через договорённости. Сложно говорить о деньгах прямо.' :
+            h2s === 'scorpio'     ? 'Глубокое понимание финансовых потоков. Деньги через трансформацию или чужие ресурсы. Мышление инвестора — естественное.' :
+            h2s === 'sagittarius' ? 'Доход через знание и международные связи. Оптимизм притягивает деньги, но дисциплина расходов — слабое место.' :
+            h2s === 'capricorn'   ? 'Медленный и надёжный капитал. Финансовая деловая хватка усиливается с возрастом. Осторожен до такой степени, что иногда упускает возможности.' :
+            h2s === 'aquarius'    ? 'Нестандартные финансовые стратегии: IT, технологии, платформы. Независимость важнее богатства — что иногда дорого обходится.' :
+            'Творческий и интуитивный доход. Реальные цифры — не сильная сторона. Нужна финансовая структура и доверенный специалист.'
+          }
+        />
       )}
 
-      {/* 8th house */}
-      <Card isDark={isDark} accent="#bb77aa">
-        <div style={{ fontWeight: 700, color: '#bb77aa', fontSize: 14, marginBottom: 10 }}>
-          8-й дом (Чужие ресурсы, инвестиции) — {signRu(house8Sign)}
-        </div>
-        <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-          {house8Sign === 'scorpio' || house8Sign === 'capricorn'
-            ? 'Сильный 8-й дом — природный дар управления чужими деньгами, инвестициями, кризисными финансами.'
-            : house8Sign === 'pisces' || house8Sign === 'libra'
-            ? 'Мягкий 8-й дом — деньги партнёров, наследство, совместные финансы требуют чёткого разграничения.'
-            : `8-й дом в ${signRu(house8Sign)} — доступ к внешним ресурсам через тему «${SIGNS[house8Sign ?? '']?.keyword ?? '...'}».`}
-        </div>
-        {planetsIn8.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            {planetsIn8.map(([name]) => (
-              <Tag key={name} label={`${PLANETS[name]?.key} ${planetRu(name)} в 8-м`} color="#bb77aa" isDark={isDark} />
-            ))}
-            <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', marginTop: 6 }}>
-              Планеты в 8-м доме усиливают работу с внешними финансовыми потоками.
-            </div>
-          </div>
-        )}
-      </Card>
+      {inH2.length > 0 && inH2.map(p => (
+        <FactCard key={p.name} icon={PGLYPH[p.name] ?? '○'}
+          title={`${PRU[p.name] ?? p.name} во 2-м доме — прямой модификатор дохода`}
+          accent={PCOLOR[p.name] ?? ac} isDark={isDark}
+          text={PLANET_IN_2H[p.name] ?? `${PRU[p.name]} усиливает тему 2-го дома через стиль ${sRu(p.sign)}.`}
+          highlight={p.retrograde ? `Ретроградность: механизм доходности обращён вовнутрь. Деньги приходят через внутреннюю ценностную работу, а не внешнюю активность.` : undefined}
+        />
+      ))}
 
-      {/* Jupiter and Venus */}
-      <Card isDark={isDark} accent="#d4a04a">
-        <div style={{ fontWeight: 700, color: '#d4a04a', fontSize: 14, marginBottom: 10 }}>
-          Юпитер и Венера — катализаторы изобилия
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {jupiter && (
-            <div style={{ padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
-              <div style={{ fontWeight: 700, color: '#d4a04a', marginBottom: 4 }}>
-                ♃ Юпитер в {signRu(jupiter.sign)} · {jupiter.house} дом
-                {jupStrong ? ' ⭐' : ''}
-              </div>
-              <div style={{ color: isDark ? '#94a3b8' : '#6b7280', lineHeight: 1.5 }}>
-                {jupiter.house === 2 || jupiter.house === 8 || jupiter.house === 11
-                  ? 'Юпитер в финансовом доме — удача с деньгами встроена в карту.'
-                  : `Финансовая удача приходит через тему «${HOUSES[jupiter.house]?.theme ?? '...'}».`}
-              </div>
-            </div>
-          )}
-          {venus && (
-            <div style={{ padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
-              <div style={{ fontWeight: 700, color: '#d48aaa', marginBottom: 4 }}>
-                ♀ Венера в {signRu(venus.sign)} · {venus.house} дом
-                {venStrong ? ' ⭐' : ''}
-              </div>
-              <div style={{ color: isDark ? '#94a3b8' : '#6b7280', lineHeight: 1.5 }}>
-                {venus.house === 2
-                  ? 'Венера в 2-м доме — деньги приходят легко, через красоту и удовольствие.'
-                  : `Венера в ${venus.house}-м доме — привлекает деньги через тему «${HOUSES[venus.house]?.theme ?? '...'}».`}
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
+      {h2r && h2rP && (
+        <FactCard icon="🔑" title={`Управитель 2-го — ${pLabel(h2r, h2rP.sign, h2rP.house, h2rP.retrograde, chart)}`}
+          accent={PCOLOR[h2r] ?? ac} isDark={isDark}
+          text={`${PRU[h2r]} в ${h2rP.house}-м доме: ${MONEY_FROM_HOUSE[h2rP.house] ?? 'специфический источник дохода.'} Знак ${sRu(h2rP.sign)} определяет стиль реализации.`}
+          highlight={
+            isStrong(h2rDg) ? `${PRU[h2r]} в силе${dgBadge(h2rDg)} — поток даётся с меньшим трением. Используйте это.` :
+            isWeak(h2rDg)   ? `${PRU[h2r]} ослаблен${dgBadge(h2rDg)} — деньги есть, но требуют больше усилий. Стратегия важна.` :
+            undefined
+          }
+        />
+      )}
+      {h2r && h2rP && <AspectChips chart={chart} planetName={h2r} isDark={isDark} />}
 
-      {/* Part of Fortune */}
-      {arabicFort && (
-        <Card isDark={isDark} accent="#fbbf24">
-          <div style={{ fontWeight: 700, color: '#fbbf24', fontSize: 14, marginBottom: 6 }}>
-            ⊕ Жребий Судьбы в {signRu(arabicFort.sign)}
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-            Арабская точка удачи и материального процветания. Знак показывает стиль, через который вы естественно привлекаете фортуну.
-            <b style={{ color: '#fbbf24' }}> {SIGNS[arabicFort.sign]?.keyword ?? signRu(arabicFort.sign)}</b> —
-            именно через это качество открывается наибольший поток.
-          </div>
-        </Card>
+      {(inH8.length > 0 || h8s) && (
+        <FactCard icon="♟" title={`8-й дом — ${sRu(h8s)}: чужие деньги и инвестиции`}
+          accent="#bb77aa" isDark={isDark}
+          text={
+            inH8.length > 0
+              ? `${inH8.map(p => `${PGLYPH[p.name]} ${PRU[p.name]}`).join(', ')} в 8-м доме — прямой доступ к внешним финансовым потокам: инвестиции, партнёрские деньги, трансформационные услуги.`
+              : h8r && h8rP
+              ? `Управитель 8-го (${PRU[h8r]}) в ${h8rP.house}-м доме — внешние ресурсы приходят через тему «${HRU[h8rP.house] ?? h8rP.house}».`
+              : `8-й дом в ${sRu(h8s)} — стиль работы с чужими деньгами.`
+          }
+        />
       )}
 
-      {/* Recommendations */}
-      <Card isDark={isDark} accent="#22c55e">
-        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 14, marginBottom: 10 }}>
-          ✅ Практические рекомендации
-        </div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 2 }}>
-          <li>Основной доход — через тему <b>{HOUSES[house2RulerData?.house ?? 2]?.theme ?? 'ресурса'}</b>, сферу управителя 2-го дома.</li>
-          {isRulerWeak && <li>Укрепите управителя: дайте ему "работу" — сознательно развивайте связанную с ним тему.</li>}
-          {planetsIn8.length > 0 && <li>Инвестиции и партнёрские деньги — сильный канал. Изучайте финансовые инструменты.</li>}
-          {venus && venus.house !== 2 && <li>Венера в {venus.house}-м доме: красота и эстетика в этой сфере — ваш магнит для денег.</li>}
-          {jupiter && <li>Юпитер в {signRu(jupiter.sign)}: расширение и обучение в стиле {SIGNS[jupiter.sign ?? '']?.keyword?.toLowerCase() ?? '...'} притягивает изобилие.</li>}
-        </ul>
-      </Card>
+      {jup && ven && (
+        <FactCard icon="✦" title="Юпитер и Венера — усилители дохода"
+          accent="#d4a04a" isDark={isDark}
+          text={`♃ Юпитер в ${sRu(jup.sign)}, ${jup.house}H${dgBadge(dignity(chart,'jupiter'))} — расширение дохода через «${HRU[jup.house] ?? jup.house}». ♀ Венера в ${sRu(ven.sign)}, ${ven.house}H${dgBadge(dignity(chart,'venus'))} — магнит для денег через «${HRU[ven.house] ?? ven.house}».`}
+        />
+      )}
+
+      {pof && (
+        <FactCard icon="⊕" title={`Жребий Судьбы — ${sRu(pof.sign)}`}
+          accent="#fbbf24" isDark={isDark}
+          text={`Арабская точка процветания. Стиль ${sRu(pof.sign)} — тот принцип, через который фортуна открывается максимально. Не форсируйте другие пути, если этот ещё не задействован.`}
+        />
+      )}
+
+      <ActionList accent={ac} isDark={isDark} items={[
+        h2rP ? `Основной поток — ${MONEY_FROM_HOUSE[h2rP.house] ?? `тема ${h2rP.house}H`} Концентрируйте монетизацию там.` : `Развивайте тему 2-го дома (${sRu(h2s)}).`,
+        isWeak(h2rDg) && h2r ? `${PRU[h2r]} ослаблен — работайте с финансовым консультантом, не принимайте крупных денежных решений единолично.` : `Ежеквартальный финансовый отчёт: доходы по источникам — какой из них растёт?`,
+        inH2.some(p => ['neptune','moon','pisces'].includes(p.name)) ? 'Neptune/water в 2H: ведите учёт всех расходов. Деньги утекают незаметно.' : 'Установите автоматическое резервирование 15–20% от каждого поступления.',
+        jup ? `Юпитер в ${sRu(jup.sign)} ${jup.house}H: расширяйтесь через «${HRU[jup.house] ?? jup.house}» — это ваш катализатор изобилия.` : 'Изучите инвестиционные инструменты своей ниши.',
+      ].filter(Boolean)} />
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── HEALTH SPHERE ────────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── HEALTH ──────────────────────────────────────────────────────────────────
 function HealthSphere({ chart, isDark }: { chart: NatalChart; isDark: boolean }) {
-  const c = '#34d399';
-  const asc = chart.houses['1'];
-  const ascSign = asc?.sign ?? null;
-  const house6Sign = getHouseSign(chart, 6);
-  const house12Sign = getHouseSign(chart, 12);
-  const house6Ruler = getHouseRuler(chart, 6);
-  const house6RulerData = house6Ruler ? chart.planets[house6Ruler] : null;
-  const planetsIn1 = getPlanetsInHouse(chart, 1);
-  const planetsIn6 = getPlanetsInHouse(chart, 6);
-  const planetsIn12 = getPlanetsInHouse(chart, 12);
-  const sun = chart.planets.sun;
-  const mars = chart.planets.mars;
-  const saturn = chart.planets.saturn;
+  const ac = '#34d399';
+  const h1s = hSign(chart, 1);
+  const h1r = hRuler(chart, 1);
+  const h1rP = h1r ? chart.planets[h1r] : null;
+  const h6s = hSign(chart, 6);
+  const h6r = hRuler(chart, 6);
+  const h6rP = h6r ? chart.planets[h6r] : null;
+  const inH1 = planetsIn(chart, 1);
+  const inH6 = planetsIn(chart, 6);
+  const inH12 = planetsIn(chart, 12);
+  const sunP = chart.planets.sun;
+  const marsP = chart.planets.mars;
+  const satP = chart.planets.saturn;
+  const sunDg = dignity(chart, 'sun');
 
-  // Saturn in 6th or 12th = extra health challenges
-  const saturnIn6or12 = saturn && (saturn.house === 6 || saturn.house === 12);
+  const tone: 'strong' | 'mixed' | 'challenging' =
+    isStrong(sunDg) && !inH12.some(p => ['saturn','mars','pluto'].includes(p.name)) ? 'strong' :
+    isWeak(sunDg) || satP?.house === 6 || satP?.house === 12 ? 'challenging' : 'mixed';
 
-  const sunDig = chart.dignities?.sun?.dignity;
-  const sunStrong = sunDig === 'domicile' || sunDig === 'exaltation';
-  const sunWeak = sunDig === 'detriment' || sunDig === 'fall';
+  const verdictText = h1s
+    ? `Конституция: ${sRu(h1s)} — ${BODY[h1s]?.zones ?? '—'}. ${isStrong(sunDg) ? 'Жизненная сила мощная.' : isWeak(sunDg) ? 'Витальность требует активной поддержки.' : 'Витальность стабильна при соблюдении режима.'}`
+    : 'Рассчитайте дом 1 (АСЦ) для полного анализа конституции.';
 
   return (
     <div>
-      <SectionHead icon="🌿" title="Здоровье и жизненный тонус" isDark={isDark} accent={c}
-        sub="Анализ АСЦ, 1-го, 6-го и 12-го домов, Солнца и Марса" />
+      <VerdictBanner text={verdictText} tone={tone} isDark={isDark} />
 
-      {/* Constitution */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 10 }}>
-          Конституция — {signRu(ascSign)} Асцендент
-        </div>
-        {ascSign && (
-          <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              <Tag label={SIGNS[ascSign]?.element ?? ''} color={c} isDark={isDark} />
-              <Tag label={SIGNS[ascSign]?.mode ?? ''} color="#60a5fa" isDark={isDark} />
-              <Tag label={SIGNS[ascSign]?.body_zone ?? ''} color="#f59e0b" isDark={isDark} />
-            </div>
-            <Callout color={c} isDark={isDark}>
-              <b>Уязвимые зоны:</b> {SIGNS[ascSign]?.body_zone ?? '—'}.{' '}
-              {SIGNS[ascSign]?.body_desc ?? ''}
-            </Callout>
-          </>
-        )}
-        {planetsIn1.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Планеты в 1-м доме (влияние на тело):</div>
-            {planetsIn1.map(([name, p]) => (
-              <div key={name} style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', marginBottom: 4 }}>
-                <span style={{ color: PLANETS[name]?.color ?? '#fff', fontWeight: 600 }}>
-                  {PLANETS[name]?.key} {planetRu(name)}
-                </span> в {signRu(p.sign)} —{' '}
-                {name === 'saturn' ? 'Сатурн в 1-м: сдержанная конституция, риск хронических проблем, важны режим и профилактика.' :
-                 name === 'mars'   ? 'Марс в 1-м: высокий физический тонус, но риск воспалений и травм.' :
-                 name === 'jupiter'? 'Юпитер в 1-м: крепкое здоровье, тенденция к полноте, важна умеренность.' :
-                 name === 'pluto'  ? 'Плутон в 1-м: трансформативная конституция, способность к регенерации.' :
-                 name === 'neptune'? 'Нептун в 1-м: чувствительный организм, реакция на тонкие факторы среды.' :
-                 `${planetRu(name)} окрашивает физическую конституцию.`}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Sun vitality */}
-      <Card isDark={isDark} accent="#d4a853">
-        <div style={{ fontWeight: 700, color: '#d4a853', fontSize: 14, marginBottom: 10 }}>
-          ☉ Солнце — жизненная сила
-        </div>
-        {sun && (
-          <>
-            <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', marginBottom: 8 }}>
-              <b style={{ color: '#d4a853' }}>☉ Солнце в {signRu(sun.sign)}</b> · {sun.house}-й дом
-              {sunStrong ? <span style={{ color: '#22c55e' }}> ⭐ в силе</span> :
-               sunWeak   ? <span style={{ color: '#f87171' }}> ⬇ ослаблено</span> : null}
-            </div>
-            <Callout color="#d4a853" isDark={isDark}>
-              {sunStrong
-                ? 'Солнце в силе — жизненная энергия мощная, восстановление идёт быстро. Высокий иммунитет.'
-                : sunWeak
-                ? 'Солнце ослаблено — жизненная сила требует поддержки. Важны режим сна, солнечный свет и физическая активность.'
-                : 'Солнце в нейтральной позиции — жизненная сила стабильна при правильном образе жизни.'}
-            </Callout>
-            {sun.retrograde && (
-              <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 6 }}>
-                ⚠ Солнце не бывает ретроградным — если вы видите это, проверьте данные карты.
-              </div>
-            )}
-          </>
-        )}
-      </Card>
-
-      {/* Mars immune */}
-      <Card isDark={isDark} accent="#d45b5b">
-        <div style={{ fontWeight: 700, color: '#d45b5b', fontSize: 14, marginBottom: 10 }}>
-          ♂ Марс — иммунитет и физическая энергия
-        </div>
-        {mars && (
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            <b style={{ color: '#d45b5b' }}>♂ Марс в {signRu(mars.sign)}</b> · {mars.house}-й дом{mars.retrograde ? ' Rx' : ''}
-            <br />
-            {MARS_ENERGY[mars.sign ?? ''] ?? 'Марс управляет физической активностью и иммунной системой.'}
-            {mars.retrograde && (
-              <><br /><span style={{ color: '#fbbf24' }}>Ретроградный Марс: сила обращена вовнутрь. Активность через осознанность, а не напор.</span></>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* 6th house */}
-      <Card isDark={isDark} accent="#60a5fa">
-        <div style={{ fontWeight: 700, color: '#60a5fa', fontSize: 14, marginBottom: 10 }}>
-          6-й дом (Здоровье и режим) — {signRu(house6Sign)}
-        </div>
-        <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-          6-й дом отвечает за ежедневный режим, рутину здоровья, связь работы и самочувствия.
-          Куспид в <b>{signRu(house6Sign)}</b> говорит о стиле поддержания здоровья — через{' '}
-          <b>{SIGNS[house6Sign ?? '']?.keyword?.toLowerCase() ?? '...'}</b>.
-        </div>
-        {house6RulerData && house6Ruler && (
-          <div style={{ marginTop: 8, fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280' }}>
-            Управитель 6-го дома ({planetRu(house6Ruler)}) в {signRu(house6RulerData.sign)} ·{' '}
-            {house6RulerData.house}-й дом —
-            {house6RulerData.house === 6
-              ? ' управитель в своём доме, режим здоровья даётся легко.'
-              : ` режим здоровья тесно связан с темой «${HOUSES[house6RulerData.house]?.theme ?? '...'}».`}
-          </div>
-        )}
-        {planetsIn6.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            {planetsIn6.map(([name]) => (
-              <Tag key={name} label={`${PLANETS[name]?.key} ${planetRu(name)}`} color="#60a5fa" isDark={isDark} />
-            ))}
-            <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', marginTop: 6 }}>
-              Планеты в 6-м доме — активные участники темы здоровья.
-            </div>
-          </div>
-        )}
-        {saturnIn6or12 && (
-          <Callout color="#f87171" isDark={isDark}>
-            ⚠ Сатурн в {saturn!.house}-м доме — тема хронических, накопительных проблем. Профилактика важнее лечения.
-          </Callout>
-        )}
-      </Card>
-
-      {/* 12th house */}
-      {(planetsIn12.length > 0 || house12Sign) && (
-        <Card isDark={isDark} accent="#c084fc">
-          <div style={{ fontWeight: 700, color: '#c084fc', fontSize: 14, marginBottom: 10 }}>
-            12-й дом (Скрытые, хронические темы) — {signRu(house12Sign)}
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            12-й дом — зона невидимых болезней, накопленного стресса, психосоматики.
-            {planetsIn12.length === 0
-              ? ' Без планет — хронические риски минимальны, если нет других указаний.'
-              : ' Планеты здесь указывают на скрытые уязвимости, которые важно не игнорировать.'}
-          </div>
-          {planetsIn12.map(([name, p]) => (
-            <div key={name} style={{ marginTop: 6, fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280' }}>
-              <span style={{ color: PLANETS[name]?.color }}>{PLANETS[name]?.key} {planetRu(name)}</span> в {signRu(p.sign)} в 12-м —
-              {name === 'saturn' ? ' хронические структурные проблемы, важна профилактика суставов/костей.' :
-               name === 'mars'   ? ' скрытые воспаления, важны регулярные обследования.' :
-               name === 'neptune'? ' чувствительность к токсинам, аллергии, важна детоксикация.' :
-               name === 'pluto'  ? ' глубинные трансформационные процессы в теле, риск игнорирования сигналов.' :
-               ` ${planetRu(name)} в 12-м — скрытая работа этой функции, стоит исследовать.`}
-            </div>
-          ))}
-        </Card>
+      {h1s && (
+        <FactCard icon="🧬" title={`Конституция — ${sRu(h1s)} АСЦ`} accent={ac} isDark={isDark}
+          text={`Уязвимые зоны: ${BODY[h1s]?.zones ?? '—'}. ${BODY[h1s]?.note ?? ''}`}
+          highlight={h1r && h1rP ? ASC_RULER_HOUSE[h1rP.house] ?? undefined : undefined}
+        />
       )}
 
-      {/* Recommendations */}
-      <Card isDark={isDark} accent="#22c55e">
-        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 14, marginBottom: 10 }}>
-          ✅ Рекомендации по здоровью
-        </div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 2 }}>
-          <li>Уязвимые зоны АСЦ: <b>{ascSign ? SIGNS[ascSign]?.body_zone : '—'}</b> — регулярная профилактика.</li>
-          {sunWeak && <li>Укрепляйте жизненную силу: режим сна, солнечные ванны, спорт по конституции.</li>}
-          {mars && mars.retrograde && <li>Ретроградный Марс: йога, плавание, медитация — лучше агрессивных нагрузок.</li>}
-          {saturnIn6or12 && <li>Сатурн в 6/12: диспансеризация раз в год, внимание к суставам и опорно-двигательной системе.</li>}
-          <li>Режим 6-го дома: <b>{house6Sign ? SIGNS[house6Sign]?.keyword : '...'}</b> — именно через этот принцип строится ваша рутина здоровья.</li>
-          {planetsIn12.length > 0 && <li>Регулярные медицинские проверки — особенно при стрессе.</li>}
-        </ul>
-      </Card>
+      {inH1.length > 0 && inH1.map(p => (
+        <FactCard key={p.name} icon={PGLYPH[p.name] ?? '○'}
+          title={`${PRU[p.name] ?? p.name} в 1-м доме — влияние на тело`}
+          accent={PCOLOR[p.name] ?? ac} isDark={isDark}
+          text={
+            p.name === 'saturn'  ? 'Сдержанная, жилистая конституция. Риск хронических костно-суставных проблем при длительном перенапряжении. Регулярность важнее интенсивности.' :
+            p.name === 'mars'    ? 'Высокий физический тонус, быстрая реакция. Риск воспалений, травм, перегрева при игнорировании сигналов усталости.' :
+            p.name === 'jupiter' ? 'Крепкая конституция, быстрое восстановление. Риск набора веса и излишеств — умеренность во всём.' :
+            p.name === 'uranus'  ? 'Нестандартная, нервная конституция. Реагирует на электромагнитные поля и стресс нестандартно. Возможны внезапные состояния.' :
+            p.name === 'neptune' ? 'Чувствительный организм, реагирует на тонкие факторы среды: химия, алкоголь, токсины. Аллергии и психосоматика.' :
+            p.name === 'pluto'   ? 'Высокий регенеративный потенциал. Тело способно полностью восстанавливаться после тяжёлых состояний.' :
+            `${PRU[p.name]} окрашивает физическую конституцию через стиль ${sRu(p.sign)}.`
+          }
+        />
+      ))}
+
+      {sunP && (
+        <FactCard icon="☉" title={`Солнце — жизненная сила: ${sRu(sunP.sign)}, ${sunP.house}H${dgBadge(sunDg)}`}
+          accent="#d4a853" isDark={isDark}
+          text={
+            isStrong(sunDg) ? `Солнце в силе ${dgBadge(sunDg)}: высокая витальность, иммунитет крепкий, восстановление быстрое. Это ресурс, который нужно использовать, а не беречь.` :
+            isWeak(sunDg)   ? `Солнце ослаблено ${dgBadge(sunDg)}: жизненный огонь требует поддержки. Режим сна, световой день и регулярная физическая нагрузка — не опции, а необходимость.` :
+            `Солнце в нейтральной позиции: витальность стабильна. Ключ — режим и устранение хронических стрессоров.`
+          }
+        />
+      )}
+
+      {marsP && (
+        <FactCard icon="♂" title={`Марс — иммунитет и физическая энергия: ${sRu(marsP.sign)}, ${marsP.house}H${dgBadge(dignity(chart,'mars'))}${marsP.retrograde?' Rx':''}`}
+          accent="#d45b5b" isDark={isDark}
+          text={MARS_PROFILE[marsP.sign ?? ''] ?? 'Марс управляет иммунным ответом и физической активностью.'}
+          highlight={marsP.retrograde ? 'Rx: физическая энергия обращена вовнутрь. Статические нагрузки, йога, плавание работают лучше динамических.' : undefined}
+        />
+      )}
+      {marsP && <AspectChips chart={chart} planetName="mars" isDark={isDark} />}
+
+      {h6s && (
+        <FactCard icon="⚕" title={`6-й дом — ${sRu(h6s)}: режим и профилактика`} accent="#60a5fa" isDark={isDark}
+          text={
+            h6r && h6rP
+              ? `Управитель 6-го (${PRU[h6r] ?? h6r}) в ${h6rP.house}-м доме: режим здоровья лучше всего работает через «${HRU[h6rP.house] ?? h6rP.house}». ${inH6.length > 0 ? `Планеты в 6-м: ${inH6.map(p => `${PGLYPH[p.name]}${PRU[p.name]}`).join(', ')} — активные участники темы здоровья.` : ''}`
+              : `6-й дом в ${sRu(h6s)}: режим строится через принцип ${sRu(h6s)}.`
+          }
+        />
+      )}
+
+      {satP && (satP.house === 6 || satP.house === 12) && (
+        <FactCard icon="♄" title={`Сатурн в ${satP.house}-м — хронические темы`} accent="#f87171" isDark={isDark}
+          text={`Сатурн в ${satP.house === 6 ? '6-м' : '12-м'} доме — маркер накопительных, хронических процессов. Профилактика за 2–3 года предотвращает то, что потом лечится годами. Диспансеризация ежегодно.`}
+        />
+      )}
+
+      {inH12.length > 0 && (
+        <FactCard icon="🔮" title={`12-й дом: скрытые процессы (${inH12.map(p => PRU[p.name]).join(', ')})`} accent="#c084fc" isDark={isDark}
+          text={`Планеты в 12-м доме — сигналы, которые организм посылает тихо и долго, пока не станет громко. Не игнорируйте субклинические симптомы. ${inH12.some(p => p.name === 'neptune') ? 'Нептун в 12-м: особая чувствительность к токсинам, медикаментам и алкоголю.' : ''}`}
+        />
+      )}
+
+      <ActionList accent={ac} isDark={isDark} items={[
+        h1s ? `Контроль зон ${sRu(h1s)}: ${BODY[h1s]?.zones ?? '—'} — осмотр раз в год.` : 'Определите АСЦ для точного анализа конституции.',
+        isWeak(sunDg) ? 'Витальность под угрозой: 8 часов сна, дневной свет утром, физическая нагрузка 3+ раза в неделю.' : 'Используйте естественный пик энергии — не бороться с природным ритмом.',
+        marsP?.retrograde ? 'Марс Rx: статические нагрузки, йога, плавание. Взрывной спорт — не ваш.' : marsP ? `Марс в ${sRu(marsP.sign)}: ${MARS_PROFILE[marsP.sign ?? '']?.split('.')[0]}.` : '',
+        satP && (satP.house === 6 || satP.house === 12) ? 'Сатурн в 6/12: ежегодная диспансеризация — обязательна, не опционально.' : 'Ключ здоровья — режим 6-го дома, а не эпизодические практики.',
+        inH12.length > 0 ? 'Не игнорируйте тихие хронические сигналы: усталость, апатия, повторяющиеся симптомы — это 12-й дом.' : '',
+      ].filter(Boolean)} />
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── CAREER SPHERE ────────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── CAREER ──────────────────────────────────────────────────────────────────
 function CareerSphere({ chart, isDark }: { chart: NatalChart; isDark: boolean }) {
-  const c = '#818cf8';
-  const mc = chart.houses['10'];
-  const mcSign = mc?.sign ?? null;
-  const house10Ruler = getHouseRuler(chart, 10);
-  const house10RulerData = house10Ruler ? chart.planets[house10Ruler] : null;
-  const planetsIn10 = getPlanetsInHouse(chart, 10);
-  const house6Sign = getHouseSign(chart, 6);
-  const sun = chart.planets.sun;
-  const saturn = chart.planets.saturn;
-  const mars = chart.planets.mars;
+  const ac = '#818cf8';
+  const h10s = hSign(chart, 10);
+  const h10r = hRuler(chart, 10);
+  const h10rP = h10r ? chart.planets[h10r] : null;
+  const inH10 = planetsIn(chart, 10);
+  const h6s = hSign(chart, 6);
+  const satP = chart.planets.saturn;
+  const sunP = chart.planets.sun;
 
-  const saturnDig = chart.dignities?.saturn?.dignity;
-  const saturnStrong = saturnDig === 'domicile' || saturnDig === 'exaltation';
-  const rulerDig = house10Ruler ? chart.dignities?.[house10Ruler]?.dignity : null;
-  const rulerStrong = rulerDig === 'domicile' || rulerDig === 'exaltation';
-  const rulerWeak = rulerDig === 'detriment' || rulerDig === 'fall';
+  const h10rDg = h10r ? dignity(chart, h10r) : null;
+  const tone: 'strong' | 'mixed' | 'challenging' =
+    (isStrong(h10rDg) || satP?.house === 10 || inH10.length >= 2) ? 'strong' :
+    isWeak(h10rDg) ? 'challenging' : 'mixed';
 
-  const rulerAspects = house10Ruler ? getAspectsTo(chart, house10Ruler).slice(0, 4) : [];
+  const verdictText = h10s && h10rP
+    ? `MC ${sRu(h10s)}: ${MC_ARCHETYPE[h10s]?.split('.')[0] ?? 'профессиональный путь'}. Управитель в ${h10rP.house}H — успех через «${HRU[h10rP.house] ?? h10rP.house}».`
+    : `MC в ${sRu(h10s)}: ${h10s ? (MC_ARCHETYPE[h10s]?.split('.')[0] ?? '—') : '—'}.`;
 
   return (
     <div>
-      <SectionHead icon="🏆" title="Профессия и призвание" isDark={isDark} accent={c}
-        sub="Анализ MC (10-го дома), его управителя, Сатурна и профессиональных индикаторов" />
+      <VerdictBanner text={verdictText} tone={tone} isDark={isDark} />
 
-      {/* MC card */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 10 }}>
-          MC (Середина Неба) — {signRu(mcSign)}
-        </div>
-        {mcSign && (
-          <>
-            <Callout color={c} isDark={isDark}>
-              {MC_SIGN_CAREER[mcSign] ?? `MC в ${signRu(mcSign)} — особый профессиональный путь.`}
-            </Callout>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              <Tag label={SIGNS[mcSign]?.element ?? ''} color={c} isDark={isDark} />
-              <Tag label={SIGNS[mcSign]?.mode ?? ''} color="#60a5fa" isDark={isDark} />
-              <Tag label={SIGNS[mcSign]?.keyword ?? ''} color="#f59e0b" isDark={isDark} />
-            </div>
-          </>
-        )}
-        {planetsIn10.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Планеты в 10-м доме:</div>
-            {planetsIn10.map(([name, p]) => (
-              <div key={name} style={{
-                marginBottom: 8, padding: '8px 10px', borderRadius: 8,
-                background: 'rgba(255,255,255,0.03)', fontSize: 13,
-                color: isDark ? '#cbd5e1' : '#374151',
-              }}>
-                <span style={{ color: PLANETS[name]?.color ?? '#fff', fontWeight: 600 }}>
-                  {PLANETS[name]?.key} {planetRu(name)}
-                </span> в {signRu(p.sign)} —{' '}
-                {name === 'sun'     ? 'Солнце в MC — рождены для публичной роли. Карьера и самопроявление неразделимы.' :
-                 name === 'moon'    ? 'Луна в MC — профессия связана с заботой, публичными эмоциями, работой с людьми.' :
-                 name === 'saturn'  ? 'Сатурн в MC — серьёзная профессиональная репутация. Строится долго, но держится крепко.' :
-                 name === 'jupiter' ? 'Юпитер в MC — карьерная удача и экспансия. Успех через обучение и мировоззрение.' :
-                 name === 'mars'    ? 'Марс в MC — карьера требует энергии, лидерства, соревновательности.' :
-                 name === 'venus'   ? 'Венера в MC — карьера в сфере красоты, дипломатии, искусства, отношений.' :
-                 name === 'mercury' ? 'Меркурий в MC — профессия через слово, данные, коммуникации.' :
-                 name === 'uranus'  ? 'Уран в MC — нестандартная карьера, новаторство, смена профессий.' :
-                 name === 'neptune' ? 'Нептун в MC — карьера в творчестве, духовности, кино, помощи.' :
-                 name === 'pluto'   ? 'Плутон в MC — трансформирует свою отрасль. Власть и кризисы в карьере.' :
-                 `${planetRu(name)} окрашивает профессиональный путь.`}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Ruler of 10th */}
-      {house10Ruler && house10RulerData && (
-        <Card isDark={isDark} accent={c}>
-          <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 10 }}>
-            Управитель MC — {planetBadge(house10Ruler, house10RulerData, chart)}
-          </div>
-          <Callout color={rulerStrong ? '#22c55e' : rulerWeak ? '#f87171' : c} isDark={isDark}>
-            {rulerStrong
-              ? `${planetRu(house10Ruler)} в силе — карьерный управитель работает мощно. Профессиональный рост приходит с меньшим трением.`
-              : rulerWeak
-              ? `${planetRu(house10Ruler)} ослаблен — карьера требует дополнительных усилий, но возможна при сознательной работе над собой.`
-              : `${planetRu(house10Ruler)} в нейтральной позиции — стабильный, рабочий карьерный путь.`}
-          </Callout>
-          <div style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280', marginTop: 6 }}>
-            Управитель MC в <b>{house10RulerData.house}-м доме</b> ({HOUSES[house10RulerData.house]?.name}) —
-            профессиональный успех тесно связан с темой «{HOUSES[house10RulerData.house]?.theme ?? '...'}».
-          </div>
-          {rulerAspects.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Аспекты управителя MC:</div>
-              {rulerAspects.map((a, i) => {
-                const other = a.p1 === house10Ruler ? a.p2 : a.p1;
-                const info = describeAspect(a.aspect);
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <Pill label={info.short} tone={info.tone} isDark={isDark} />
-                    <span style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280' }}>
-                      с {PLANETS[other]?.key} {planetRu(other)} · орб {a.orb.toFixed(1)}°
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+      {h10s && (
+        <FactCard icon="🏆" title={`MC ${sRu(h10s)} — профессиональный архетип`} accent={ac} isDark={isDark}
+          text={MC_ARCHETYPE[h10s] ?? `MC в ${sRu(h10s)}: особый профессиональный путь.`}
+        />
       )}
 
-      {/* Saturn */}
-      <Card isDark={isDark} accent="#8899bb">
-        <div style={{ fontWeight: 700, color: '#8899bb', fontSize: 14, marginBottom: 10 }}>
-          ♄ Сатурн — дисциплина и мастерство
-        </div>
-        {saturn && (
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            <b style={{ color: '#8899bb' }}>♄ Сатурн в {signRu(saturn.sign)}</b> · {saturn.house}-й дом{saturn.retrograde ? ' Rx' : ''}
-            {saturnStrong && <span style={{ color: '#22c55e' }}> ⭐ в силе</span>}
-            <br />
-            {saturn.house === 10
-              ? 'Сатурн в 10-м — мощный карьерный индикатор. Серьёзная репутация, долгосрочные достижения, лидерство через компетентность.'
-              : `Сатурн в ${saturn.house}-м доме — дисциплина и мастерство через тему «${HOUSES[saturn.house]?.theme ?? '...'}». Успех приходит позже, но стоит прочнее.`}
-            {saturn.retrograde && (
-              <><br /><span style={{ color: '#fbbf24' }}>Ретроградный Сатурн: внутренняя работа над структурой и ответственностью. Карьера строится изнутри наружу.</span></>
-            )}
-          </div>
-        )}
-      </Card>
+      {h10r && h10rP && (
+        <FactCard icon="🔑" title={`Управитель MC — ${pLabel(h10r, h10rP.sign, h10rP.house, h10rP.retrograde, chart)}`}
+          accent={PCOLOR[h10r] ?? ac} isDark={isDark}
+          text={`${PRU[h10r]} в ${h10rP.house}-м доме: ${CAREER_FROM_HOUSE[h10rP.house] ?? 'нестандартный карьерный путь.'} Стиль реализации — ${sRu(h10rP.sign)}.`}
+          highlight={
+            isStrong(h10rDg) ? `В силе ${dgBadge(h10rDg)}: карьерный двигатель мощный — используйте без оглядки.` :
+            isWeak(h10rDg)   ? `Ослаблен ${dgBadge(h10rDg)}: профессиональный рост требует дополнительных усилий и наставника/ментора.` :
+            h10rP.retrograde ? `Rx: карьера строится изнутри наружу. Нестандартный путь, нелинейный рост.` :
+            undefined
+          }
+        />
+      )}
+      {h10r && <AspectChips chart={chart} planetName={h10r} isDark={isDark} />}
 
-      {/* Sun and Mars as career drivers */}
-      <Card isDark={isDark} accent="#d4a853">
-        <div style={{ fontWeight: 700, color: '#d4a853', fontSize: 14, marginBottom: 10 }}>
-          ☉ Солнце и ♂ Марс — профессиональная воля
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {sun && (
-            <div style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
-              <div style={{ fontWeight: 700, color: '#d4a853', marginBottom: 4 }}>
-                ☉ Солнце в {signRu(sun.sign)} · {sun.house} дом
-              </div>
-              <div style={{ color: isDark ? '#94a3b8' : '#6b7280', lineHeight: 1.5 }}>
-                Солнце показывает профессиональную идентичность — чем «светите» в работе.
-                Лучшие результаты там, где реализуется {SIGNS[sun.sign ?? '']?.keyword?.toLowerCase() ?? 'потенциал'}.
-              </div>
-            </div>
-          )}
-          {mars && (
-            <div style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
-              <div style={{ fontWeight: 700, color: '#d45b5b', marginBottom: 4 }}>
-                ♂ Марс в {signRu(mars.sign)} · {mars.house} дом
-              </div>
-              <div style={{ color: isDark ? '#94a3b8' : '#6b7280', lineHeight: 1.5 }}>
-                Марс — карьерный двигатель. Профессиональная энергия и стиль борьбы за место:
-                через {SIGNS[mars.sign ?? '']?.keyword?.toLowerCase() ?? '...'}.
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
+      {inH10.length > 0 && (
+        <FactCard icon="🌐" title={`Планеты в 10-м доме: ${inH10.map(p => `${PGLYPH[p.name]}${PRU[p.name]}`).join(' · ')}`}
+          accent={ac} isDark={isDark}
+          text={inH10.map(p =>
+            `${PGLYPH[p.name]} ${PRU[p.name]} ${sRu(p.sign)}${p.retrograde ? ' Rx' : ''}: ${
+              p.name === 'sun'     ? 'Карьера неотделима от личной идентичности. Нужна публичная роль.' :
+              p.name === 'moon'    ? 'Профессиональный успех через эмоциональный контакт с аудиторией.' :
+              p.name === 'saturn'  ? 'Сатурн в MC — серьёзная, долгосрочная репутация. Строится медленно, стоит десятилетиями.' :
+              p.name === 'jupiter' ? 'Карьерная удача. Масштаб, экспансия, международный потенциал.' :
+              p.name === 'mars'    ? 'Энергичная, конкурентная карьера. Нужны вызовы и действие.' :
+              p.name === 'venus'   ? 'Карьера в эстетике, дипломатии, красоте или отношениях.' :
+              p.name === 'mercury' ? 'Карьера через коммуникации, данные, обучение.' :
+              p.name === 'uranus'  ? 'Нестандартная карьера, неоднократная смена профессии — это план, не сбой.' :
+              p.name === 'neptune' ? 'Карьера в творчестве, духовности или помощи. Размытые границы роли.' :
+              p.name === 'pluto'   ? 'Трансформирует свою профессиональную сферу. Власть и кризисы — рабочий контекст.' :
+              `${PRU[p.name]} усиливает профессиональный путь.`
+            }`
+          ).join(' | ')}
+        />
+      )}
 
-      {/* 6th house work routine */}
-      <Card isDark={isDark} accent="#60a5fa">
-        <div style={{ fontWeight: 700, color: '#60a5fa', fontSize: 14, marginBottom: 8 }}>
-          6-й дом (Ежедневная работа) — {signRu(house6Sign)}
-        </div>
-        <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-          6-й дом описывает рабочую среду, коллег и ежедневный режим труда.
-          Куспид в <b>{signRu(house6Sign)}</b> — работа наиболее продуктивна в атмосфере{' '}
-          <b>{SIGNS[house6Sign ?? '']?.keyword?.toLowerCase() ?? '...'}</b>.
-        </div>
-      </Card>
+      {satP && (
+        <FactCard icon="♄" title={`Сатурн — зона профессионального мастерства: ${sRu(satP.sign)}, ${satP.house}H${dgBadge(dignity(chart,'saturn'))}${satP.retrograde?' Rx':''}`}
+          accent="#8899bb" isDark={isDark}
+          text={satP.house === 10
+            ? `Сатурн в 10-м — самый мощный карьерный индикатор карты. Репутация строится через компетентность и дисциплину. Долго, но нерушимо. Признание — после 35.`
+            : `Сатурн в ${satP.house}H (${HRU[satP.house] ?? satP.house}): профессиональный результат приходит через эту тему — медленно, но фундаментально. Это ваша зона долгосрочного мастерства.`
+          }
+          highlight={satP.retrograde ? 'Rx: мастерство строится через внутреннюю дисциплину и нестандартные методы.' : undefined}
+        />
+      )}
 
-      {/* Recommendations */}
-      <Card isDark={isDark} accent="#22c55e">
-        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 14, marginBottom: 10 }}>
-          ✅ Профессиональные рекомендации
-        </div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 2 }}>
-          <li>Ключевая карьерная сфера: <b>{mcSign ? signRu(mcSign) : '—'}</b> MC — следуйте этому вектору.</li>
-          {rulerWeak && <li>Развивайте качества управителя MC — это ваш профессиональный ключ.</li>}
-          {planetsIn10.length > 0 && <li>Планеты в 10-м доме — используйте их энергию сознательно для карьерного роста.</li>}
-          <li>Управитель MC в {house10RulerData?.house}-м доме: профессиональный успех через «{HOUSES[house10RulerData?.house ?? 10]?.theme}».</li>
-          {saturn && saturn.retrograde && <li>Сатурн Rx: строите карьеру через внутреннюю проработку и нестандартные методы.</li>}
-        </ul>
-      </Card>
+      {h6s && (
+        <FactCard icon="⚙" title={`6-й дом — ${sRu(h6s)}: ежедневная рабочая среда`} accent="#60a5fa" isDark={isDark}
+          text={`Повседневный режим труда, коллеги, рабочий стиль. В ${sRu(h6s)}: продуктивны в атмосфере ${
+            h6s === 'aries'||h6s==='leo'||h6s==='sagittarius' ? 'динамики, конкуренции и новых вызовов' :
+            h6s === 'taurus'||h6s==='virgo'||h6s==='capricorn' ? 'порядка, конкретики и измеримых результатов' :
+            h6s === 'gemini'||h6s==='libra'||h6s==='aquarius' ? 'разнообразия, диалога и интеллектуальной свободы' :
+            'безопасности, доверия и эмоционального комфорта'
+          }.`}
+        />
+      )}
+
+      <ActionList accent={ac} isDark={isDark} items={[
+        h10s ? `${MC_ARCHETYPE[h10s]?.split('.')[0] ?? sRu(h10s)}: сфокусируйтесь на этом архетипе — он работает.` : 'Определите MC для точного карьерного вектора.',
+        h10rP ? `Ключевой канал успеха — «${HRU[h10rP.house] ?? h10rP.house}» (${PRU[h10r ?? ''] ?? h10r} в ${h10rP.house}H). Инвестируйте время именно туда.` : '',
+        isWeak(h10rDg) && h10r ? `${PRU[h10r]} ослаблен: работайте с ментором в этой области, не действуйте в одиночку.` : satP?.house === 10 ? 'Сатурн в 10H: долгосрочная стратегия > краткосрочные победы. Репутация строится годами.' : '',
+        `Раз в 90 дней: оцените, сколько % рабочего времени идёт на тему ${HRU[h10rP?.house ?? 10] ?? '10H'}. Если меньше 50% — перераспределите.`,
+        inH10.length > 0 ? `Планеты в 10H: ${inH10.map(p => PRU[p.name]).join(', ')} — используйте их качества осознанно в публичной роли.` : '',
+      ].filter(Boolean)} />
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── ENERGY SPHERE ────────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── ENERGY ──────────────────────────────────────────────────────────────────
 function EnergySphere({ chart, isDark }: { chart: NatalChart; isDark: boolean }) {
-  const c = '#f59e0b';
-  const sun = chart.planets.sun;
-  const moon = chart.planets.moon;
-  const mars = chart.planets.mars;
-  const pluto = chart.planets.pluto;
+  const ac = '#f59e0b';
+  const sunP = chart.planets.sun;
+  const moonP = chart.planets.moon;
+  const marsP = chart.planets.mars;
+  const plutP = chart.planets.pluto;
   const sect = chart.sect;
+  const sunDg = dignity(chart, 'sun');
+  const marsDg = dignity(chart, 'mars');
 
-  // Count fire/earth/air/water
-  const elements: Record<string, number> = { Огонь: 0, Земля: 0, Воздух: 0, Вода: 0 };
+  const elems: Record<string, number> = { Огонь:0, Земля:0, Воздух:0, Вода:0 };
   for (const [, p] of Object.entries(chart.planets)) {
     if (!p?.sign) continue;
-    const el = SIGNS[p.sign]?.element;
-    if (el && el in elements) elements[el]++;
+    const el = ELEMENT[p.sign];
+    if (el) elems[el] = (elems[el] ?? 0) + 1;
   }
-  const topElement = Object.entries(elements).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Огонь';
+  const topEl = Object.entries(elems).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? 'Огонь';
+  const total = Object.values(elems).reduce((a,b)=>a+b,0);
 
-  const marsDig = chart.dignities?.mars?.dignity;
-  const marsStrong = marsDig === 'domicile' || marsDig === 'exaltation';
-  const marsWeak = marsDig === 'detriment' || marsDig === 'fall';
+  let score = 5;
+  if (isStrong(sunDg)) score += 1;
+  if (isStrong(marsDg)) score += 2;
+  if (isWeak(marsDg)) score -= 1;
+  if (elems['Огонь'] >= 4) score += 1;
+  if (sect === 'day') score += 1;
+  if (plutP && plutP.house === 1) score += 1;
+  score = Math.max(2, Math.min(10, score));
 
-  const sunDig = chart.dignities?.sun?.dignity;
-  const sunStrong = sunDig === 'domicile' || sunDig === 'exaltation';
+  const tone: 'strong' | 'mixed' | 'challenging' = score >= 8 ? 'strong' : score >= 5 ? 'mixed' : 'challenging';
 
-  // Energy level score
-  let energy = 5;
-  if (sunStrong) energy += 1;
-  if (marsStrong) energy += 2;
-  if (marsWeak) energy -= 1;
-  if (elements['Огонь'] >= 4) energy += 1;
-  if (sect === 'day') energy += 1;
-  if (pluto && (pluto.house === 1 || pluto.house === 10)) energy += 1;
-  energy = Math.max(1, Math.min(10, energy));
+  const verdictText = sunP
+    ? `Природный уровень энергии ${score}/10. Солнце ${sRu(sunP.sign)} (${sunP.house}H)${isStrong(sunDg) ? ' — в силе, высокий потенциал' : isWeak(sunDg) ? ' — ослаблено, требует режима' : ''}. Марс ${marsP ? `${sRu(marsP.sign)} (${marsP.house}H)${isWeak(marsDg)?' ослаблен':''}` : '—'}.`
+    : `Доминирующая стихия: ${topEl}.`;
 
   return (
     <div>
-      <SectionHead icon="⚡" title="Энергия и жизненный ресурс" isDark={isDark} accent={c}
-        sub="Анализ Солнца, Марса, стихий и природного ритма" />
+      <VerdictBanner text={verdictText} tone={tone} isDark={isDark} />
 
-      {/* Energy meter */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <span style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280' }}>Природный уровень энергии:</span>
-          <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)' }}>
-            <div style={{ width: `${energy * 10}%`, height: '100%', borderRadius: 4, background: c }} />
-          </div>
-          <span style={{ fontWeight: 700, color: c, fontSize: 15 }}>{energy}/10</span>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {Object.entries(elements).map(([el, n]) => (
-            <Tag key={el} label={`${el}: ${n}`} color={el === topElement ? c : '#94a3b8'} isDark={isDark} />
-          ))}
-          {sect && (
-            <Tag label={sect === 'day' ? '☀ Дневное рождение' : '☾ Ночное рождение'} color="#818cf8" isDark={isDark} />
-          )}
-        </div>
-      </Card>
-
-      {/* Sun energy */}
-      <Card isDark={isDark} accent="#d4a853">
-        <div style={{ fontWeight: 700, color: '#d4a853', fontSize: 14, marginBottom: 10 }}>
-          ☉ Солнце — источник жизненной энергии
-        </div>
-        {sun && (
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            <b style={{ color: '#d4a853' }}>☉ Солнце в {signRu(sun.sign)}</b> · {sun.house}-й дом
-            {sunStrong ? <span style={{ color: '#22c55e' }}> ⭐</span> : null}
-            <br />
-            <Callout color="#d4a853" isDark={isDark}>
-              {SUN_ENERGY[sun.sign ?? ''] ?? 'Солнце — источник вашей центральной энергии.'}
-            </Callout>
-            <div style={{ marginTop: 6, fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280' }}>
-              Солнце в {sun.house}-м доме: энергия наиболее мощна в теме «{HOUSES[sun.house]?.theme ?? '...'}».
-              Именно там вы «заряжаетесь» и находите смысл.
+      {/* Elements bar */}
+      <div style={{
+        borderRadius: 10, padding: '12px 14px', marginBottom: 12,
+        border: `1px solid ${ac}2a`,
+        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ac, marginBottom: 10, letterSpacing:'0.05em' }}>СТИХИИ КАРТЫ</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8 }}>
+          {[['Огонь','#d45b5b'],['Земля','#d4a853'],['Воздух','#60a5fa'],['Вода','#9ab5d4']].map(([el, c]) => (
+            <div key={el} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:12, minWidth:55, color: el===topEl ? (c as string) : (isDark?'#64748b':'#9ca3af'), fontWeight: el===topEl?700:400 }}>
+                {el===topEl ? '★ ':''}{el}
+              </span>
+              <div style={{ flex:1, height:5, borderRadius:3, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                <div style={{ width:`${((elems[el]??0)/total)*100}%`, height:'100%', background: el===topEl?(c as string):'#334155', borderRadius:3 }} />
+              </div>
+              <span style={{ fontSize:11, color:'#64748b', minWidth:12 }}>{elems[el]??0}</span>
             </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Mars */}
-      <Card isDark={isDark} accent="#d45b5b">
-        <div style={{ fontWeight: 700, color: '#d45b5b', fontSize: 14, marginBottom: 10 }}>
-          ♂ Марс — двигатель и воля
+          ))}
         </div>
-        {mars && (
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            <b style={{ color: '#d45b5b' }}>♂ Марс в {signRu(mars.sign)}</b> · {mars.house}-й дом
-            {marsStrong ? <span style={{ color: '#22c55e' }}> ⭐ в силе</span>
-              : marsWeak ? <span style={{ color: '#f87171' }}> ⬇ ослаблен</span> : null}
-            {mars.retrograde ? <span style={{ color: '#fbbf24' }}> Rx</span> : null}
-            <Callout color="#d45b5b" isDark={isDark}>
-              {MARS_ENERGY[mars.sign ?? ''] ?? 'Марс — двигатель вашей активности.'}
-            </Callout>
-            {marsStrong && (
-              <div style={{ fontSize: 12, color: '#22c55e', marginTop: 4 }}>
-                Марс в силе — высокая природная активность, быстрое восстановление.
-              </div>
-            )}
-            {marsWeak && (
-              <div style={{ fontSize: 12, color: '#f87171', marginTop: 4 }}>
-                Марс ослаблен — физическая энергия требует бережного отношения. Избегайте перегрузок.
-              </div>
-            )}
-            {mars.retrograde && (
-              <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 4 }}>
-                Ретроградный Марс: энергия обращена вовнутрь. Медленный старт, но выносливость.
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* Moon recovery */}
-      <Card isDark={isDark} accent="#9ab5d4">
-        <div style={{ fontWeight: 700, color: '#9ab5d4', fontSize: 14, marginBottom: 10 }}>
-          ☽ Луна — ритм восстановления
+        <div style={{ marginTop:10, fontSize:12, color:isDark?'#94a3b8':'#6b7280' }}>
+          {topEl === 'Огонь' ? 'Огненная натура: энергия экстравертная, взрывная, требует действия и выхода.' :
+           topEl === 'Земля' ? 'Земная натура: энергия стабильная, накопительная, требует ощутимого результата.' :
+           topEl === 'Воздух' ? 'Воздушная натура: энергия ментальная, социальная, требует общения и идей.' :
+           'Водная натура: энергия глубинная, эмоциональная, требует безопасной среды для восстановления.'}
+          {sect === 'day' ? ' Дневное рождение — пик активности: утро/день.' : sect === 'night' ? ' Ночное рождение — пик активности: вечер/ночь.' : ''}
         </div>
-        {moon && (
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.7 }}>
-            <b style={{ color: '#9ab5d4' }}>☽ Луна в {signRu(moon.sign)}</b> · {moon.house}-й дом
-            <br />
-            {moon.sign === 'aries' || moon.sign === 'leo' || moon.sign === 'sagittarius'
-              ? 'Восстанавливаетесь через активность, движение, игру. Пассивный отдых не работает — нужно действие.'
-              : moon.sign === 'taurus' || moon.sign === 'virgo' || moon.sign === 'capricorn'
-              ? 'Восстанавливаетесь через тело: сон, природу, вкусную еду, режим. Стабильность — ваша батарейка.'
-              : moon.sign === 'gemini' || moon.sign === 'libra' || moon.sign === 'aquarius'
-              ? 'Восстанавливаетесь через общение, смену обстановки, интеллектуальные занятия. Изоляция утомляет.'
-              : 'Восстанавливаетесь через уединение, воду, эмоциональный контакт с близкими. Нужна тишина и безопасность.'}
-          </div>
-        )}
-      </Card>
+      </div>
 
-      {/* Pluto */}
-      {pluto && (
-        <Card isDark={isDark} accent="#bb77aa">
-          <div style={{ fontWeight: 700, color: '#bb77aa', fontSize: 14, marginBottom: 8 }}>
-            ♇ Плутон — глубинная трансформационная сила
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-            <b style={{ color: '#bb77aa' }}>♇ Плутон в {signRu(pluto.sign)}</b> · {pluto.house}-й дом
-            <br />
-            {pluto.house === 1
-              ? 'Плутон в 1-м доме — трансформативная, интенсивная энергия. Буквально перерождаетесь после кризисов.'
-              : pluto.house === 8
-              ? 'Плутон в 8-м — мощный ресурс через трансформации. Кризисы — двигатель роста.'
-              : `Плутон в ${pluto.house}-м доме — глубинная сила сосредоточена в теме «${HOUSES[pluto.house]?.theme ?? '...'}».`}
-          </div>
-        </Card>
+      {sunP && (
+        <FactCard icon="☉" title={`Солнце — источник заряда: ${sRu(sunP.sign)}, ${sunP.house}H${dgBadge(sunDg)}`}
+          accent="#d4a853" isDark={isDark}
+          text={sunP.sign ? `Заряд: ${SUN_ENERGY_PROFILE[sunP.sign]?.charge ?? '—'}. Слив: ${SUN_ENERGY_PROFILE[sunP.sign]?.drain ?? '—'}. Восстановление: ${SUN_ENERGY_PROFILE[sunP.sign]?.restore ?? '—'}.` : 'Данные Солнца отсутствуют.'}
+          highlight={sunP.house ? `Солнце в ${sunP.house}H: максимальная отдача — когда занимаетесь темой «${HRU[sunP.house] ?? sunP.house}». Именно там заряжаетесь, а не тратитесь.` : undefined}
+        />
+      )}
+      {sunP && <AspectChips chart={chart} planetName="sun" isDark={isDark} />}
+
+      {marsP && (
+        <FactCard icon="♂" title={`Марс — двигатель воли: ${sRu(marsP.sign)}, ${marsP.house}H${dgBadge(marsDg)}${marsP.retrograde?' Rx':''}`}
+          accent="#d45b5b" isDark={isDark}
+          text={MARS_PROFILE[marsP.sign ?? ''] ?? 'Марс — двигатель вашей активности.'}
+          highlight={
+            isStrong(marsDg) ? 'В силе: высокий природный мотор. Риск — сжечь других своей интенсивностью.' :
+            isWeak(marsDg)   ? 'Ослаблен: физическая энергия требует грамотного управления. Перегруз → долгое восстановление.' :
+            marsP.retrograde ? 'Rx: энергия вовнутрь. Работает через накопление, а не прорыв.' :
+            undefined
+          }
+        />
+      )}
+      {marsP && <AspectChips chart={chart} planetName="mars" isDark={isDark} />}
+
+      {moonP && (
+        <FactCard icon="☽" title={`Луна — ритм восстановления: ${sRu(moonP.sign)}, ${moonP.house}H`}
+          accent="#9ab5d4" isDark={isDark}
+          text={
+            moonP.sign === 'aries'||moonP.sign==='leo'||moonP.sign==='sagittarius'
+              ? 'Восстановление через активность: пассивный отдых не работает. Нужны движение, игра, творчество.' :
+            moonP.sign === 'taurus'||moonP.sign==='virgo'||moonP.sign==='capricorn'
+              ? 'Восстановление через тело и режим: сон, природа, еда, структура. Хаос истощает.' :
+            moonP.sign === 'gemini'||moonP.sign==='libra'||moonP.sign==='aquarius'
+              ? 'Восстановление через общение и смену обстановки. Изоляция — не отдых.' :
+            'Восстановление через уединение, тишину, воду, близкие люди. Чужая интенсивность истощает.'
+          }
+        />
       )}
 
-      {/* Sect */}
-      <Card isDark={isDark} accent="#818cf8">
-        <div style={{ fontWeight: 700, color: '#818cf8', fontSize: 14, marginBottom: 8 }}>
-          {sect === 'day' ? '☀ Дневное рождение' : '☾ Ночное рождение'}
-        </div>
-        <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-          {sect === 'day'
-            ? 'Рождены днём — Солнце и Юпитер работают в своей стихии. Энергия более экстравертная, социальная. Лучшие часы продуктивности — утро и день.'
-            : sect === 'night'
-            ? 'Рождены ночью — Луна и Венера сильнее. Энергия более интровертная, интуитивная. Пик продуктивности — вечер или ночь.'
-            : 'Рождение на границе дня и ночи — совмещаете оба ритма.'}
-        </div>
-      </Card>
+      {plutP && plutP.house === 1 && (
+        <FactCard icon="♇" title={`Плутон в 1-м — трансформационная энергия`}
+          accent="#bb77aa" isDark={isDark}
+          text="Плутон в 1-м доме: интенсивная, regenerative конституция. После полного истощения — полное возрождение. Энергия работает через крайности."
+        />
+      )}
 
-      {/* Recommendations */}
-      <Card isDark={isDark} accent="#22c55e">
-        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 14, marginBottom: 10 }}>
-          ✅ Практики восстановления энергии
-        </div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 2 }}>
-          <li>Доминирующая стихия: <b>{topElement}</b> — строите энергоресурс через её принципы.</li>
-          {sun && <li>Солнечная зарядка: занятия, связанные с {sun.house}-м домом («{HOUSES[sun.house]?.theme}»), заряжают сильнее всего.</li>}
-          {mars && marsWeak && <li>Марс ослаблен: регулярные, но умеренные физические нагрузки — без фанатизма.</li>}
-          {sect === 'night' && <li>Ночное рождение: не насилуйте себя утренними ритуалами — найдите свой пик активности.</li>}
-          {moon && <li>Луна в {signRu(moon.sign)}: восстанавливайтесь через стихию {SIGNS[moon.sign ?? '']?.element ?? '...'} — это ваша природная батарейка.</li>}
-        </ul>
-      </Card>
+      <ActionList accent={ac} isDark={isDark} items={[
+        sunP?.sign ? `Ключевой заряжальщик: ${SUN_ENERGY_PROFILE[sunP.sign]?.restore ?? '—'}. Делайте это регулярно, не как награду.` : '',
+        isWeak(marsDg) && marsP ? `Марс ослаблен: планируйте 2 дня восстановления после каждого высокоинтенсивного периода. Не форсируйте.` : marsP ? `Марс в ${sRu(marsP.sign)}: используйте свой стиль воли — не чужой.` : '',
+        sect === 'night' ? 'Ночное рождение: не ломайте себя ранними подъёмами — найдите режим, совпадающий с биологическим пиком.' : 'Дневное рождение: утренние ритуалы и ранние задачи — ваша суперсила.',
+        topEl === 'Огонь' ? 'Огневая стихия: нужен выход для энергии. Спорт, проекты, соревнование — без этого накапливается агрессия.' :
+        topEl === 'Вода'  ? 'Водная стихия: защищайте личные границы. Без барьеров — накапливаете чужой стресс физически.' :
+        'Восстанавливайте баланс стихий: если всё — земля и огонь, добавьте воздуха (общение) и воды (тишина).',
+        moonP ? `Луна в ${sRu(moonP.sign)}: ваш аккумулятор заряжается через ${ELEMENT[moonP.sign??'']?.toLowerCase() ?? '...'} — не игнорируйте это.` : '',
+      ].filter(Boolean)} />
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── LIFE PLAN SPHERE ─────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-function LifePlanSphere({ chart, isDark, birthDate }: {
+// ─── LIFE PLAN ────────────────────────────────────────────────────────────────
+function PlanSphere({ chart, isDark, birthDate }: {
   chart: NatalChart; isDark: boolean; birthDate?: string;
 }) {
-  const c = '#60a5fa';
+  const ac = '#60a5fa';
+  const age = useMemo(() => calcAge(birthDate ?? chart.metadata?.date), [birthDate, chart.metadata?.date]);
+  const sat = saturnPhase(age);
+  const jup = jupiterPhase(age);
+  const nodeP = chart.planets.node;
+  const satP  = chart.planets.saturn;
+  const chirP = chart.planets.chiron;
+  const nordSign = nodeP?.sign ?? null;
+  const nordHouse = nodeP?.house ?? null;
 
-  // Calculate age
-  const ageNow = useMemo(() => {
-    const bd = birthDate ?? chart.metadata?.date;
-    if (!bd) return 35;
-    const birth = new Date(bd.replace(/\./g, '-').split('-').reverse().join('-'));
-    if (isNaN(birth.getTime())) return 35;
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age;
-  }, [birthDate, chart.metadata?.date]);
+  // South node sign = opposite
+  const signOrder = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
+  const nordIdx = nordSign ? signOrder.indexOf(nordSign) : -1;
+  const southSign = nordIdx >= 0 ? signOrder[(nordIdx + 6) % 12] : null;
+  const southHouse = nordHouse ? (nordHouse <= 6 ? nordHouse + 6 : nordHouse - 6) : null;
 
-  const satPhase = getSaturnPhase(ageNow);
-  const jupPhase = getJupiterPhase(ageNow);
-
-  const node = chart.planets.node;
-  const saturn = chart.planets.saturn;
-  const chiron = chart.planets.chiron;
-
-  // Saturn return years
-  const sr1 = 29; const sr2 = 59; const sr3 = 88;
-  const chironReturn = 50;
-
-  // Key life stages description
-  const stages = [
-    { age: '0–7',   title: 'Корни',        icon: '🌱', desc: 'Формирование базовых программ, семейные паттерны. Основа для всей жизни.' },
-    { age: '7–14',  title: 'Открытие мира', icon: '🌍', desc: 'Первые социальные контакты, образование, формирование личности.' },
-    { age: '14–21', title: 'Идентичность',  icon: '🔥', desc: 'Первый кризис выбора, формирование ценностей, юношеский максимализм.' },
-    { age: '21–29', title: 'Взросление',    icon: '🏗', desc: 'Строительство взрослой жизни: карьера, отношения, самостоятельность.' },
-    { age: '29–30', title: '1-й возврат ♄', icon: '♄', desc: 'Кризис переоценки. Сатурн требует итогов и ответственных решений.' },
-    { age: '30–42', title: 'Мастерство',    icon: '🌟', desc: 'Расцвет компетентности. Карьера, семья, социальная роль оформляются.' },
-    { age: '42–49', title: 'Кризис среднего', icon: '🔮', desc: 'Юпитерианский оппозит + Уран оппозит — время глубокой переоценки смысла.' },
-    { age: '50',    title: 'Хирон-возврат', icon: '⚷', desc: 'Рана становится мудростью. Целительский потенциал достигает пика.' },
-    { age: '59–60', title: '2-й возврат ♄', icon: '♄', desc: 'Второй сатурнов цикл завершён. Подведение итогов зрелости.' },
-    { age: '60+',   title: 'Мудрость',      icon: '🌙', desc: 'Передача опыта, духовный рост, лёгкость бытия.' },
-  ];
-
-  const northNodeSign = node?.sign ?? null;
-  const northNodeHouse = node?.house ?? null;
-  const southHouseNum = northNodeHouse ? (northNodeHouse <= 6 ? northNodeHouse + 6 : northNodeHouse - 6) : null;
+  const tone: 'strong' | 'mixed' | 'challenging' =
+    sat.cycleNum === 2 && sat.yr >= 7 && sat.yr < 21 ? 'mixed' : 'mixed';
 
   return (
     <div>
-      <SectionHead icon="🗺️" title="Жизненный план и развитие" isDark={isDark} accent={c}
-        sub="Циклы Сатурна и Юпитера · Кармическая ось · Ключевые точки роста" />
+      <VerdictBanner
+        text={`${age} лет · Сатурн: цикл ${sat.cycleNum}, год ${sat.yr} (${sat.label}). Следующий возврат ♄ ~${sat.next} лет.`}
+        tone={tone} isDark={isDark}
+      />
 
-      {/* Current age + phase */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ fontWeight: 700, color: c, fontSize: 15, marginBottom: 10 }}>
-          Сейчас вам {ageNow} лет — {satPhase.phase}
-        </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-          <Tag label={satPhase.keywords} color={satPhase.color} isDark={isDark} />
-          {satPhase.nextReturn > 0 && satPhase.nextReturn < 30 && (
-            <Tag label={`До следующего возврата Сатурна: ~${satPhase.nextReturn} лет`} color="#8899bb" isDark={isDark} />
-          )}
-        </div>
-        <Callout color={satPhase.color} isDark={isDark}>
-          <b style={{ color: satPhase.color }}>Цикл Сатурна:</b> {satPhase.desc}
-        </Callout>
-        <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Цикл Юпитера (12 лет):</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Tag label={jupPhase.phase} color={jupPhase.color} isDark={isDark} />
-          </div>
-          <Callout color={jupPhase.color} isDark={isDark}>
-            {jupPhase.desc}
-          </Callout>
-        </div>
-      </Card>
+      {/* Saturn cycle */}
+      <FactCard icon="♄" title={`Сатурн: ${sat.label}`} accent="#8899bb" isDark={isDark}
+        text={sat.desc}
+        highlight={`Прошлый возврат Сатурна: ~${sat.prev} лет. Следующий: ~${sat.next} лет. До него — ${sat.next - age} лет.`}
+      />
 
-      {/* Life stages timeline */}
-      <Card isDark={isDark} accent={c}>
-        <div style={{ fontWeight: 700, color: c, fontSize: 14, marginBottom: 14 }}>
-          Ключевые точки развития
-        </div>
-        <div style={{ position: 'relative' }}>
-          {stages.map((stage, i) => {
-            const isNow = (() => {
-              const [start, end] = stage.age.includes('–')
-                ? stage.age.split('–').map(Number)
-                : [Number(stage.age.replace(/\D/g, '')), Number(stage.age.replace(/\D/g, '')) + 1];
-              return ageNow >= (start || 0) && ageNow < (end || start + 1);
-            })();
+      {/* Jupiter cycle */}
+      <FactCard icon="♃" title={`Юпитер: ${jup.label}`} accent="#d4a04a" isDark={isDark}
+        text={jup.desc}
+      />
 
-            return (
-              <div key={i} style={{
-                display: 'flex', gap: 12, marginBottom: 12, opacity: isNow ? 1 : 0.65,
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 24 }}>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 12,
-                    background: isNow ? c + '33' : 'rgba(255,255,255,0.05)',
-                    border: isNow ? `2px solid ${c}` : '1px solid rgba(255,255,255,0.1)',
-                  }}>
-                    {stage.icon}
-                  </div>
-                  {i < stages.length - 1 && (
-                    <div style={{ width: 1, flex: 1, minHeight: 10, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
-                  )}
-                </div>
-                <div style={{ flex: 1, paddingBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#94a3b8', minWidth: 55 }}>{stage.age}</span>
-                    <span style={{ fontWeight: isNow ? 700 : 500, fontSize: 13, color: isNow ? c : (isDark ? '#e2e8f0' : '#1e293b') }}>
-                      {stage.title}
-                    </span>
-                    {isNow && <span style={{ fontSize: 10, color: c, fontWeight: 700, padding: '1px 6px',
-                      borderRadius: 10, background: c + '22', border: `1px solid ${c}44` }}>◉ СЕЙЧАС</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', marginTop: 2 }}>
-                    {stage.desc}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Karmic axis */}
-      {node && (
-        <Card isDark={isDark} accent="#c084fc">
-          <div style={{ fontWeight: 700, color: '#c084fc', fontSize: 14, marginBottom: 10 }}>
-            🔮 Кармическая ось — направление развития
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.8 }}>
-            <div style={{ marginBottom: 8 }}>
-              <b style={{ color: '#c084fc' }}>Северный Узел ☊</b> в <b>{signRu(northNodeSign)}</b>
-              {northNodeHouse ? ` · ${northNodeHouse}-й дом (${HOUSES[northNodeHouse]?.name})` : ''}
-              {' '}— <b>куда идёте</b>.
-              <br />
-              <span style={{ color: isDark ? '#94a3b8' : '#6b7280', fontSize: 12 }}>
-                Освоить качества <b>{signRu(northNodeSign)}</b> через тему «{HOUSES[northNodeHouse ?? 1]?.theme ?? '...'}».
-                Это страшно — но именно там настоящий рост.
-              </span>
-            </div>
-            <div>
-              <b style={{ color: '#94a3b8' }}>Южный Узел ☋</b> в{' '}
-              {(() => {
-                if (!northNodeSign) return '—';
-                const signs = Object.keys(SIGNS);
-                const idx = signs.indexOf(northNodeSign);
-                const southIdx = (idx + 6) % 12;
-                return signRu(signs[southIdx] ?? '');
-              })()}
-              {southHouseNum ? ` · ${southHouseNum}-й дом (${HOUSES[southHouseNum]?.name})` : ''}
-              {' '}— <b>откуда пришли</b>.
-              <br />
-              <span style={{ color: isDark ? '#94a3b8' : '#6b7280', fontSize: 12 }}>
-                Накопленный ресурс прошлого — ваша точка опоры. Но не точка назначения.
-              </span>
-            </div>
-          </div>
-        </Card>
+      {/* North Node */}
+      {nodeP && (
+        <FactCard icon="☊" title={`Кармическая ось: куда расти`} accent="#c084fc" isDark={isDark}
+          text={`Северный Узел ☊ ${sRu(nordSign)}, ${nordHouse}H (${HRU[nordHouse??1]??nordHouse}) — направление роста в этой жизни. Именно здесь страшно и именно здесь — суть. Южный Узел ☋ ${sRu(southSign)}, ${southHouse}H (${HRU[southHouse??7]??southHouse}) — накопленный ресурс прошлого. Опирайтесь, но не живите там.`}
+          highlight={nordHouse && nordSign ? `Ключевая задача: освоить качества «${sRu(nordSign)}» в сфере «${HRU[nordHouse]??nordHouse}». Каждый шаг туда — против комфорта и в сторону реализации.` : undefined}
+        />
       )}
 
-      {/* Saturn natal */}
-      {saturn && (
-        <Card isDark={isDark} accent="#8899bb">
-          <div style={{ fontWeight: 700, color: '#8899bb', fontSize: 14, marginBottom: 8 }}>
-            ♄ Сатурн в натале — зона мастерства
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-            <b style={{ color: '#8899bb' }}>♄ Сатурн в {signRu(saturn.sign)}</b> · {saturn.house}-й дом
-            {saturn.retrograde ? ' Rx' : ''}
-            <br />
-            Эта область жизни — ваш главный урок. Здесь не получается легко, но именно здесь строится
-            настоящее мастерство и долгосрочные результаты.
-            Тема <b>«{HOUSES[saturn.house]?.theme ?? '...'}»</b> — ваш профессиональный и личностный приоритет.
-          </div>
-        </Card>
+      {/* Saturn natal mastery */}
+      {satP && (
+        <FactCard icon="♄" title={`Сатурн в натале — зона мастерства: ${sRu(satP.sign)}, ${satP.house}H${satP.retrograde?' Rx':''}`}
+          accent="#8899bb" isDark={isDark}
+          text={`Сфера «${HRU[satP.house]??satP.house}» — ваш главный урок. Здесь не даётся легко, но здесь строится нерушимое мастерство. Результаты в этой теме приходят позже среднего, но остаются навсегда. Стиль ${sRu(satP.sign)} — через него и только.`}
+          highlight={satP.retrograde ? 'Rx: мастерство строится изнутри — переосмысление структур, нестандартный путь к компетентности.' : undefined}
+        />
       )}
 
       {/* Chiron */}
-      {chiron && (
-        <Card isDark={isDark} accent="#66aabb">
-          <div style={{ fontWeight: 700, color: '#66aabb', fontSize: 14, marginBottom: 8 }}>
-            ⚷ Хирон — рана и дар целителя
-          </div>
-          <div style={{ fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 }}>
-            <b style={{ color: '#66aabb' }}>⚷ Хирон в {signRu(chiron.sign)}</b> · {chiron.house}-й дом
-            <br />
-            Глубинная рана в теме «{HOUSES[chiron.house]?.theme ?? '...'}» — после принятия становится
-            главным источником мудрости и способности помогать другим в этой же теме.
-            {ageNow >= 48 && ageNow <= 53 && (
-              <><br /><span style={{ color: '#66aabb', fontWeight: 600 }}>
-                ⚡ Вы сейчас вблизи возврата Хирона (~{chironReturn} лет) — ключевой период исцеления и интеграции.
-              </span></>
-            )}
-          </div>
-        </Card>
+      {chirP && (
+        <FactCard icon="⚷" title={`Хирон — рана и дар: ${sRu(chirP.sign)}, ${chirP.house}H`}
+          accent="#66aabb" isDark={isDark}
+          text={`Глубинная уязвимость в теме «${HRU[chirP.house]??chirP.house}». До принятия — источник боли. После — главный дар и способность помогать другим именно здесь глубже любого «специалиста». Хирон-возврат ~50 лет — ключевая точка интеграции.`}
+          highlight={age >= 48 && age <= 53 ? '⚡ Вы вблизи Хирон-возврата (~50 лет). Сейчас рана либо исцеляется, либо обостряется — оба варианта нормальны.' : undefined}
+        />
       )}
 
-      {/* Saturn returns guide */}
-      <Card isDark={isDark} accent="#8899bb">
-        <div style={{ fontWeight: 700, color: '#8899bb', fontSize: 14, marginBottom: 10 }}>
-          Ключевые точки возвратов Сатурна
-        </div>
-        {[sr1, sr2, sr3].map(yr => {
-          const passed = ageNow > yr + 1;
-          const current = Math.abs(ageNow - yr) <= 1;
+      {/* Mini timeline */}
+      <div style={{ marginBottom: 12, borderRadius: 10, border:`1px solid ${ac}2a`,
+        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding:'12px 14px' }}>
+        <div style={{ fontSize:12, fontWeight:700, color:ac, marginBottom:10, letterSpacing:'0.05em' }}>КЛЮЧЕВЫЕ ТОЧКИ ВПЕРЕДИ</div>
+        {[
+          age < 29  && { yr:29,  label:'1-й возврат Сатурна', desc:'Переосмысление фундамента. Сатурн требует итогов и взятия ответственности.', c:'#8899bb' },
+          age < 42  && { yr:42,  label:'Оппозиция Урана', desc:'Неожиданный внутренний переворот. Что из навязанного — не ваше?', c:'#5bbbcc' },
+          age < 50  && { yr:50,  label:'Хирон-возврат', desc:'Интеграция главной раны. Дар целителя открывается полностью.', c:'#66aabb' },
+          age < 59  && { yr:59,  label:'2-й возврат Сатурна', desc:'Итог зрелости. Готовность передавать опыт.', c:'#8899bb' },
+          age < 84  && { yr:84,  label:'Возврат Урана', desc:'Освобождение от всех внешних масок. Абсолютная аутентичность.', c:'#5bbbcc' },
+        ].filter(Boolean).map((pt, i) => {
+          if (!pt) return null;
+          const yrsLeft = (pt as {yr:number}).yr - age;
           return (
-            <div key={yr} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10,
-              opacity: passed && !current ? 0.5 : 1,
-            }}>
+            <div key={i} style={{ display:'flex', gap:10, marginBottom:8, alignItems:'flex-start' }}>
               <div style={{
-                width: 32, height: 32, borderRadius: '50%', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: current ? '#8899bb33' : 'rgba(255,255,255,0.04)',
-                border: current ? '2px solid #8899bb' : '1px solid rgba(255,255,255,0.1)',
-                fontSize: 12, color: '#8899bb', fontWeight: 700,
-              }}>{yr}</div>
+                width:36, height:36, borderRadius:'50%', flexShrink:0,
+                background:`${(pt as {c:string}).c}1a`, border:`1px solid ${(pt as {c:string}).c}44`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:12, fontWeight:700, color:(pt as {c:string}).c,
+              }}>{(pt as {yr:number}).yr}</div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: current ? '#8899bb' : (isDark ? '#e2e8f0' : '#1e293b') }}>
-                  {yr === 29 ? 'Первый возврат Сатурна' : yr === 59 ? 'Второй возврат Сатурна' : 'Третий возврат Сатурна'}
-                  {current && <span style={{ color: '#8899bb' }}> ← вы здесь</span>}
+                <div style={{ fontWeight:600, fontSize:13, color: isDark?'#e2e8f0':'#1e293b' }}>
+                  {(pt as {label:string}).label} <span style={{ color:'#94a3b8', fontWeight:400 }}>— через {yrsLeft} лет</span>
                 </div>
-                <div style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', marginTop: 2 }}>
-                  {yr === 29
-                    ? 'Переход во взрослость. Сатурн требует взять ответственность за свою жизнь. Важны честные итоги.'
-                    : yr === 59
-                    ? 'Кризис зрелости. Переосмысление достижений. Готовность передавать опыт.'
-                    : 'Мудрость старчества. Освобождение от социальных масок.'}
-                </div>
+                <div style={{ fontSize:12, color:isDark?'#94a3b8':'#6b7280', marginTop:2 }}>{(pt as {desc:string}).desc}</div>
               </div>
             </div>
           );
         })}
-      </Card>
+      </div>
 
-      {/* Recommendations */}
-      <Card isDark={isDark} accent="#22c55e">
-        <div style={{ fontWeight: 700, color: '#22c55e', fontSize: 14, marginBottom: 10 }}>
-          ✅ Рекомендации по развитию
-        </div>
-        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: isDark ? '#cbd5e1' : '#374151', lineHeight: 2 }}>
-          <li>Сейчас — фаза <b>{satPhase.phase}</b>. {satPhase.desc}</li>
-          {northNodeHouse && <li>Направление роста: тема <b>«{HOUSES[northNodeHouse]?.theme}»</b> ({signRu(northNodeSign)}) — инвестируйте туда энергию.</li>}
-          {saturn && <li>Сатурн в {saturn.house}-м доме: систематически работайте над темой «{HOUSES[saturn.house]?.theme}».</li>}
-          {chiron && ageNow < 50 && <li>Хирон в {chiron.house}-м доме: примите уязвимость в теме «{HOUSES[chiron.house]?.theme}» — там ваш главный дар.</li>}
-          {satPhase.nextReturn <= 5 && <li>⚠ До следующего возврата Сатурна {satPhase.nextReturn} лет — время подвести итоги и выстроить новый фундамент.</li>}
-          <li>Цикл Юпитера: <b>{jupPhase.phase}</b> — {jupPhase.desc}</li>
-        </ul>
-      </Card>
+      <ActionList accent={ac} isDark={isDark} items={[
+        `Сатурн: сейчас фаза "${sat.label}" — ${sat.desc.split('.')[0]}.`,
+        nodeP && nordHouse ? `Кармическая задача: делайте шаги в «${HRU[nordHouse]??nordHouse}» (${sRu(nordSign)}) — даже если некомфортно. Комфорт = Южный Узел = прошлое.` : '',
+        satP ? `Мастерство в «${HRU[satP.house]??satP.house}»: системная работа здесь раз в неделю — важнее эпизодических прорывов.` : '',
+        chirP && age < 50 ? `Хирон в ${sRu(chirP.sign)} (${chirP.house}H): примите уязвимость в этой теме — она станет вашим главным даром к 50.` : '',
+        `Юпитер: фаза "${jup.label}" — ${jup.desc.split('.')[0]}. Действуйте в рамках этого цикла.`,
+      ].filter(Boolean)} />
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Sphere config ─────────────────────────────────────────────────────────────
+const SPHERES: Array<{ key: SphereKey; icon: string; label: string; color: string }> = [
+  { key:'finance', icon:'💰', label:'Финансы',        color:'#d4a853' },
+  { key:'health',  icon:'🌿', label:'Здоровье',       color:'#34d399' },
+  { key:'career',  icon:'🏆', label:'Профессия',      color:'#818cf8' },
+  { key:'energy',  icon:'⚡', label:'Энергия',        color:'#f59e0b' },
+  { key:'plan',    icon:'🗺️', label:'Жизненный план', color:'#60a5fa' },
+];
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export default function LifeSphereReports({ chart, name, theme, birthDate }: Props) {
   const [active, setActive] = useState<SphereKey>('finance');
-  const isDark = useDark(theme);
-
-  const bg = isDark ? '#0f1117' : '#f8fafc';
-  const cardBg = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
-  const textColor = isDark ? '#e2e8f0' : '#1e293b';
+  const isDark = theme === 'dark';
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', color: textColor, background: bg }}>
+    <div style={{ fontFamily:'system-ui,sans-serif', color: isDark?'#e2e8f0':'#1e293b' }}>
       {/* Header */}
-      <div style={{ marginBottom: 20, padding: '0 2px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <span style={{ fontSize: 20 }}>📋</span>
-          <span style={{ fontWeight: 700, fontSize: 17, color: isDark ? '#e2e8f0' : '#0f172a', fontFamily: 'Georgia, serif' }}>
-            Отчёты по сферам жизни
-          </span>
-          {name && (
-            <span style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280' }}>— {name}</span>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: isDark ? '#64748b' : '#9ca3af' }}>
-          Метод школы Павла Андреева · Финансы, Здоровье, Профессия, Энергия, Жизненный план
-        </div>
+      <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <span style={{ fontWeight:700, fontSize:16, color:isDark?'#e2e8f0':'#0f172a', fontFamily:'Georgia,serif' }}>
+          Сферы жизни
+        </span>
+        {name && <span style={{ fontSize:13, color:'#94a3b8' }}>— {name}</span>}
+        <span style={{ fontSize:11, color:'#475569', marginLeft:'auto' }}>Метод Павла Андреева</span>
       </div>
 
-      {/* Sphere tabs */}
+      {/* Tabs */}
       <div style={{
-        display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20,
-        padding: '4px', borderRadius: 12,
-        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+        display:'flex', gap:4, flexWrap:'wrap', marginBottom:18,
+        padding:4, borderRadius:12,
+        background: isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)',
       }}>
         {SPHERES.map(s => (
-          <button
-            key={s.key}
-            onClick={() => setActive(s.key)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontWeight: active === s.key ? 700 : 500,
-              fontSize: 13,
-              background: active === s.key ? s.color + '22' : 'transparent',
-              color: active === s.key ? s.color : (isDark ? '#94a3b8' : '#6b7280'),
-              outline: active === s.key ? `1.5px solid ${s.color}66` : '1px solid transparent',
-              transition: 'all 0.15s',
-            }}
-          >
-            <span style={{ fontSize: 15 }}>{s.icon}</span>
+          <button key={s.key} onClick={() => setActive(s.key)} style={{
+            display:'flex', alignItems:'center', gap:5,
+            padding:'7px 14px', borderRadius:8, border:'none', cursor:'pointer',
+            fontWeight: active===s.key ? 700 : 500,
+            fontSize:13,
+            background: active===s.key ? `${s.color}1e` : 'transparent',
+            color: active===s.key ? s.color : (isDark?'#94a3b8':'#6b7280'),
+            outline: active===s.key ? `1.5px solid ${s.color}55` : '1px solid transparent',
+            transition:'all 0.15s',
+          }}>
+            <span style={{ fontSize:14 }}>{s.icon}</span>
             {s.label}
           </button>
         ))}
       </div>
 
-      {/* Active sphere content */}
+      {/* Content */}
       <div style={{
-        borderRadius: 14, border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}`,
-        background: cardBg, padding: '18px 16px',
+        borderRadius:12,
+        border:`1px solid ${isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.07)'}`,
+        background: isDark?'rgba(255,255,255,0.02)':'#fff',
+        padding:'16px',
       }}>
-        {active === 'finance' && <FinanceSphere chart={chart} isDark={isDark} />}
-        {active === 'health'  && <HealthSphere  chart={chart} isDark={isDark} />}
-        {active === 'career'  && <CareerSphere  chart={chart} isDark={isDark} />}
-        {active === 'energy'  && <EnergySphere  chart={chart} isDark={isDark} />}
-        {active === 'plan'    && <LifePlanSphere chart={chart} isDark={isDark} birthDate={birthDate} />}
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        marginTop: 12, padding: '10px 14px', borderRadius: 10,
-        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
-        fontSize: 11, color: '#475569', lineHeight: 1.6,
-      }}>
-        ✦ Отчёты построены по методологии школы Павла Андреева. Анализ основан на данных натальной карты — планетах, домах и аспектах.
+        {active==='finance' && <FinanceSphere chart={chart} isDark={isDark} />}
+        {active==='health'  && <HealthSphere  chart={chart} isDark={isDark} />}
+        {active==='career'  && <CareerSphere  chart={chart} isDark={isDark} />}
+        {active==='energy'  && <EnergySphere  chart={chart} isDark={isDark} />}
+        {active==='plan'    && <PlanSphere    chart={chart} isDark={isDark} birthDate={birthDate} />}
       </div>
     </div>
   );

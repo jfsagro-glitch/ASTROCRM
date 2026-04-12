@@ -2169,7 +2169,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'|'holos'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'|'holos'|'spheres'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
