@@ -27,6 +27,7 @@ import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
 import InteractionRelocationEngine from './InteractionRelocationEngine';
 import AstroSummaryBlock from './AstroSummaryBlock';
+import LifeSphereReports from './LifeSphereReports';
 import DateSegmentInput from './DateSegmentInput';
 import InterpretationPanel from './InterpretationPanel';
 import {
@@ -2270,6 +2271,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
     { key: 'navigation',     icon: Compass,   label: '🧭 Навигация' },
     { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
+    { key: 'spheres',        icon: Zap,       label: '📋 Сферы' },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
     { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
@@ -2395,6 +2397,27 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'spheres' && (
+            <div id="pdf-section-spheres">
+              {natalChart
+                ? (
+                  <div className={`rounded-xl border ${theme.card} p-4`}>
+                    <LifeSphereReports
+                      chart={natalChart}
+                      name={birth.name}
+                      theme={theme.wheelTheme}
+                      birthDate={birth.date}
+                    />
+                  </div>
+                )
+                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
+                  </div>
+              }
             </div>
           )}
 
