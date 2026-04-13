@@ -274,12 +274,28 @@ function LocationCard({
               <p className={`text-xs font-semibold ${theme.accent} mb-2`}>🗺 Планеты на углах карты (ACG):</p>
               <div className="space-y-1.5">
                 {loc.key_planet_activations.map((ka, i) => {
-                  const kaInterp = getAcgInterp(ka.planet.toLowerCase(), ka.angle.toUpperCase());
+                  // planet_key is English (sun/moon/…) for ACG lookup; fallback to Russian→English map
+                  const RU_TO_EN: Record<string, string> = {
+                    'солнце':'sun','луна':'moon','венера':'venus','марс':'mars',
+                    'юпитер':'jupiter','сатурн':'saturn','уран':'uranus',
+                    'нептун':'neptune','плутон':'pluto','хирон':'chiron',
+                    'лилит':'lilith','сев.узел':'node',
+                  };
+                  const planetKey = (ka as { planet_key?: string }).planet_key
+                    ?? RU_TO_EN[ka.planet.toLowerCase()]
+                    ?? ka.planet.toLowerCase();
+                  const kaInterp = getAcgInterp(planetKey, ka.angle.toUpperCase());
+                  const isMalefic = ['mars','saturn','pluto'].includes(planetKey);
+                  const kaSign = (ka as { sign?: string }).sign;
                   return (
-                    <div key={i} className={`rounded-lg p-2.5 ${isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100'}`}>
+                    <div key={i} className={`rounded-lg p-2.5 ${isMalefic
+                      ? (isDark ? 'bg-orange-900/15 border border-orange-500/20' : 'bg-orange-50 border border-orange-100')
+                      : (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')}`}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[11px] font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
-                          {ka.planet} / {ka.angle}
+                        <span className={`text-[11px] font-semibold ${isMalefic
+                          ? (isDark ? 'text-orange-300' : 'text-orange-700')
+                          : (isDark ? 'text-indigo-300' : 'text-indigo-700')}`}>
+                          {isMalefic ? '⚠️ ' : '⭐ '}{ka.planet}{kaSign ? ` в ${kaSign}` : ''} / {ka.angle}
                         </span>
                         <span className={`text-[10px] ${theme.text} opacity-40`}>{ka.orb}° орбис</span>
                       </div>

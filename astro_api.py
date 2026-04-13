@@ -1646,17 +1646,20 @@ def _get_house_for_lon(lon: float, cusps: List[float]) -> int:
     return 1
 
 
-# Goal → {house: weight} maps (which houses activate this goal most)
+# Goal → {house: weight} maps.
+# Weights are calibrated so that a realistically good chart scores ~70–85 (not always 96).
+# Max possible delta before stay factor: ~6 planets × best_weight(11) + 4×angular(4) = 66+16 = 82
+# With factor 0.85: 50 + 82×0.85 = 120 → clamp 96 only for truly exceptional charts.
 _GOAL_HOUSES: Dict[str, Dict[int, int]] = {
-    "love":       {5: 20, 7: 20, 1: 8, 8: 12, 4: 8, 11: 5},
-    "career":     {10: 22, 1: 12, 6: 10, 2: 8, 11: 8, 9: 5},
-    "money":      {2: 22, 8: 16, 11: 10, 4: 8, 10: 8, 5: 5},
-    "health":     {1: 20, 6: 18, 4: 10, 10: 6, 12: -8},
-    "creativity": {5: 20, 3: 14, 11: 12, 1: 10, 9: 8, 12: 5},
-    "spirit":     {9: 20, 12: 18, 4: 12, 8: 10, 1: 6},
-    "stability":  {4: 20, 7: 14, 10: 12, 2: 10, 1: 8},
-    "social":     {11: 20, 7: 16, 3: 12, 1: 10, 5: 8},
-    "overall":    {1: 10, 4: 10, 7: 10, 10: 10, 5: 8, 11: 8},
+    "love":       {5: 10, 7: 10, 1: 4, 8: 6, 4: 4, 11: 2},
+    "career":     {10: 11, 1: 6, 6: 5, 2: 4, 11: 4, 9: 2},
+    "money":      {2: 11, 8: 8, 11: 5, 4: 4, 10: 4, 5: 2},
+    "health":     {1: 10, 6: 9, 4: 5, 10: 3, 12: -8},
+    "creativity": {5: 10, 3: 7, 11: 6, 1: 5, 9: 4, 12: 2},
+    "spirit":     {9: 10, 12: 9, 4: 6, 8: 5, 1: 3},
+    "stability":  {4: 10, 7: 7, 10: 6, 2: 5, 1: 4},
+    "social":     {11: 10, 7: 8, 3: 6, 1: 5, 5: 4},
+    "overall":    {1: 5, 4: 5, 7: 5, 10: 5, 5: 4, 11: 4},
 }
 
 # Goal → which natal planets matter most
@@ -1673,13 +1676,29 @@ _GOAL_PLANETS: Dict[str, List[str]] = {
 }
 
 
+# Per-planet angular effect: benefics boost, malefics stress.
+# Applied when the planet is within 4° of ASC/IC/DSC/MC in the relocated chart.
+_ANGULAR_EFFECT: Dict[str, float] = {
+    "sun": 4.0, "moon": 4.0, "venus": 5.0, "jupiter": 4.0, "mercury": 2.0,
+    "mars": -3.0, "saturn": -4.0, "pluto": -3.0, "uranus": 1.0,
+    "neptune": 2.0, "node": 2.0, "chiron": 2.0, "lilith": -1.0,
+}
+
+
 def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> int:
-    """Score how well a natal chart (possibly relocated) supports a given goal."""
+    """Score how well a natal chart (possibly relocated) supports a given goal.
+
+    Calibration: typical good chart → 65–82; truly exceptional (rare) → 90–96.
+    Base 50, house weights halved vs original so ceilings require genuinely rare
+    multi-planet angular/house stacks.
+    """
     cusps = [houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
     hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
     planet_list = _GOAL_PLANETS.get(goal, _GOAL_PLANETS["overall"])
 
     score = 50.0
+
+    # 1. House-based scoring for goal planets
     for planet in planet_list:
         p = planets.get(planet, {})
         lon = p.get("lon")
@@ -1688,18 +1707,23 @@ def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> in
         house = _get_house_for_lon(float(lon), cusps)
         score += hw.get(house, 0)
 
-    # Angular strength bonus: planet on ASC/DSC/MC/IC
-    angles = [cusps[0], cusps[3], cusps[6], cusps[9]]
-    for planet in planet_list[:4]:
-        p = planets.get(planet, {})
-        lon = p.get("lon")
+    # 2. Angular effects for ALL planets (benefics boost, malefics penalise)
+    angles = [cusps[0], cusps[3], cusps[6], cusps[9]]  # ASC, IC, DSC, MC
+    for pname, pdata in planets.items():
+        effect = _ANGULAR_EFFECT.get(pname)
+        if effect is None:
+            continue
+        lon = pdata.get("lon")
         if lon is None:
             continue
         for angle_lon in angles:
-            if _ang_diff(float(lon), float(angle_lon)) < 4:
-                score += 8
+            diff = _ang_diff(float(lon), float(angle_lon))
+            if diff < 3:
+                score += effect            # tight orb — full effect
+            elif diff < 5:
+                score += effect * 0.5     # wider orb — partial
 
-    # Stay duration modifier — short stay activates only transit/event layer (~40%)
+    # 3. Stay duration modifier
     if stay_days <= 21:
         factor = 0.35
     elif stay_days <= 60:
@@ -1716,7 +1740,13 @@ def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> in
 def _partner_house_overlay_bonus(
     b_planets: Dict, a_houses: Dict, goal: str
 ) -> float:
-    """How much partner's planets fall into A's goal-relevant houses."""
+    """How much partner's natal planets land in A's goal-relevant houses.
+
+    Reduced multiplier (0.18) prevents partner bonus from overshadowing
+    the location-specific alone_score and saturating the 8–96 range.
+    Capped at 12.0 so a single very compatible partner can add at most
+    ~12–14 points after partner_type_factor, preserving score spread.
+    """
     cusps = [a_houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
     hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
     bonus = 0.0
@@ -1725,8 +1755,8 @@ def _partner_house_overlay_bonus(
         if lon is None:
             continue
         house = _get_house_for_lon(float(lon), cusps)
-        bonus += hw.get(house, 0) * 0.45
-    return bonus
+        bonus += hw.get(house, 0) * 0.18
+    return min(bonus, 12.0)
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -1800,10 +1830,12 @@ def _compute_location_scenarios(
     rel_b_planets = rel_b.get("planets", chart_b.get("planets", {}))
 
     overlay_bonus = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, goal)
-    syn_adj = (syn_pct - 50.0) * 0.28
+    # Synastry adjustment: capped at ±5 so it flavours without dominating.
+    # High synastry (80%) adds only +2.1; low (20%) subtracts −2.1.
+    syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -5.0, 5.0))
     partner_type_factor = {
-        "romantic": 1.15, "business": 0.85, "friend": 0.9,
-        "family": 0.9, "mentor": 0.8, "colleague": 0.75,
+        "romantic": 1.10, "business": 0.85, "friend": 0.90,
+        "family": 0.90, "mentor": 0.80, "colleague": 0.75,
     }.get(req.partner_type, 1.0)
 
     with_partner_score = int(_clamp(
@@ -1827,21 +1859,20 @@ def _compute_location_scenarios(
         chart_b.get("planets", {}), rel_a_houses, goal
     )
     distance_score = int(_clamp(
-        alone_score + overlay_natal_b * 0.6 * partner_type_factor + syn_adj * 0.7 + dist_penalty,
+        alone_score + overlay_natal_b * 0.55 * partner_type_factor + syn_adj * 0.65 + dist_penalty,
         8, 96,
     ))
 
     # ── Sphere breakdown ──
-    SPHERE_GOALS = ["love", "career", "money", "health", "creativity", "spirit", "stability"]
+    SPHERE_GOALS = ["love", "career", "money", "health", "creativity", "spirit", "stability", "social"]
     sphere_alone   = {g: _score_by_goal(rel_a_planets, rel_a_houses, g, req.stay_days)
                       for g in SPHERE_GOALS}
     sphere_with    = {}
     sphere_dist    = {}
+    g_syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -5.0, 5.0))
     for g in SPHERE_GOALS:
-        hw = _GOAL_HOUSES.get(g, {})
         ov_b_rel  = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, g)
         ov_b_nat  = _partner_house_overlay_bonus(chart_b.get("planets", {}), rel_a_houses, g)
-        g_syn_adj = (syn_pct - 50.0) * 0.25
         sphere_with[g] = int(_clamp(sphere_alone[g] + ov_b_rel * partner_type_factor + g_syn_adj, 8, 96))
         sphere_dist[g] = int(_clamp(sphere_alone[g] + ov_b_nat * 0.55 * partner_type_factor + g_syn_adj * 0.65 + dist_penalty * 0.6, 8, 96))
 
@@ -1868,18 +1899,20 @@ def _compute_location_scenarios(
     through_with   = _what_through(sphere_with, "with")
     through_dist   = _what_through(sphere_dist, "dist")
 
-    # Key planets on angles in relocated chart
+    # Key planets on angles in relocated chart (ACG activations)
+    # Orb 5° is standard professional astrocartography practice.
     key_activations = []
     angle_names = {"h1": "ASC", "h4": "IC", "h7": "DSC", "h10": "MC"}
-    planet_names = {
+    planet_display = {
         "sun": "Солнце", "moon": "Луна", "venus": "Венера", "mars": "Марс",
         "jupiter": "Юпитер", "saturn": "Сатурн", "uranus": "Уран",
-        "neptune": "Нептун", "pluto": "Плутон",
+        "neptune": "Нептун", "pluto": "Плутон", "node": "Сев.Узел",
+        "chiron": "Хирон", "lilith": "Лилит",
     }
     for h_key, angle_label in angle_names.items():
         a_cusp = float(rel_a_houses.get(h_key, {}).get("lon", 999))
         for pname, pdata in rel_a_planets.items():
-            if pname not in planet_names:
+            if pname not in planet_display:
                 continue
             p_lon = pdata.get("lon")
             if p_lon is None:
@@ -1887,9 +1920,11 @@ def _compute_location_scenarios(
             orb = _ang_diff(float(p_lon), a_cusp)
             if orb <= 5:
                 key_activations.append({
-                    "planet": planet_names[pname],
+                    "planet": planet_display[pname],   # Russian display name
+                    "planet_key": pname,                # English key for ACG lookup
                     "angle": angle_label,
                     "orb": round(orb, 1),
+                    "sign": pdata.get("sign", ""),
                 })
     key_activations.sort(key=lambda x: x["orb"])
 

@@ -1199,7 +1199,7 @@ export type ScenarioResult = {
   through_alone: { comes: string[]; leaves: string[] };
   through_with: { comes: string[]; leaves: string[] };
   through_distance: { comes: string[]; leaves: string[] };
-  key_planet_activations: Array<{ planet: string; angle: string; orb: number }>;
+  key_planet_activations: Array<{ planet: string; planet_key?: string; angle: string; orb: number; sign?: string }>;
 };
 
 export type CompareResponse = {
