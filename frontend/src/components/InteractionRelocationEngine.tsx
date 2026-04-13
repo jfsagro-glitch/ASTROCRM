@@ -840,18 +840,24 @@ function getAcgInterp(planet: string, angle: string): string | null {
   return ACG_INTERP[key] ?? null;
 }
 
+const MALEFIC_PLANETS = new Set(['mars', 'saturn', 'pluto', 'lilith']);
+
 function AcgHitBadge({ hit, isDark }: { hit: AcgHit; isDark: boolean }) {
   const pn = PLANET_NAMES_RU[hit.planet] ?? hit.planet;
-  const isGood = Object.values(hit.sphereImpact).some(v => (v ?? 0) > 0);
+  const netImpact = Object.values(hit.sphereImpact).reduce((s: number, v) => s + (v ?? 0), 0);
+  const isMalefic = MALEFIC_PLANETS.has(hit.planet.toLowerCase());
+  const isStress  = (netImpact ?? 0) < 0 || isMalefic;
+  const isPartile = hit.orb < 1.0;
+
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${
       hit.isTransit
         ? (isDark ? 'bg-cyan-900/25 border-cyan-500/30 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-700')
-        : isGood
-          ? (isDark ? 'bg-indigo-900/25 border-indigo-500/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
-          : (isDark ? 'bg-orange-900/20 border-orange-500/25 text-orange-300' : 'bg-orange-50 border-orange-200 text-orange-600')
+        : isStress
+          ? (isDark ? 'bg-orange-900/20 border-orange-500/25 text-orange-300' : 'bg-orange-50 border-orange-200 text-orange-600')
+          : (isDark ? 'bg-indigo-900/25 border-indigo-500/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700')
     }`}>
-      {hit.isTransit ? '🌍' : '⭐'} {pn}/{hit.angle} {hit.orb.toFixed(1)}°
+      {hit.isTransit ? '🌍' : isStress ? '⚠️' : isPartile ? '✦' : '⭐'} {pn}/{hit.angle} {hit.orb.toFixed(1)}°
     </span>
   );
 }
@@ -1186,9 +1192,24 @@ function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLik
                   {/* Full ACG hits */}
                   {item.acgHits.length > 0 && (
                     <div className="pt-3">
-                      <p className={`text-xs font-semibold ${theme.accent} mb-2`}>
-                        🗺 ACG — планетарные линии через город:
-                      </p>
+                      {/* ACG quality summary */}
+                      {(() => {
+                        const goodCount = item.acgHits.filter(h => !h.isTransit && !MALEFIC_PLANETS.has(h.planet.toLowerCase())).length;
+                        const stressCount = item.acgHits.filter(h => !h.isTransit && MALEFIC_PLANETS.has(h.planet.toLowerCase())).length;
+                        const transitCount = item.acgHits.filter(h => h.isTransit).length;
+                        return (
+                          <div className="flex items-center gap-3 mb-2">
+                            <p className={`text-xs font-semibold ${theme.accent}`}>
+                              🗺 ACG — активные планетарные линии:
+                            </p>
+                            <div className="flex gap-1.5">
+                              {goodCount > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>⭐ ×{goodCount}</span>}
+                              {stressCount > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-600'}`}>⚠️ ×{stressCount}</span>}
+                              {transitCount > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-600'}`}>🌍 ×{transitCount}</span>}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div className="space-y-2">
                         {item.acgHits.slice(0, 10).map((h, i) => {
                           const pn = PLANET_NAMES_RU[h.planet] ?? h.planet;
@@ -1197,22 +1218,28 @@ function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLik
                             .sort((a, b) => Math.abs(b[1] ?? 0) - Math.abs(a[1] ?? 0))
                             .slice(0, 3);
                           const interp = getAcgInterp(h.planet, h.angle);
-                          const isGoodHit = topImpact.some(([,v]) => (v ?? 0) > 0);
+                          const isMaleficHit = MALEFIC_PLANETS.has(h.planet.toLowerCase());
+                          const isGoodHit = !isMaleficHit && topImpact.some(([,v]) => (v ?? 0) > 0);
+                          const isPartile = h.orb < 1.0;
                           return (
                             <div key={i} className={`rounded-lg p-3 ${
                               h.isTransit
                                 ? (isDark ? 'bg-cyan-900/15 border border-cyan-500/20' : 'bg-cyan-50 border border-cyan-100')
-                                : isGoodHit
-                                  ? (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')
-                                  : (isDark ? 'bg-orange-900/10 border border-orange-500/15' : 'bg-orange-50 border border-orange-100')
+                                : isMaleficHit
+                                  ? (isDark ? 'bg-orange-900/15 border border-orange-500/20' : 'bg-orange-50 border border-orange-100')
+                                  : (isDark ? 'bg-indigo-900/15 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100')
                             }`}>
-                              {/* Header row: planet/angle + orb + type + sphere chips */}
                               <div className="flex items-start gap-3">
                                 <div className="shrink-0 text-center w-16">
-                                  <div className={`text-[11px] font-bold ${h.isTransit ? (isDark ? 'text-cyan-300' : 'text-cyan-700') : isGoodHit ? (isDark ? 'text-indigo-300' : 'text-indigo-700') : (isDark ? 'text-orange-300' : 'text-orange-700')}`}>
-                                    {pn}/{h.angle}
+                                  <div className={`text-[11px] font-bold ${
+                                    h.isTransit ? (isDark ? 'text-cyan-300' : 'text-cyan-700')
+                                    : isMaleficHit ? (isDark ? 'text-orange-300' : 'text-orange-700')
+                                    : (isDark ? 'text-indigo-300' : 'text-indigo-700')}`}>
+                                    {isMaleficHit ? '⚠️ ' : isPartile ? '✦ ' : '⭐ '}{pn}/{h.angle}
                                   </div>
-                                  <div className={`text-[10px] ${theme.text} opacity-50`}>{h.orb.toFixed(1)}° орбис</div>
+                                  <div className={`text-[10px] ${theme.text} opacity-50`}>
+                                    {isPartile ? <span className={isDark ? 'text-amber-400' : 'text-amber-600'}>◉ {h.orb.toFixed(1)}° партил</span> : `${h.orb.toFixed(1)}° орбис`}
+                                  </div>
                                   <div className={`text-[9px] mt-0.5 ${h.isTransit ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-indigo-400' : 'text-indigo-500')}`}>
                                     {h.isTransit ? 'транзит' : 'натал'}
                                   </div>
@@ -1234,10 +1261,9 @@ function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLik
                                   })}
                                 </div>
                               </div>
-                              {/* Interpretation text */}
                               {interp && (
                                 <p className={`mt-2 text-[11px] leading-relaxed ${theme.text} opacity-70`}>
-                                  {interp}
+                                  {isMaleficHit ? '⚠️ ' : ''}{interp}
                                 </p>
                               )}
                             </div>

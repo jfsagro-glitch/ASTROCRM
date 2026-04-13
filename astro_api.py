@@ -1646,10 +1646,75 @@ def _get_house_for_lon(lon: float, cusps: List[float]) -> int:
     return 1
 
 
+def _sign_norm(s: str) -> str:
+    """Normalise sign string to Title-case for lookup."""
+    return s.strip().capitalize() if s else ""
+
+
+# ── Planetary essential dignity table ────────────────────────────────────────
+# Traditional + modern rulerships.
+# Domicile = 2.0, Exaltation = 1.5, Detriment = -1.5, Fall = -2.0
+_PLANET_DIGNITY: Dict[str, Dict[str, float]] = {
+    "sun":     {"Leo": 2.0, "Aries": 1.5, "Aquarius": -1.5, "Libra": -2.0},
+    "moon":    {"Cancer": 2.0, "Taurus": 1.5, "Capricorn": -1.5, "Scorpio": -2.0},
+    "mercury": {"Gemini": 2.0, "Virgo": 2.0, "Sagittarius": -1.5, "Pisces": -2.0},
+    "venus":   {"Taurus": 2.0, "Libra": 2.0, "Pisces": 1.5, "Scorpio": -2.0, "Aries": -1.5},
+    "mars":    {"Aries": 2.0, "Scorpio": 1.5, "Capricorn": 1.5, "Libra": -1.5, "Taurus": -2.0, "Cancer": -2.0},
+    "jupiter": {"Sagittarius": 2.0, "Pisces": 1.5, "Cancer": 1.5, "Gemini": -1.5, "Virgo": -2.0, "Capricorn": -1.5},
+    "saturn":  {"Capricorn": 2.0, "Aquarius": 1.5, "Libra": 1.5, "Aries": -2.0, "Cancer": -1.5, "Leo": -1.5},
+    "uranus":  {"Aquarius": 2.0, "Scorpio": 1.0, "Leo": -1.5, "Taurus": -1.0},
+    "neptune": {"Pisces": 2.0, "Cancer": 1.0, "Virgo": -1.5, "Capricorn": -1.0},
+    "pluto":   {"Scorpio": 2.0, "Aries": 1.0, "Taurus": -1.5, "Libra": -1.0},
+    "node":    {"Gemini": 1.0, "Cancer": 1.0, "Sagittarius": -1.0, "Capricorn": -1.0},
+    "chiron":  {"Virgo": 1.5, "Sagittarius": 1.0},
+}
+
+# ── Relocated ASC sign quality per goal ──────────────────────────────────────
+# The rising sign at the new location shapes how you show up there.
+_ASC_SIGN_QUALITY: Dict[str, Dict[str, int]] = {
+    "career":     {"Capricorn": 4, "Leo": 4, "Aries": 3, "Scorpio": 3, "Aquarius": 2,
+                   "Libra": 1, "Cancer": -2, "Pisces": -1},
+    "love":       {"Libra": 5, "Taurus": 4, "Cancer": 3, "Pisces": 3, "Leo": 2,
+                   "Scorpio": 2, "Aries": -1, "Virgo": -1},
+    "money":      {"Taurus": 5, "Scorpio": 4, "Capricorn": 3, "Virgo": 3,
+                   "Aries": 1, "Gemini": -1, "Pisces": -2},
+    "health":     {"Aries": 5, "Virgo": 4, "Leo": 3, "Taurus": 2,
+                   "Scorpio": -1, "Pisces": -1, "Capricorn": 1},
+    "creativity": {"Leo": 4, "Gemini": 4, "Aquarius": 3, "Sagittarius": 3,
+                   "Pisces": 2, "Virgo": -2, "Capricorn": -1},
+    "spirit":     {"Pisces": 5, "Sagittarius": 3, "Scorpio": 3, "Aquarius": 3,
+                   "Cancer": 2, "Capricorn": -2, "Aries": -1},
+    "stability":  {"Taurus": 4, "Capricorn": 4, "Cancer": 3, "Virgo": 3,
+                   "Aries": -1, "Gemini": -2, "Sagittarius": -1},
+    "social":     {"Gemini": 5, "Aquarius": 4, "Libra": 4, "Leo": 3,
+                   "Sagittarius": 3, "Capricorn": -2, "Scorpio": -1},
+    "overall":    {"Leo": 2, "Capricorn": 2, "Libra": 1, "Aquarius": 1},
+}
+
+# ── Relocated MC sign quality per goal ───────────────────────────────────────
+# The Midheaven at the new location shapes your public image and calling there.
+_MC_SIGN_QUALITY: Dict[str, Dict[str, int]] = {
+    "career":     {"Capricorn": 5, "Leo": 4, "Aries": 3, "Aquarius": 3,
+                   "Scorpio": 3, "Virgo": 2, "Cancer": -2, "Pisces": -1},
+    "love":       {"Libra": 5, "Cancer": 4, "Taurus": 3, "Pisces": 3,
+                   "Scorpio": 2, "Aries": -2, "Capricorn": -1},
+    "money":      {"Taurus": 5, "Capricorn": 4, "Scorpio": 4, "Virgo": 3,
+                   "Sagittarius": 2, "Pisces": -1, "Gemini": -1},
+    "health":     {"Virgo": 5, "Aries": 4, "Taurus": 3, "Scorpio": 3,
+                   "Capricorn": 2, "Pisces": -2, "Libra": -1},
+    "creativity": {"Leo": 5, "Pisces": 4, "Sagittarius": 3, "Gemini": 3,
+                   "Aquarius": 3, "Virgo": -2, "Capricorn": -1},
+    "spirit":     {"Pisces": 5, "Sagittarius": 4, "Scorpio": 3,
+                   "Aquarius": 3, "Cancer": 2, "Capricorn": -2},
+    "stability":  {"Taurus": 5, "Capricorn": 4, "Cancer": 4,
+                   "Virgo": 3, "Scorpio": 2, "Gemini": -1},
+    "social":     {"Aquarius": 5, "Gemini": 4, "Libra": 4,
+                   "Leo": 3, "Sagittarius": 3, "Capricorn": -2},
+    "overall":    {"Capricorn": 2, "Leo": 2, "Libra": 1, "Taurus": 1},
+}
+
 # Goal → {house: weight} maps.
-# Weights are calibrated so that a realistically good chart scores ~70–85 (not always 96).
-# Max possible delta before stay factor: ~6 planets × best_weight(11) + 4×angular(4) = 66+16 = 82
-# With factor 0.85: 50 + 82×0.85 = 120 → clamp 96 only for truly exceptional charts.
+# Calibrated: typical good chart → 65-82. Exceptional multi-planet stacks → 90-96.
 _GOAL_HOUSES: Dict[str, Dict[int, int]] = {
     "love":       {5: 10, 7: 10, 1: 4, 8: 6, 4: 4, 11: 2},
     "career":     {10: 11, 1: 6, 6: 5, 2: 4, 11: 4, 9: 2},
@@ -1662,68 +1727,121 @@ _GOAL_HOUSES: Dict[str, Dict[int, int]] = {
     "overall":    {1: 5, 4: 5, 7: 5, 10: 5, 5: 4, 11: 4},
 }
 
-# Goal → which natal planets matter most
+# Goal → which natal planets are primary significators.
+# "mc" removed — it is an angle, not a planet; its effect is captured via house weights for h10.
 _GOAL_PLANETS: Dict[str, List[str]] = {
     "love":       ["venus", "moon", "mars", "sun", "node"],
-    "career":     ["sun", "saturn", "jupiter", "mars", "mc"],
-    "money":      ["jupiter", "venus", "saturn", "mercury"],
-    "health":     ["sun", "mars", "saturn", "moon"],
+    "career":     ["sun", "saturn", "jupiter", "mars", "mercury"],
+    "money":      ["jupiter", "venus", "saturn", "mercury", "pluto"],
+    "health":     ["sun", "mars", "saturn", "moon", "jupiter"],
     "creativity": ["venus", "neptune", "mercury", "moon", "uranus"],
     "spirit":     ["neptune", "jupiter", "pluto", "node", "chiron"],
-    "stability":  ["saturn", "moon", "venus", "jupiter"],
+    "stability":  ["saturn", "moon", "venus", "jupiter", "sun"],
     "social":     ["mercury", "jupiter", "moon", "venus", "uranus"],
     "overall":    ["sun", "moon", "venus", "mars", "saturn", "jupiter"],
 }
 
 
-# Per-planet angular effect: benefics boost, malefics stress.
-# Applied when the planet is within 4° of ASC/IC/DSC/MC in the relocated chart.
+# Per-planet base angular effect on the relocated chart angles (ASC/IC/DSC/MC).
+# Benefics add positive energy to the location; malefics introduce stress/challenge.
+# Effect is further modified by the planet's dignity and retrograde state.
 _ANGULAR_EFFECT: Dict[str, float] = {
-    "sun": 4.0, "moon": 4.0, "venus": 5.0, "jupiter": 4.0, "mercury": 2.0,
-    "mars": -3.0, "saturn": -4.0, "pluto": -3.0, "uranus": 1.0,
-    "neptune": 2.0, "node": 2.0, "chiron": 2.0, "lilith": -1.0,
+    "sun": 4.0, "moon": 4.0, "venus": 5.0, "jupiter": 5.0, "mercury": 2.0,
+    "mars": -3.0, "saturn": -4.5, "pluto": -3.5, "uranus": 1.5,
+    "neptune": 2.5, "node": 2.5, "chiron": 2.0, "lilith": -1.5,
 }
 
 
-def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> int:
-    """Score how well a natal chart (possibly relocated) supports a given goal.
+def _orb_factor(diff: float, max_orb: float = 5.0) -> float:
+    """Smooth cosine-based orb decay: 1.0 at 0°, 0.0 at max_orb°."""
+    if diff >= max_orb:
+        return 0.0
+    return math.cos(math.pi * diff / (2 * max_orb))
 
-    Calibration: typical good chart → 65–82; truly exceptional (rare) → 90–96.
-    Base 50, house weights halved vs original so ceilings require genuinely rare
-    multi-planet angular/house stacks.
+
+def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> int:
+    """Score how well a relocated chart supports a given goal.
+
+    Methodology layers (in order of astrological priority):
+      1. House placement of goal-significant planets (primary)
+      2. Essential dignity of those planets (multiplier)
+      3. Retrograde state modifier
+      4. Angular activations: benefics boost, malefics penalise
+         — partile (<1°) = full effect; smooth cosine decay to 5° orb
+         — dignity of angular planet modifies the effect ±20%
+      5. Relocated ASC + MC sign quality for this goal
+      6. Stay-duration factor (short trip = surface layer only)
+
+    Calibration: neutral chart ~50; good chart 65–82;
+    exceptional (rare multi-planet stacks + quality angles) 88–96.
     """
     cusps = [houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
-    hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
+    hw    = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
     planet_list = _GOAL_PLANETS.get(goal, _GOAL_PLANETS["overall"])
 
     score = 50.0
 
-    # 1. House-based scoring for goal planets
-    for planet in planet_list:
-        p = planets.get(planet, {})
+    # ── 1 + 2 + 3: House placement × dignity × retrograde ──────────────────
+    for pname in planet_list:
+        p   = planets.get(pname, {})
         lon = p.get("lon")
         if lon is None:
             continue
-        house = _get_house_for_lon(float(lon), cusps)
-        score += hw.get(house, 0)
+        house   = _get_house_for_lon(float(lon), cusps)
+        hw_val  = float(hw.get(house, 0))
+        if hw_val == 0:
+            continue
 
-    # 2. Angular effects for ALL planets (benefics boost, malefics penalise)
-    angles = [cusps[0], cusps[3], cusps[6], cusps[9]]  # ASC, IC, DSC, MC
+        # Essential dignity multiplier (±20-40% change)
+        sign    = _sign_norm(str(p.get("sign", "")))
+        dignity = _PLANET_DIGNITY.get(pname, {}).get(sign, 0.0)
+        dign_mult = 1.0 + dignity * 0.2       # dignity=2.0 → ×1.4; fall=-2.0 → ×0.6
+
+        # Retrograde: in goal-relevant house benefic effect is softened,
+        # malefic stress is slightly amplified (planet energy turns inward)
+        if p.get("retrograde", False):
+            if hw_val > 0:
+                hw_val *= 0.70   # good house placement muted when retro
+            else:
+                hw_val *= 1.15   # bad house placement (e.g. h12 for health) slightly worse
+
+        score += hw_val * dign_mult
+
+    # ── 4: Angular planet effects ───────────────────────────────────────────
+    angles = [cusps[0], cusps[3], cusps[6], cusps[9]]   # ASC, IC, DSC, MC
     for pname, pdata in planets.items():
-        effect = _ANGULAR_EFFECT.get(pname)
-        if effect is None:
+        base_effect = _ANGULAR_EFFECT.get(pname)
+        if base_effect is None:
             continue
         lon = pdata.get("lon")
         if lon is None:
             continue
+
+        # Dignity modifier for angular planet
+        sign    = _sign_norm(str(pdata.get("sign", "")))
+        dignity = _PLANET_DIGNITY.get(pname, {}).get(sign, 0.0)
+        effect  = base_effect * (1.0 + dignity * 0.15)
+
+        # Retrograde on angle: malefics more destructive, benefics more introspective
+        if pdata.get("retrograde", False):
+            effect *= (-1.25 if effect < 0 else 0.75)
+
         for angle_lon in angles:
             diff = _ang_diff(float(lon), float(angle_lon))
-            if diff < 3:
-                score += effect            # tight orb — full effect
-            elif diff < 5:
-                score += effect * 0.5     # wider orb — partial
+            orb_f = _orb_factor(diff, 5.0)
+            if orb_f > 0:
+                # Partile bonus: extra weight when within 1°
+                partile = 1.4 if diff < 1.0 else 1.0
+                score  += effect * orb_f * partile
 
-    # 3. Stay duration modifier
+    # ── 5: Relocated ASC + MC sign quality ─────────────────────────────────
+    asc_sign = _sign_norm(str(houses.get("h1",  {}).get("sign", "")))
+    mc_sign  = _sign_norm(str(houses.get("h10", {}).get("sign", "")))
+    asc_q    = _ASC_SIGN_QUALITY.get(goal, {}).get(asc_sign, 0)
+    mc_q     = _MC_SIGN_QUALITY.get(goal, {}).get(mc_sign, 0)
+    sign_bonus = asc_q + mc_q   # structural quality, scaled separately below
+
+    # ── 6: Stay-duration factor ─────────────────────────────────────────────
     if stay_days <= 21:
         factor = 0.35
     elif stay_days <= 60:
@@ -1733,30 +1851,90 @@ def _score_by_goal(planets: Dict, houses: Dict, goal: str, stay_days: int) -> in
     else:
         factor = 1.0
 
-    delta = (score - 50.0) * factor
+    # Sign bonus activates a bit faster than deep house/angular effects
+    sign_factor = min(factor + 0.25, 1.0)
+    delta = (score - 50.0) * factor + sign_bonus * sign_factor
     return int(_clamp(50.0 + delta, 8, 96))
 
 
 def _partner_house_overlay_bonus(
     b_planets: Dict, a_houses: Dict, goal: str
 ) -> float:
-    """How much partner's natal planets land in A's goal-relevant houses.
+    """Partner's natal planets in A's goal-relevant relocated houses.
 
-    Reduced multiplier (0.18) prevents partner bonus from overshadowing
-    the location-specific alone_score and saturating the 8–96 range.
-    Capped at 12.0 so a single very compatible partner can add at most
-    ~12–14 points after partner_type_factor, preserving score spread.
+    Dignity of the partner's planet modifies its overlay contribution.
+    Capped at 10.0 to preserve differentiation across cities.
     """
     cusps = [a_houses.get(f"h{i}", {}).get("lon", i * 30) for i in range(1, 13)]
-    hw = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
+    hw    = _GOAL_HOUSES.get(goal, _GOAL_HOUSES["overall"])
     bonus = 0.0
     for pname, p in b_planets.items():
         lon = p.get("lon")
         if lon is None:
             continue
-        house = _get_house_for_lon(float(lon), cusps)
-        bonus += hw.get(house, 0) * 0.18
-    return min(bonus, 12.0)
+        house   = _get_house_for_lon(float(lon), cusps)
+        hw_val  = hw.get(house, 0)
+        if hw_val == 0:
+            continue
+        sign    = _sign_norm(str(p.get("sign", "")))
+        dignity = _PLANET_DIGNITY.get(pname, {}).get(sign, 0.0)
+        bonus  += hw_val * 0.18 * (1.0 + dignity * 0.15)
+    return float(_clamp(bonus, -5.0, 10.0))
+
+
+def _partner_angle_aspect_bonus(b_planets: Dict, a_houses: Dict) -> float:
+    """Partner's planets aspecting A's relocated angles (ASC, MC, DSC, IC).
+
+    This is the synastry-in-relocation layer: a partner whose Venus trines
+    your relocated ASC amplifies the location's love/beauty energy for the couple;
+    a partner's Saturn squaring your relocated MC creates career friction there.
+
+    Major aspects checked (orb 6°):
+      Conjunction (0°)  × 1.0
+      Trine (120°)      × 0.8
+      Sextile (60°)     × 0.5
+      Opposition (180°) × -0.5
+      Square (90°)      × -0.4
+    """
+    angles = {
+        "ASC": float(a_houses.get("h1",  {}).get("lon", 0)),
+        "MC":  float(a_houses.get("h10", {}).get("lon", 0)),
+        "DSC": float(a_houses.get("h7",  {}).get("lon", 0)),
+        "IC":  float(a_houses.get("h4",  {}).get("lon", 0)),
+    }
+    # Base positivity of each planet (positive = generally constructive overlay)
+    _PLANET_VALENCE: Dict[str, float] = {
+        "sun": 2.5, "moon": 2.0, "venus": 4.0, "jupiter": 4.0, "mercury": 1.5,
+        "mars": -1.5, "saturn": -3.0, "pluto": -2.5, "uranus": 1.0,
+        "neptune": 1.5, "node": 2.0, "chiron": 1.0,
+    }
+    ASPECTS = {0: 1.0, 60: 0.5, 120: 0.8, 180: -0.5, 90: -0.4}
+    MAX_ORB = 6.0
+
+    bonus = 0.0
+    for pname, pdata in b_planets.items():
+        valence = _PLANET_VALENCE.get(pname, 0.0)
+        if valence == 0.0:
+            continue
+        lon = pdata.get("lon")
+        if lon is None:
+            continue
+        # Dignity adjusts valence
+        sign    = _sign_norm(str(pdata.get("sign", "")))
+        dignity = _PLANET_DIGNITY.get(pname, {}).get(sign, 0.0)
+        v_adj   = valence * (1.0 + dignity * 0.15)
+
+        for angle_name, angle_lon in angles.items():
+            diff = _ang_diff(float(lon), angle_lon)
+            for asp_deg, asp_mult in ASPECTS.items():
+                orb = _ang_diff(diff, float(asp_deg))
+                if orb < MAX_ORB:
+                    orb_f  = _orb_factor(orb, MAX_ORB)
+                    # MC/ASC carry more weight for most goals than IC/DSC
+                    a_wt   = 1.2 if angle_name in ("ASC", "MC") else 0.8
+                    bonus += v_adj * asp_mult * orb_f * a_wt * 0.35
+
+    return float(_clamp(bonus, -8.0, 10.0))
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -1830,16 +2008,22 @@ def _compute_location_scenarios(
     rel_b_planets = rel_b.get("planets", chart_b.get("planets", {}))
 
     overlay_bonus = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, goal)
-    # Synastry adjustment: capped at ±5 so it flavours without dominating.
-    # High synastry (80%) adds only +2.1; low (20%) subtracts −2.1.
-    syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -5.0, 5.0))
+    angle_bonus   = _partner_angle_aspect_bonus(rel_b_planets, rel_a_houses)
+
+    # Synastry: global compatibility level adds flavour but is NOT location-specific.
+    # Cap ±4 so it never dominates location-specific scores.
+    syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -4.0, 4.0))
+
     partner_type_factor = {
         "romantic": 1.10, "business": 0.85, "friend": 0.90,
         "family": 0.90, "mentor": 0.80, "colleague": 0.75,
     }.get(req.partner_type, 1.0)
 
+    # Total partner contribution capped to avoid ceiling saturation.
+    # With-partner score = alone + (house overlay + angle aspects) × type_factor + synastry
+    raw_partner = (overlay_bonus + angle_bonus) * partner_type_factor + syn_adj
     with_partner_score = int(_clamp(
-        alone_score + overlay_bonus * partner_type_factor + syn_adj,
+        alone_score + float(_clamp(raw_partner, -12.0, 16.0)),
         8, 96,
     ))
 
@@ -1858,8 +2042,10 @@ def _compute_location_scenarios(
     overlay_natal_b = _partner_house_overlay_bonus(
         chart_b.get("planets", {}), rel_a_houses, goal
     )
+    angle_bonus_nat = _partner_angle_aspect_bonus(chart_b.get("planets", {}), rel_a_houses)
+    raw_dist = (overlay_natal_b + angle_bonus_nat * 0.7) * 0.55 * partner_type_factor + syn_adj * 0.65
     distance_score = int(_clamp(
-        alone_score + overlay_natal_b * 0.55 * partner_type_factor + syn_adj * 0.65 + dist_penalty,
+        alone_score + float(_clamp(raw_dist, -10.0, 13.0)) + dist_penalty,
         8, 96,
     ))
 
@@ -1869,12 +2055,15 @@ def _compute_location_scenarios(
                       for g in SPHERE_GOALS}
     sphere_with    = {}
     sphere_dist    = {}
-    g_syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -5.0, 5.0))
+    g_syn_adj = float(_clamp((syn_pct - 50.0) * 0.07, -4.0, 4.0))
+    # Angle bonus is goal-agnostic (applies equally to all spheres); use shared value
     for g in SPHERE_GOALS:
         ov_b_rel  = _partner_house_overlay_bonus(rel_b_planets, rel_a_houses, g)
         ov_b_nat  = _partner_house_overlay_bonus(chart_b.get("planets", {}), rel_a_houses, g)
-        sphere_with[g] = int(_clamp(sphere_alone[g] + ov_b_rel * partner_type_factor + g_syn_adj, 8, 96))
-        sphere_dist[g] = int(_clamp(sphere_alone[g] + ov_b_nat * 0.55 * partner_type_factor + g_syn_adj * 0.65 + dist_penalty * 0.6, 8, 96))
+        rw = float(_clamp((ov_b_rel + angle_bonus) * partner_type_factor + g_syn_adj, -10.0, 15.0))
+        rd = float(_clamp((ov_b_nat + angle_bonus_nat * 0.7) * 0.55 * partner_type_factor + g_syn_adj * 0.65, -8.0, 12.0))
+        sphere_with[g] = int(_clamp(sphere_alone[g] + rw, 8, 96))
+        sphere_dist[g] = int(_clamp(sphere_alone[g] + rd + dist_penalty * 0.6, 8, 96))
 
     # ── What comes / leaves per scenario ──
     def _what_through(spheres: Dict[str, int], prefix: str) -> Dict[str, List[str]]:

@@ -874,7 +874,10 @@ export function buildNatalSnapshot(
   natalLat: number,
   natalLon: number,
 ): NatalSnapshot {
-  const mcLon = chart.houses?.['10']?.lon ?? 0;
+  // Houses are keyed as 'h1'..'h12' in the chart API response.
+  // Fallback to bare '10' for compatibility with any legacy format.
+  const h = chart.houses as Record<string, { lon?: number } | undefined>;
+  const mcLon = h['h10']?.lon ?? h['10']?.lon ?? 0;
   const ramc  = _eclToEq(mcLon).ra;
   const planets: NatalSnapshot['planets'] = {};
   for (const [name, pd] of Object.entries(chart.planets)) {
@@ -903,9 +906,18 @@ export function buildTransitSnapshot(
 }
 
 // ── Основная функция вычисления ACG-бонуса ────────────────────────────────────
+// Professional ACG orbs: 7° for natal lines, 5° for transit lines.
+// Cosine-smooth orb decay with partile (<1°) bonus ×1.4.
+// Retrograde planets: benefic effects muted ×0.75, stress effects amplified ×1.25.
+
+/** Cosine-smooth orb factor: 1.0 at diff=0°, 0.0 at diff=maxOrb° */
+function _acgOrbFactor(diff: number, maxOrb: number): number {
+  if (diff >= maxOrb) return 0;
+  return Math.cos((Math.PI / 2) * (diff / maxOrb));
+}
 
 function _computeAcgBonus(
-  planets: Record<string, { ra: number; dec: number }>,
+  planets: Record<string, { ra: number; dec: number; retro?: boolean }>,
   ramc: number,
   natalLon: number,
   cityLat: number,
@@ -915,6 +927,8 @@ function _computeAcgBonus(
   isTransit: boolean,
 ): Partial<SphereBias> {
   const bonus: Partial<SphereBias> = {};
+  // Professional standard: 7° natal, 5° transit
+  const maxOrb = isTransit ? 5 : 7;
 
   for (const [pname, pd] of Object.entries(planets)) {
     const angleWeights = _PLANET_ANGLE_WEIGHTS[pname];
@@ -929,19 +943,23 @@ function _computeAcgBonus(
       ['MC', mcLon], ['IC', icLon], ['ASC', ascLon], ['DSC', dscLon],
     ];
 
+    const isRetro = pd.retro ?? false;
+
     for (const [angle, lineLon] of checks) {
       if (lineLon === null) continue;
-      // Угловое расстояние между долготой города и долготой линии
       const diff = Math.abs(_normAngle(cityLon - lineLon));
-      if (diff > 15) continue;
+      if (diff >= maxOrb) continue;
 
-      // Орбис: плавный спад через 3°, 8°, 15°
-      const orbFactor = diff <= 3 ? 1.0 : diff <= 8 ? 1.0 - (diff - 3) / 8 : (15 - diff) / 28;
-      const weights = angleWeights[angle] ?? {};
+      const orbFactor = _acgOrbFactor(diff, maxOrb);
+      const partile   = diff < 1.0 ? 1.4 : 1.0;   // partile boost
+      const weights   = angleWeights[angle] ?? {};
 
       const sphereImpact: Partial<Record<string, number>> = {};
       for (const [sk, w] of Object.entries(weights)) {
-        const contrib = Math.round((w as number) * orbFactor * transitFactor);
+        const wNum = w as number;
+        // Retrograde: beneficial weights muted, negative weights amplified
+        const retroAdj = isRetro ? (wNum > 0 ? wNum * 0.75 : wNum * 1.25) : wNum;
+        const contrib  = Math.round(retroAdj * orbFactor * partile * transitFactor);
         if (Math.abs(contrib) < 1) continue;
         bonus[sk as keyof SphereBias] = (bonus[sk as keyof SphereBias] ?? 0) + contrib;
         sphereImpact[sk] = contrib;
@@ -981,21 +999,45 @@ export interface LocalCityScore {
   usedTransit: boolean;
 }
 
-function _latModifier(lat: number): SphereBias {
+/** Climate/latitude zone effect on life spheres.
+ *  Based on consistent patterns from relocation astrology practice:
+ *  - Tropical (< 23.5°): vital energy, sensuality, spirituality
+ *  - Sub-tropical (23.5–35°): creativity, social life, warmth
+ *  - Mediterranean / temperate warm (35–45°): balance, moderate everything
+ *  - Continental (45–55°): career focus, structure, inner work
+ *  - Northern (> 55°): stability-seeking, spirit depth but health cost
+ */
+function _latModifier(lat: number): Partial<SphereBias> {
   const absLat = Math.abs(lat);
-  if (absLat < 23.5) return { health: 5, spirit: 3, love: 3 };
-  if (absLat < 35)   return { love: 4, creativity: 3, health: 3 };
-  if (absLat < 45)   return { love: 4, creativity: 3, spirit: 2 };
-  if (absLat < 55)   return { stability: 3, health: 2, career: 2 };
-  return { stability: 4, spirit: 5, health: -2 };
+  const southPenalty = lat < 0 ? { stability: -1 } : {};  // southern hemisphere mild instability modifier
+  if (absLat < 23.5) return { health: 5, spirit: 4, love: 4, creativity: 3, stability: -1, ...southPenalty };
+  if (absLat < 30)   return { love: 5, creativity: 4, health: 3, social: 2, ...southPenalty };
+  if (absLat < 35)   return { love: 4, creativity: 3, health: 3, social: 2, ...southPenalty };
+  if (absLat < 45)   return { love: 3, creativity: 3, spirit: 2, career: 1 };
+  if (absLat < 52)   return { career: 3, stability: 3, money: 2, health: 1 };
+  if (absLat < 60)   return { stability: 4, career: 3, spirit: 3, health: -1 };
+  return { stability: 3, spirit: 5, career: 2, health: -3, love: -2 };  // high north: tough but spiritual
 }
 
-function _lonPlanetBonus(lon: number): SphereBias {
-  if (lon < -60) return { love: 3, money: 2 };
-  if (lon < 0)   return { love: 2, creativity: 2 };
-  if (lon < 60)  return { spirit: 2, stability: 2 };
-  if (lon < 120) return { career: 3, money: 2 };
-  return { career: 2, social: 2 };
+/** Longitudinal macro-region character bonus.
+ *  Reflects dominant cultural-economic spheres of each longitude band.
+ */
+function _lonPlanetBonus(lon: number): Partial<SphereBias> {
+  // Americas (West)
+  if (lon < -100) return { money: 3, career: 3, social: 2, stability: -1 };
+  if (lon < -60)  return { love: 3, creativity: 3, money: 2, social: 2 };
+  // Atlantic / Western Europe
+  if (lon < 0)    return { love: 3, creativity: 3, stability: 2, social: 1 };
+  // Europe / MENA
+  if (lon < 30)   return { career: 2, stability: 3, creativity: 2, spirit: 1 };
+  if (lon < 60)   return { spirit: 3, stability: 2, money: 2, career: 2 };
+  // Central Asia / Middle East
+  if (lon < 90)   return { money: 3, career: 3, stability: 2, spirit: 2 };
+  // East Asia
+  if (lon < 120)  return { career: 4, money: 3, social: 2, stability: 2 };
+  if (lon < 145)  return { career: 3, money: 2, creativity: 2, social: 2 };
+  // Pacific
+  return { spirit: 3, health: 3, creativity: 2, social: 2 };
 }
 
 export function computeLocalCityScores(
@@ -1005,19 +1047,25 @@ export function computeLocalCityScores(
   natal?: NatalSnapshot | null,
   transit?: TransitSnapshot | null,
 ): LocalCityScore {
-  const base = 50;
+  const BASE = 50;
   const bias = CITY_SPHERE_BIAS[city.nameRu] ?? {};
   const lm   = _latModifier(city.lat);
   const lp   = _lonPlanetBonus(city.lon);
 
-  // Stay multiplier: longer stay → biases more pronounced
-  const stayMult = stayDays <= 14 ? 0.35 : stayDays <= 90 ? 0.65 : stayDays <= 240 ? 0.85 : 1.0;
+  // Stay multiplier: progressive — short trips show only surface effects.
+  // Smooth curve rather than step function to avoid cliff edges.
+  const stayMult = stayDays <= 7  ? 0.25
+                 : stayDays <= 21 ? 0.35 + (stayDays - 7)  / 14 * 0.15   // 0.35→0.50
+                 : stayDays <= 90 ? 0.50 + (stayDays - 21) / 69 * 0.20   // 0.50→0.70
+                 : stayDays <= 180 ? 0.70 + (stayDays - 90) / 90 * 0.15  // 0.70→0.85
+                 : stayDays <= 365 ? 0.85 + (stayDays - 180) / 185 * 0.10 // 0.85→0.95
+                 : 1.0;
 
   const acgHits: AcgHit[] = [];
   const natalAcgBonus: Partial<SphereBias>   = {};
   const transitAcgBonus: Partial<SphereBias> = {};
 
-  // Натальный ACG-слой (вес 1.0)
+  // ── Натальный ACG-слой (полный вес 1.0) ──────────────────────────────────
   if (natal && Object.keys(natal.planets).length > 0) {
     const b = _computeAcgBonus(
       natal.planets, natal.ramc, natal.natalLon,
@@ -1028,11 +1076,11 @@ export function computeLocalCityScores(
     }
   }
 
-  // Транзитный ACG-слой (вес 0.55)
+  // ── Транзитный ACG-слой (вес 0.50 — текущие активации) ───────────────────
   if (transit && Object.keys(transit.planets).length > 0) {
     const b = _computeAcgBonus(
       transit.planets, natal?.ramc ?? 0, natal?.natalLon ?? city.lon,
-      city.lat, city.lon, 0.55, acgHits, true,
+      city.lat, city.lon, 0.50, acgHits, true,
     );
     for (const [k, v] of Object.entries(b)) {
       transitAcgBonus[k as keyof SphereBias] = (transitAcgBonus[k as keyof SphereBias] ?? 0) + (v ?? 0);
@@ -1041,22 +1089,35 @@ export function computeLocalCityScores(
 
   const sphereScores: Record<string, number> = {};
   for (const sk of Object.keys(SPHERE_LABELS)) {
-    const b   = (bias[sk as keyof SphereBias] ?? 0);
-    const l   = (lm[sk as keyof SphereBias]  ?? 0);
-    const lp2 = (lp[sk as keyof SphereBias]  ?? 0);
-    const goalBonus = sk === goal ? 8 : 0;
-    // Базовый слой масштабируется на stayMult
-    const baseLayer = base + (b + l + lp2 + goalBonus) * stayMult;
-    // ACG-слои уже несут реальные значения; добавляем без дополнительного масштабирования
-    const natalAcg   = (natalAcgBonus[sk as keyof SphereBias]   ?? 0) * stayMult;
+    const cityBias  = (bias[sk as keyof SphereBias] ?? 0);
+    const latMod    = (lm[sk as keyof SphereBias]   ?? 0);
+    const lonMod    = (lp[sk as keyof SphereBias]   ?? 0);
+    // Goal-sphere gets a targeted bonus (city is being evaluated FOR this sphere)
+    const goalBonus = sk === goal ? 6 : 0;
+
+    // ── Layer 1: Heuristic base (city character + geography) ──────────────
+    // Scaled by stayMult — longer stay lets city energy manifest more fully.
+    const baseLayer = BASE + (cityBias + latMod + lonMod + goalBonus) * stayMult;
+
+    // ── Layer 2: ACG natal lines (personal activation layer) ──────────────
+    // Also scaled: natal lines deepen with immersion.
+    const natalAcg = (natalAcgBonus[sk as keyof SphereBias] ?? 0) * stayMult;
+
+    // ── Layer 3: Transit ACG (current timing window) ──────────────────────
+    // NOT stay-scaled — transits are windows, not permanences.
     const transitAcg = (transitAcgBonus[sk as keyof SphereBias] ?? 0);
+
     const raw = baseLayer + natalAcg + transitAcg;
-    sphereScores[sk] = Math.round(Math.min(99, Math.max(10, raw)));
+    sphereScores[sk] = Math.round(Math.min(96, Math.max(10, raw)));
   }
 
-  const goalScore = sphereScores[goal] ?? 50;
-  const total = Object.values(sphereScores).reduce((a, v) => a + v, 0);
-  const overallScore = Math.round((total + goalScore * 2) / (Object.keys(SPHERE_LABELS).length + 2));
+  // Overall score: weighted average with 2× weight on the chosen goal sphere.
+  const goalScore  = sphereScores[goal] ?? BASE;
+  const sphereKeys = Object.keys(SPHERE_LABELS);
+  const total      = sphereKeys.reduce((acc, sk) => acc + (sphereScores[sk] ?? BASE), 0);
+  const overallScore = Math.round(
+    (total + goalScore * 2) / (sphereKeys.length + 2)
+  );
 
   const topSpheres = Object.entries(sphereScores)
     .sort((a, b) => b[1] - a[1])
@@ -1066,8 +1127,11 @@ export function computeLocalCityScores(
   const stayAdvice = (SPHERE_STAY_ADVICE[goal] ?? SPHERE_STAY_ADVICE['career'])
     .filter(a => stayDays >= a.minDays * 0.5 || stayDays <= a.maxDays * 2);
 
-  // Сортируем хиты по орбису
-  acgHits.sort((a, b) => a.orb - b.orb);
+  // Sort ACG hits: natal partile first, then by orb
+  acgHits.sort((a, b) => {
+    if (a.isNatal !== b.isNatal) return a.isNatal ? -1 : 1;
+    return a.orb - b.orb;
+  });
 
   return {
     city, sphereScores, overallScore, stayAdvice, topSpheres,
