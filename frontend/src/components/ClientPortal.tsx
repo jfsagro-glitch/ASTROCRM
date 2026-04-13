@@ -27,9 +27,8 @@ import SynastryInteractionEngine from './SynastryInteractionEngine';
 import PredictiveExpanded from './PredictiveExpanded';
 import InteractionRelocationEngine from './InteractionRelocationEngine';
 import AstroSummaryBlock from './AstroSummaryBlock';
-import LifeSphereReports from './LifeSphereReports';
 import DateSegmentInput from './DateSegmentInput';
-import InterpretationPanel from './InterpretationPanel';
+import PAReportBlock from './PAReportBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2169,7 +2168,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'interpretation'|'jyotish'|'navigation'|'holos'|'spheres'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2270,8 +2269,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
     { key: 'relocation',     icon: Globe,     label: tr.relocation },
     { key: 'navigation',     icon: Compass,   label: '🧭 Навигация' },
-    { key: 'interpretation', icon: BookOpen,  label: tr.interpretation },
-    { key: 'spheres',        icon: Zap,       label: '📋 Сферы' },
+    { key: 'analysis',        icon: BookOpen,  label: '✦ Анализ' },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
     { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
@@ -2400,27 +2398,6 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
           )}
 
-          {activeTab === 'spheres' && (
-            <div id="pdf-section-spheres">
-              {natalChart
-                ? (
-                  <div className={`rounded-xl border ${theme.card} p-4`}>
-                    <LifeSphereReports
-                      chart={natalChart}
-                      name={birth.name}
-                      theme={theme.wheelTheme}
-                      birthDate={birth.date}
-                    />
-                  </div>
-                )
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
-              }
-            </div>
-          )}
-
           {activeTab === 'human-design' && (
             <div id="pdf-section-human-design">
               <HumanDesignBlock
@@ -2512,15 +2489,16 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
           )}
 
-          {activeTab === 'interpretation' && (
-            <div id="pdf-section-interpretation">
+          {activeTab === 'analysis' && (
+            <div id="pdf-section-analysis">
               {natalChart
                 ? (
                   <div className={`rounded-xl border ${theme.card} p-4`}>
-                    <InterpretationPanel
+                    <PAReportBlock
                       chart={natalChart}
                       name={birth.name}
                       theme={theme.wheelTheme}
+                      birthDate={birth.date}
                     />
                   </div>
                 )
