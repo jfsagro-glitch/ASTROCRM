@@ -6,6 +6,7 @@ import {
   ArrowRight, Star, AlertCircle, Loader2, Globe, Heart,
   Briefcase, Navigation, ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import ChartWheel from './ChartWheel';
 import {
   CITIES, GOALS, PARTNER_TYPES, STAY_MODES, SPHERE_LABELS, SPHERE_KEYS,
   REGION_LABELS, SCENARIO_LABELS, PARTNER_TYPE_INTERPS, STAY_EFFECT_TEXT,
@@ -15,12 +16,13 @@ import {
   type CompareResponse, type ScenarioResult, type LocalCityScore,
   type NatalSnapshot, type TransitSnapshot, type AcgHit,
 } from '../data/interactionData';
-import { getNatalChart, getTransits } from '../services/astrologyService';
+import { getNatalChart, getTransits, getRelocatedChart } from '../services/astrologyService';
 import {
   compareScenarios, getPersonalForecastInteraction,
   type InteractionPersonInput, type LocationInput,
 } from '../services/astrologyService';
-import type { BirthInput } from '../types/astro';
+import type { BirthInput, NatalChart } from '../types/astro';
+import { SIGN_COLORS } from '../types/astro';
 import type { SavedPerson } from '../services/peopleService';
 import DateSegmentInput from './DateSegmentInput';
 
@@ -40,7 +42,7 @@ interface PartnerData {
   currentLon: number | null;
 }
 
-type TabKey = 'setup' | 'explore' | 'scenarios' | 'locations' | 'channels' | 'summary';
+type TabKey = 'map' | 'setup' | 'explore' | 'scenarios' | 'locations' | 'channels' | 'summary';
 
 interface ThemeLike {
   card: string; header: string; accent: string; text: string;
@@ -1322,6 +1324,156 @@ function ExploreTab({ isDark, theme, birth }: { isDark: boolean; theme: ThemeLik
   );
 }
 
+// ── Map Tab (Relocated Chart) ─────────────────────────────────────────────────
+// Простая релокация: один город → смещённая натальная карта + куспиды домов
+
+function MapTab({ birth, isDark, theme }: { birth: BirthInput; isDark: boolean; theme: ThemeLike }) {
+  const [cityName, setCityName] = useState('');
+  const [lat, setLat]           = useState('');
+  const [lon, setLon]           = useState('');
+  const [relocChart, setRelocChart] = useState<NatalChart | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+
+  const run = useCallback(async () => {
+    const la = parseFloat(lat);
+    const lo = parseFloat(lon);
+    if (isNaN(la) || isNaN(lo)) { setError('Выберите город из списка или введите координаты'); return; }
+    setLoading(true); setError(null);
+    try {
+      setRelocChart(await getRelocatedChart(birth, la, lo) as NatalChart);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }, [birth, lat, lon]);
+
+  const hd = (n: number) =>
+    (relocChart?.houses as Record<string, { sign: string; deg_min: string } | undefined> | undefined)?.[`h${n}`];
+
+  return (
+    <div className="space-y-4">
+      {/* Input block */}
+      <div className={`rounded-xl border ${theme.card} p-4 space-y-3`}>
+        <h4 className={`font-bold text-sm ${theme.header} flex items-center gap-2`}>
+          <MapPin className="h-4 w-4" /> Переезд: новая карта места
+        </h4>
+        <p className={`text-xs ${theme.text} opacity-60`}>
+          Выбери город — карта пересчитается с новым ASC и MC для этой локации.
+        </p>
+        <CityPicker
+          label="Город для переезда"
+          value={cityName}
+          onChange={(name, la, lo) => { setCityName(name); setLat(String(la)); setLon(String(lo)); }}
+          isDark={isDark}
+          theme={theme}
+        />
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Широта</label>
+            <input type="number" step="0.0001" value={lat}
+              onChange={e => setLat(e.target.value)} placeholder="48.85"
+              className={`px-3 py-2 rounded-lg border text-sm w-28 ${theme.card} ${theme.text}`} />
+          </div>
+          <div>
+            <label className={`text-xs ${theme.text} opacity-60 mb-1 block`}>Долгота</label>
+            <input type="number" step="0.0001" value={lon}
+              onChange={e => setLon(e.target.value)} placeholder="2.35"
+              className={`px-3 py-2 rounded-lg border text-sm w-28 ${theme.card} ${theme.text}`} />
+          </div>
+          <button onClick={run} disabled={loading || !lat}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${theme.btn} disabled:opacity-40`}>
+            {loading ? <><Spin />Считаю...</> : '🗺 Рассчитать карту'}
+          </button>
+        </div>
+      </div>
+
+      {error && <Err msg={error} />}
+
+      {relocChart && (
+        <div className="space-y-3">
+          {/* ASC / MC summary */}
+          <div className={`rounded-xl border ${theme.card} p-3 flex flex-wrap gap-4`}>
+            <div>
+              <span className={`text-[10px] ${theme.text} opacity-50 block`}>Асцендент (ASC)</span>
+              <span className={`text-sm font-bold ${theme.accent}`}
+                style={{ color: hd(1) ? SIGN_COLORS[hd(1)!.sign] : undefined }}>
+                {hd(1)?.sign ?? '—'} {hd(1)?.deg_min ?? ''}
+              </span>
+            </div>
+            <div>
+              <span className={`text-[10px] ${theme.text} opacity-50 block`}>Середина неба (MC)</span>
+              <span className={`text-sm font-bold ${theme.accent}`}
+                style={{ color: hd(10) ? SIGN_COLORS[hd(10)!.sign] : undefined }}>
+                {hd(10)?.sign ?? '—'} {hd(10)?.deg_min ?? ''}
+              </span>
+            </div>
+            <div>
+              <span className={`text-[10px] ${theme.text} opacity-50 block`}>DSC (7 дом)</span>
+              <span className={`text-sm font-bold ${theme.accent}`}
+                style={{ color: hd(7) ? SIGN_COLORS[hd(7)!.sign] : undefined }}>
+                {hd(7)?.sign ?? '—'} {hd(7)?.deg_min ?? ''}
+              </span>
+            </div>
+            <div>
+              <span className={`text-[10px] ${theme.text} opacity-50 block`}>IC (4 дом)</span>
+              <span className={`text-sm font-bold ${theme.accent}`}
+                style={{ color: hd(4) ? SIGN_COLORS[hd(4)!.sign] : undefined }}>
+                {hd(4)?.sign ?? '—'} {hd(4)?.deg_min ?? ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Chart wheel */}
+          <div className="flex justify-center">
+            <ChartWheel chart={relocChart} size={420} theme={theme.wheelTheme} />
+          </div>
+
+          {/* House cusps table */}
+          <div className={`rounded-xl border ${theme.card} p-3`}>
+            <h4 className={`text-xs font-semibold ${theme.accent} mb-2`}>Куспиды домов в новой локации</h4>
+            <div className="grid grid-cols-3 gap-1 text-xs">
+              {Array.from({ length: 12 }, (_, i) => {
+                const h = hd(i + 1);
+                return h ? (
+                  <div key={i} className={`flex gap-1 ${theme.text}`}>
+                    <span className="opacity-50 w-4">H{i + 1}</span>
+                    <span style={{ color: SIGN_COLORS[h.sign] || '#888' }}>{h.sign}</span>
+                    <span className={`ml-auto font-mono text-[10px] ${theme.accent}`}>{h.deg_min}</span>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+
+          {/* Quick ACG hint */}
+          <div className={`rounded-xl border ${isDark ? 'bg-indigo-900/15 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'} p-3`}>
+            <p className={`text-xs font-semibold mb-1 ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+              💡 Что изменилось при переезде?
+            </p>
+            <p className={`text-xs ${theme.text} opacity-70 leading-relaxed`}>
+              При переезде планеты сохраняют свои градусы, но меняются дома и углы карты (ASC, MC, DSC, IC).
+              Новый ASC определяет, как тебя видит окружение в этом городе.
+              Новый MC — карьерная энергия и публичный образ.
+              Используй вкладку <span className={theme.accent}>«Исследовать»</span> для рейтинга городов по сферам жизни.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!relocChart && !loading && (
+        <div className={`rounded-xl border ${theme.card} p-10 text-center`}>
+          <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-30`} />
+          <p className={`text-sm ${theme.text} opacity-50`}>
+            Выбери город выше — увидишь смещённую натальную карту
+          </p>
+          <p className={`text-xs mt-1 ${theme.text} opacity-30`}>
+            Или перейди в «Исследовать» для рейтинга по сферам жизни
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SETUP PANEL (external component — prevents focus loss on re-render) ───────
 
 function SetupPanel({
@@ -1590,8 +1742,9 @@ function SetupPanel({
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
 const TABS: { key: TabKey; icon: string; label: string; alwaysEnabled?: boolean }[] = [
+  { key: 'map',       icon: '🗺',  label: 'Карта',        alwaysEnabled: true },
+  { key: 'explore',   icon: '🔍', label: 'Рейтинг',      alwaysEnabled: true },
   { key: 'setup',     icon: '⚙️', label: 'Настройка',    alwaysEnabled: true },
-  { key: 'explore',   icon: '🔍', label: 'Исследовать',  alwaysEnabled: true },
   { key: 'scenarios', icon: '📊', label: 'Сценарии' },
   { key: 'locations', icon: '🌍', label: 'Локации' },
   { key: 'channels',  icon: '📡', label: 'Каналы' },
@@ -1614,7 +1767,7 @@ export default function InteractionRelocationEngine({ birth, theme, people }: Pr
   const isDark = theme.wheelTheme === 'dark';
 
   // ── State ──
-  const [tab, setTab]               = useState<TabKey>('setup');
+  const [tab, setTab]               = useState<TabKey>('map');
   const [partner, setPartner]       = useState<PartnerData>(DEFAULT_PARTNER);
   const [targetCities, setTargetCities] = useState<Array<{ name: string; lat: number; lon: number }>>([]);
   const [goal, setGoal]             = useState('love');
@@ -1686,6 +1839,10 @@ export default function InteractionRelocationEngine({ birth, theme, people }: Pr
       </div>
 
       {error && <Err msg={error} />}
+
+      {tab === 'map' && (
+        <MapTab birth={birth} isDark={isDark} theme={theme} />
+      )}
 
       {tab === 'explore' && (
         <ExploreTab isDark={isDark} theme={theme} birth={birth} />

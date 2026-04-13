@@ -3,7 +3,7 @@ import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,
   AlertCircle, Loader2, Search, BookOpen, ChevronRight, Lightbulb,
-  LogOut, UserCircle, Trash2, Compass,
+  LogOut, UserCircle, Trash2,
 } from 'lucide-react';
 import {
   scoreSpheres, getPairInterp, getAspectCategory, getAspectInterpText,
@@ -33,7 +33,7 @@ import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
   getConverseProgressions, getSynastry, getCompositeChart, getDavisonChart,
-  getRelocatedChart, getEphemerides, getAstroSummary, geocodeCity, resolveHistoricalTimezone,
+  getEphemerides, getAstroSummary, geocodeCity, resolveHistoricalTimezone,
 } from '../services/astrologyService';
 import type { NatalChart, BirthInput, SynastryResult } from '../types/astro';
 import type { HumanDesignContentMode } from '../types/humanDesign';
@@ -2058,63 +2058,6 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
   );
 }
 
-// ─── Relocation Panel ─────────────────────────────────────────────────────────
-function RelocationPanel({ birth, theme }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey] }) {
-  const { tr } = useLang();
-  const [newLat, setNewLat] = useState('');
-  const [newLon, setNewLon] = useState('');
-  const [result, setResult] = useState<NatalChart | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      setResult(await getRelocatedChart(birth, parseFloat(newLat), parseFloat(newLon)) as NatalChart);
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  }, [birth, newLat, newLon]);
-
-  return (
-    <div className="space-y-4">
-      {/* City geocoder for relocation */}
-      <div className={`p-4 rounded-xl border ${theme.card} space-y-3`}>
-        <CityField
-          onFound={(lat, lon) => { setNewLat(String(lat)); setNewLon(String(lon)); }}
-          theme={theme}
-        />
-        <div className="flex gap-3 items-end">
-          <div>
-            <label className={`text-xs ${theme.text} mb-1 block`}>{tr.newLatitude}</label>
-            <input type="number" step="0.0001" value={newLat} onChange={e => setNewLat(e.target.value)}
-              placeholder="48.85"
-              className={`px-3 py-2 rounded-lg border text-sm w-32 ${theme.card}`} />
-          </div>
-          <div>
-            <label className={`text-xs ${theme.text} mb-1 block`}>{tr.newLongitude}</label>
-            <input type="number" step="0.0001" value={newLon} onChange={e => setNewLon(e.target.value)}
-              placeholder="2.35"
-              className={`px-3 py-2 rounded-lg border text-sm w-32 ${theme.card}`} />
-          </div>
-          <button onClick={run} disabled={loading}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${theme.btn}`}>
-            {loading ? <><Spin />…</> : tr.relocate}
-          </button>
-        </div>
-      </div>
-      {error && <Err msg={error} />}
-      {result && (
-        <div className="space-y-3">
-          <div className="flex justify-center">
-            <ChartWheel chart={result} size={420} theme={theme.wheelTheme} />
-          </div>
-          <HouseTable chart={result} theme={theme} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Language Toggle ──────────────────────────────────────────────────────────
 function LangToggle({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
   const { lang, setLang, tr } = useLang();
@@ -2168,7 +2111,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'relocation'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2223,11 +2166,11 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     const savedTab = activeTab;
     const titles: Record<string, string> = {
       natal: tr.natalChart, 'human-design': `Human Design (${HD_MODE_LABELS[humanDesignMode]})`, astrosummary: 'Астросводка', predictive: tr.predictive, synastry: tr.synastry,
-      relocation: tr.relocation, interpretation: tr.interpretation,
+      interpretation: tr.interpretation,
     };
     try {
       await downloadTabsPDF(
-        (['natal', 'human-design', 'astrosummary', 'predictive', 'synastry', 'relocation', 'interpretation'] as const).map(
+        (['natal', 'human-design', 'astrosummary', 'predictive', 'synastry', 'interpretation'] as const).map(
           k => ({ id: `pdf-section-${k}`, title: titles[k] }),
         ),
         async (id) => {
@@ -2267,8 +2210,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'astrosummary',   icon: Sun,       label: 'Астросводка' },
     { key: 'predictive',     icon: Clock,     label: tr.predictive },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
-    { key: 'relocation',     icon: Globe,     label: tr.relocation },
-    { key: 'navigation',     icon: Compass,   label: '🧭 Навигация' },
+    { key: 'navigation',     icon: Globe,     label: '🌍 Релокация' },
     { key: 'analysis',        icon: BookOpen,  label: '✦ Анализ' },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
@@ -2465,18 +2407,6 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 ? <SynastryPanel birth={birth} theme={theme} people={people} />
                 : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                     <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
-              }
-            </div>
-          )}
-
-          {activeTab === 'relocation' && (
-            <div id="pdf-section-relocation">
-              {natalChart
-                ? <RelocationPanel birth={birth} theme={theme} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                     <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
                   </div>
               }
