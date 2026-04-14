@@ -395,3 +395,85 @@ export async function getJyotish(b: BirthInput): Promise<Record<string, unknown>
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
   });
 }
+
+// ─── Lunar Calendar ───────────────────────────────────────────────────────────
+export async function getLunarCalendar(
+  date?: string,
+  days = 28,
+  utc = 0,
+  lat = 0,
+  lon = 0,
+): Promise<{
+  start_date: string;
+  days: number;
+  calendar: LunarDay[];
+}> {
+  const params = new URLSearchParams({
+    days: String(days),
+    utc: String(utc),
+    lat: String(lat),
+    lon: String(lon),
+  });
+  if (date) params.set('date', date);
+  const res = await fetch(`${API_URL}/lunar-calendar?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface LunarMansion {
+  number: number;
+  name: string;
+  nature: 'benefic' | 'malefic' | 'mixed';
+  name_ru: string;
+  keyword: string;
+  theme: string;
+  do: string[];
+  avoid: string[];
+}
+
+export interface LunarDay {
+  date: string;
+  weekday: string;
+  moon_lon: number;
+  moon_sign: string;
+  moon_degree: number;
+  phase_angle: number;
+  phase: string;
+  is_critical_degree: boolean;
+  void_of_course: boolean;
+  voc_end_sign: string | null;
+  mansion: LunarMansion;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export interface DashboardData {
+  target_date: string;
+  moon: {
+    sign: string;
+    degree: number;
+    phase: string;
+    phase_angle: number;
+    is_void: boolean;
+    void_end_sign: string | null;
+    mansion: LunarMansion;
+  };
+  top_transits: Array<{
+    transit_planet: string;
+    natal_planet: string;
+    aspect: string;
+    orb: number;
+    applying: boolean;
+  }>;
+  compensatory: Record<string, unknown>;
+  firdaria: Record<string, unknown>;
+  profections: Record<string, unknown>;
+  fortune_today: { lon?: number; sign?: string; deg_min?: string };
+  arabic_natal: Record<string, unknown>;
+}
+
+export async function getDashboard(b: BirthInput, targetDate?: string): Promise<DashboardData> {
+  return post('/dashboard', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    target_date: targetDate ?? new Date().toISOString().slice(0, 10),
+  });
+}

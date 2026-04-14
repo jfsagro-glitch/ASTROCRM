@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
     calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
     void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
+    lunar_mansion_full,
 )
 from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
@@ -1007,7 +1008,7 @@ def daily_moon(date: Optional[str] = None, time: str = "12:00",
     try:
         if not date:
             date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        jd_utc = calc_jd(date, time, utc)
+        jd_utc = _to_jd(date, time, utc)
         planets = calc_planets(jd_utc)
         moon_lon = planets.get("moon", 0)
         sun_lon  = planets.get("sun",  0)
@@ -1042,6 +1043,241 @@ def daily_moon(date: Optional[str] = None, time: str = "12:00",
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+# ── LUNAR CALENDAR (28-day) ────────────────────────────────────────────────────
+@app.get("/lunar-calendar")
+def lunar_calendar(
+    date: Optional[str] = None,
+    days:   int   = 28,
+    utc:    float = 0,
+    lat:    float = 0,
+    lon:    float = 0,
+):
+    """28-day lunar calendar: moon sign, phase, VoC, mansion, critical degrees.
+
+    - **date**: start date YYYY-MM-DD (defaults to today UTC)
+    - **days**: number of days to return (1–90, default 28)
+    - **utc**: UTC offset in hours
+    - **lat/lon**: observer coordinates (used for VoC ingress scanning)
+    """
+    from datetime import timedelta as _td, date as _date_t
+    try:
+        days = max(1, min(90, days))
+        if not date:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        start_dt = datetime.strptime(date, "%Y-%m-%d")
+        # Critical degree sets (modular within sign)
+        _CRITICAL = {
+            "cardinal": {0, 13, 26},   # Aries, Cancer, Libra, Capricorn
+            "fixed":    {9, 21},        # Taurus, Leo, Scorpio, Aquarius
+            "mutable":  {4, 17},        # Gemini, Virgo, Sagittarius, Pisces
+        }
+        _CARDINAL = {"aries","cancer","libra","capricorn"}
+        _FIXED    = {"taurus","leo","scorpio","aquarius"}
+
+        calendar_days = []
+        for i in range(days):
+            dt = start_dt + timedelta(days=i)
+            d_str = dt.strftime("%Y-%m-%d")
+            jd_noon = _to_jd(d_str, "12:00", utc)
+            planets = calc_planets(jd_noon)
+            moon_lon = planets.get("moon", 0)
+            sun_lon  = planets.get("sun",  0)
+
+            phase_angle = (moon_lon - sun_lon) % 360
+            if   phase_angle <  45: phase_name = "new_moon"
+            elif phase_angle <  90: phase_name = "waxing_crescent"
+            elif phase_angle < 135: phase_name = "first_quarter"
+            elif phase_angle < 180: phase_name = "waxing_gibbous"
+            elif phase_angle < 225: phase_name = "full_moon"
+            elif phase_angle < 270: phase_name = "waning_gibbous"
+            elif phase_angle < 315: phase_name = "last_quarter"
+            else:                   phase_name = "waning_crescent"
+
+            moon_deg = moon_lon % 30
+            m_sign   = sign_name(moon_lon)
+            mansion  = lunar_mansion_full(moon_lon)
+
+            # Critical degree check
+            deg_floor = int(moon_deg)
+            if m_sign in _CARDINAL:
+                is_critical = deg_floor in _CRITICAL["cardinal"]
+            elif m_sign in _FIXED:
+                is_critical = deg_floor in _CRITICAL["fixed"]
+            else:
+                is_critical = deg_floor in _CRITICAL["mutable"]
+
+            # VoC: lightweight check (no binary search — just is_void flag)
+            # Full VoC data only when look_ahead is small
+            voc_data = void_of_course_moon(jd_noon, look_ahead_days=2.0, lat=lat, lon=lon)
+
+            calendar_days.append({
+                "date":           d_str,
+                "weekday":        dt.strftime("%A"),
+                "moon_lon":       round(moon_lon, 2),
+                "moon_sign":      m_sign,
+                "moon_degree":    round(moon_deg, 2),
+                "phase_angle":    round(phase_angle, 1),
+                "phase":          phase_name,
+                "is_critical_degree": is_critical,
+                "void_of_course": voc_data.get("is_void", False),
+                "voc_end_sign":   voc_data.get("void_end_sign"),
+                "mansion":        mansion,
+            })
+
+        return _present({
+            "start_date": date,
+            "days": days,
+            "calendar": calendar_days,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── DASHBOARD (daily aggregated report) ──────────────────────────────────────
+class DashboardRequest(BaseModel):
+    """Birth data + optional target date for the dashboard report."""
+    date:  str
+    time:  str
+    lat:   float
+    lon:   float
+    utc:   float
+    target_date: Optional[str] = None   # YYYY-MM-DD, defaults to today UTC
+    target_time: str = "12:00"
+    houses: str = "placidus"
+    julian: bool = False
+
+
+@app.post("/dashboard")
+def dashboard(req: DashboardRequest):
+    """Aggregated daily dashboard: moon status, top transits + compensatory,
+    active firdaria, profections, fortune lot.
+
+    Returns all data needed to render the bento-grid dashboard without
+    the client making multiple separate API calls.
+    """
+    try:
+        target_date = req.target_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # ── Natal chart ───────────────────────────────────────────────────────
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        natal = calc_chart(
+            yr, mo, dy, h, mi, sc,
+            req.lat, req.lon, req.utc,
+            houses_system=req.houses, julian=req.julian,
+            include_aspects=False, include_patterns=False,
+            include_dignities=True, include_arabic=True,
+            include_fixed_stars=False, include_sect=True,
+            include_dispositors=False,
+        )
+
+        # ── Today's transit aspects to natal ────────────────────────────────
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        try:
+            transit_result = transits(
+                natal_jd, target_date, req.target_time,
+                lat=req.lat, lon=req.lon,
+                transit_orb_major=2.0, transit_orb_minor=1.0,
+            )
+            raw_aspects = transit_result.get("aspects", [])
+            transit_planets_dict = {
+                p: d["lon"] for p, d in transit_result.get("transit_planets", {}).items()
+            }
+        except Exception:
+            raw_aspects = []
+            transit_planets_dict = {}
+            transit_result = {}
+
+        # Sort by orb, take top 5
+        raw_aspects.sort(key=lambda a: a.get("orb", 99))
+        top_transits = raw_aspects[:5]
+
+        # ── Moon status ───────────────────────────────────────────────────────
+        jd_target = _to_jd(target_date, req.target_time, req.utc)
+        moon_lon = transit_planets_dict.get("moon", 0)
+        sun_lon  = transit_planets_dict.get("sun",  0)
+        phase_angle = (moon_lon - sun_lon) % 360
+        if   phase_angle <  45: phase = "new_moon"
+        elif phase_angle <  90: phase = "waxing_crescent"
+        elif phase_angle < 135: phase = "first_quarter"
+        elif phase_angle < 180: phase = "waxing_gibbous"
+        elif phase_angle < 225: phase = "full_moon"
+        elif phase_angle < 270: phase = "waning_gibbous"
+        elif phase_angle < 315: phase = "last_quarter"
+        else:                   phase = "waning_crescent"
+
+        voc = void_of_course_moon(jd_target, look_ahead_days=2.0)
+        mansion = lunar_mansion_full(moon_lon)
+
+        moon_status = {
+            "sign":           sign_name(moon_lon),
+            "degree":         round(moon_lon % 30, 2),
+            "phase":          phase,
+            "phase_angle":    round(phase_angle, 1),
+            "is_void":        voc.get("is_void", False),
+            "void_end_sign":  voc.get("void_end_sign"),
+            "void_end_utc":   voc.get("void_end_jd"),
+            "mansion":        mansion,
+        }
+
+        # ── Firdaria ─────────────────────────────────────────────────────────
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        try:
+            firdaria_data = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+        except Exception:
+            firdaria_data = {}
+
+        # ── Profections ───────────────────────────────────────────────────────
+        try:
+            prof_data = profections(natal_jd, target_date,
+                                    houses_system=req.houses, lat=req.lat, lon=req.lon)
+        except Exception:
+            prof_data = {}
+
+        # ── Arabic Part of Fortune for today ──────────────────────────────────
+        from astro_engine import arabic_parts as _arabic_parts
+        transit_pl_lons = {p: d["lon"] if isinstance(d, dict) else d
+                           for p, d in transit_result.get("transit_planets", {}).items()}
+        # Fortune needs houses → use natal houses (simplified approximation)
+        natal_houses_lons = {k: v["lon"] if isinstance(v, dict) else v
+                             for k, v in natal.get("houses", {}).items()}
+        fortune_lot = _arabic_parts(transit_pl_lons, natal_houses_lons).get("fortune", {})
+
+        # ── Compensatory recommendations for top transits ─────────────────────
+        try:
+            from astro_compensatory import build_compensatory_report
+            # Build minimal chart-like dicts for compensatory engine
+            _natal_for_comp = natal
+            _transit_for_comp = {
+                "planets": {
+                    p: {"longitude": d["lon"], "sign": d.get("sign","")}
+                    for p, d in transit_result.get("transit_planets", {}).items()
+                }
+            }
+            comp_report = build_compensatory_report(
+                _natal_for_comp, _transit_for_comp, raw_aspects[:5], target_date,
+            )
+        except Exception:
+            comp_report = {}
+
+        return _present({
+            "target_date":    target_date,
+            "moon":           moon_status,
+            "top_transits":   top_transits,
+            "compensatory":   comp_report,
+            "firdaria":       firdaria_data,
+            "profections":    prof_data,
+            "fortune_today":  fortune_lot,
+            "arabic_natal":   natal.get("arabic_parts", {}),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/jyotish")
@@ -1716,7 +1952,7 @@ def compensatory_current(target_date: Optional[str] = None,
         if not target_date:
             from datetime import datetime, timezone
             target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        transit_jd = calc_jd(target_date, "12:00", 0)
+        transit_jd = _to_jd(target_date, "12:00", 0)
         transit_chart = calc_chart(transit_jd, 0, 0,
                                    include_aspects=False,
                                    include_patterns=False,

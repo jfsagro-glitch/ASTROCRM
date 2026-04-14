@@ -28,6 +28,7 @@ import InteractionRelocationEngine from './InteractionRelocationEngine';
 import HoroscopeBlock from './HoroscopeBlock';
 import DateSegmentInput from './DateSegmentInput';
 import PAReportBlock from './PAReportBlock';
+import DashboardView from './DashboardView';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2110,7 +2111,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
+  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2205,6 +2206,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   }, [activeTab, birth.name, humanDesignMode]);
 
   const tabs = [
+    { key: 'dashboard',      icon: Zap,       label: '⚡ Дашборд' },
     { key: 'natal',          icon: Star,      label: tr.natalChart },
     { key: 'horoscope',      icon: Sun,       label: '🔮 Гороскоп' },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
@@ -2309,6 +2311,19 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         </div>
 
         <div key={activeTab}>
+          {activeTab === 'dashboard' && (
+            <div id="pdf-section-dashboard">
+              {birth.date && birth.time ? (
+                <DashboardView birthData={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для дашборда</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'natal' && (
             <div id="pdf-section-natal" className="space-y-4">
               {natalChart ? (

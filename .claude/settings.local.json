@@ -60,7 +60,30 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/natal -X POST -H \"Content-Type: application/json\" -d '{\"\"date\"\":\"\"1990-03-15\"\",\"\"time\"\":\"\"14:30\"\",\"\"lat\"\":55.75,\"\"lon\"\":37.61,\"\"utc\"\":3}')",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
       "Bash(\".venv/Scripts/pip\" install:*)",
-      "Bash(where python:*)"
+      "Bash(where python:*)",
+      "Bash(npm run:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(grep -l \"humanDesign\\\\|HumanDesign\" C:/Users/jfsag/Documents/GitHub/ASTROCRM/frontend/src/services/*.ts)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(grep -rn \"email\\\\|smtp\\\\|sendgrid\\\\|nodemailer\\\\|EmailJS\\\\|emailjs\" /c/Users/jfsag/Documents/GitHub/ASTROCRM/frontend/src --include=*.ts --include=*.tsx -l)",
+      "Bash(cmd.exe /c \"cd C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM\\\\frontend && npx tsc --noEmit\")",
+      "Bash(cmd.exe /c \"cd C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM\\\\frontend && npx tsc --noEmit 2>&1\")",
+      "Bash(cmd.exe /c \"git add frontend/src/components/LifeSphereReports.tsx frontend/src/components/ClientPortal.tsx && git commit -m \"\"Add LifeSphereReports component with 5 sphere tabs \\(Finance, Health, Career, Energy, Life Plan\\)\"\" && git push\")",
+      "Bash(cmd.exe /c \"git add frontend/src/components/LifeSphereReports.tsx frontend/src/components/ClientPortal.tsx && git commit -m \"\"Add LifeSphereReports: 5-sphere report tabs \\(Finance, Health, Career, Energy, Life Plan\\)\"\" && git push\")",
+      "Bash(cmd.exe /c \"git -C C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM add frontend/src/components/LifeSphereReports.tsx frontend/src/components/ClientPortal.tsx\")",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM && git status\")",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM''; git add frontend/src/components/LifeSphereReports.tsx frontend/src/components/ClientPortal.tsx; git commit -m ''Add LifeSphereReports: 5-sphere reports \\(Finance, Health, Career, Energy, Life Plan\\)''; git push\")",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM\\\\frontend''; npx tsc --noEmit 2>&1\")",
+      "Bash(python3 -c \"import pdfplumber\")",
+      "Bash(python3 -c \"import PyPDF2\")",
+      "Bash(pip install:*)",
+      "Bash(python3:*)",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM''; git add frontend/src/components/PAReportBlock.tsx frontend/src/components/ClientPortal.tsx; git commit -m ''Add PAReportBlock: unified Interpretation+Spheres+Compensatory Practices with animations, merge into single Analysis tab''; git push\")",
+      "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM''; git push\")",
+      "Bash(ls /mnt/)",
+      "Read(//c//**)"
     ]
   }
 }
