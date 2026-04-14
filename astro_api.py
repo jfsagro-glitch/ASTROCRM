@@ -19,17 +19,24 @@ except ImportError:
 # ── Engine imports ────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
-    calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS
+    calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
+    void_of_course_moon, calc_planets, sign_name,
 )
 from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
-    profections, transits, tertiary_progressions, converse_progressions,
+    profections, firdaria, transits, tertiary_progressions, converse_progressions,
     ingress_chart, find_eclipses, find_stations, prenatal_syzygy,
     transit_exact_dates, ephemerides_table, astro_summary, rectify_birth_time,
 )
 from astro_synastry import (
     synastry_aspects, composite_chart, davison_chart, synastry_score,
 )
+try:
+    from astro_compensatory import build_compensatory_report
+    _COMPENSATORY_OK = True
+except Exception as _comp_err:
+    _COMPENSATORY_OK = False
+    build_compensatory_report = None  # type: ignore
 from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
@@ -58,8 +65,19 @@ except Exception as exc:
     CROSS_CATALOG = []  # type: ignore[assignment]
 try:
     import astro_se as _se_module
+    _SE_OK = True
 except Exception:
     _se_module = None   # type: ignore
+    _SE_OK = False
+    import logging as _logging
+    _logging.warning(
+        "\n" + "="*70 + "\n"
+        "  ⚠  pyswisseph / astro_se not installed.\n"
+        "     Calculations fall back to built-in VSOP87/Meeus approximations.\n"
+        "     Accuracy: ~1-5′ (arc-minutes). NOT suitable for professional use.\n"
+        "     Fix: pip install pyswisseph>=2.10.3\n"
+        + "="*70
+    )
 
 try:
     from jyotish_engine import calc_jyotish as _calc_jyotish
@@ -81,9 +99,16 @@ FRONTEND_DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
 FRONTEND_INDEX_FILE = os.path.join(FRONTEND_DIST_DIR, "index.html")
 HAS_FRONTEND_BUILD = os.path.exists(FRONTEND_INDEX_FILE)
 
+# CORS: read from ALLOWED_ORIGINS env var (comma-separated) or default to localhost dev
+_cors_env = os.environ.get("ALLOWED_ORIGINS", "")
+if _cors_env.strip():
+    _allowed_origins: list[str] = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    _allowed_origins = ["http://localhost:3000", "http://localhost:5173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -416,6 +441,7 @@ class PredictiveRequest(BaseModel):
     target_lat:   Optional[float] = None # for returns & relocations
     target_lon:   Optional[float] = None
     houses:       str = "placidus"
+    advanced:     bool = False           # unlock tertiary/converse progressions
 
 
 class EphemeridesRequest(BaseModel):
@@ -966,7 +992,58 @@ def root():
     return {"status": "HOLO Astrology API v2.0", "docs": "/docs"}
 
 
-# ── JYOTISH (VEDIC ASTROLOGY) ────────────────────────────────────────────────
+# ── DAILY MOON (Void of Course + Moon sign) ──────────────────────────────────
+@app.get("/daily/moon")
+def daily_moon(date: Optional[str] = None, time: str = "12:00",
+               utc: float = 0, lat: float = 0, lon: float = 0,
+               look_ahead: float = 3.0):
+    """Current Moon position, sign, phase, and Void of Course status.
+
+    - **date**: YYYY-MM-DD (defaults to today UTC)
+    - **time**: HH:MM (default 12:00)
+    - **utc**: UTC offset in hours (e.g. 3 for Moscow)
+    - **look_ahead**: days to scan for VoC end / next ingress (default 3)
+    """
+    try:
+        if not date:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        jd_utc = calc_jd(date, time, utc)
+        planets = calc_planets(jd_utc)
+        moon_lon = planets.get("moon", 0)
+        sun_lon  = planets.get("sun",  0)
+
+        # Phase angle (0=new…180=full…360=new)
+        phase_angle = (moon_lon - sun_lon) % 360
+        if   phase_angle <  45: phase_name = "new_moon"
+        elif phase_angle <  90: phase_name = "waxing_crescent"
+        elif phase_angle < 135: phase_name = "first_quarter"
+        elif phase_angle < 180: phase_name = "waxing_gibbous"
+        elif phase_angle < 225: phase_name = "full_moon"
+        elif phase_angle < 270: phase_name = "waning_gibbous"
+        elif phase_angle < 315: phase_name = "last_quarter"
+        else:                   phase_name = "waning_crescent"
+
+        voc = void_of_course_moon(jd_utc, look_ahead_days=look_ahead,
+                                  lat=lat, lon=lon)
+
+        return _present({
+            "date":         date,
+            "time":         time,
+            "utc_offset":   utc,
+            "moon_lon":     round(moon_lon, 4),
+            "moon_sign":    sign_name(moon_lon),
+            "moon_degree":  round(moon_lon % 30, 4),
+            "phase_angle":  round(phase_angle, 2),
+            "phase":        phase_name,
+            "void_of_course": voc,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+
 @app.post("/jyotish")
 def jyotish(req: BirthData):
     """Full Jyotish (Vedic astrology) chart with Lahiri sidereal, nakshatras, dashas, yogas."""
@@ -1342,6 +1419,12 @@ def calc_solar_arc(req: PredictiveRequest):
 
 @app.post("/predictive/tertiary")
 def calc_tertiary(req: PredictiveRequest):
+    if not req.advanced:
+        raise HTTPException(
+            400,
+            "Tertiary progressions are an advanced technique. "
+            "Pass advanced=true to enable."
+        )
     try:
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = tertiary_progressions(natal_jd, req.target_date,
@@ -1357,6 +1440,12 @@ def calc_tertiary(req: PredictiveRequest):
 
 @app.post("/predictive/converse")
 def calc_converse(req: PredictiveRequest):
+    if not req.advanced:
+        raise HTTPException(
+            400,
+            "Converse progressions are an advanced technique. "
+            "Pass advanced=true to enable."
+        )
     try:
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = converse_progressions(natal_jd, req.target_date,
@@ -1411,6 +1500,24 @@ def calc_profections(req: PredictiveRequest):
                              houses_system=req.houses,
                              lat=req.lat, lon=req.lon)
         result["interpretation"] = _gen_profections_interp(result)
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/predictive/firdaria")
+def calc_firdaria(req: PredictiveRequest):
+    """Firdaria (Firdariyyat) — Hellenistic unequal planetary periods.
+
+    Day chart: Sun→Venus→Mercury→Moon→Saturn→Jupiter→Mars (7+8+13+9+11+12+7 = 67 yr).
+    Night chart: Moon→Saturn→Mercury→Mars→Venus→Sun→Jupiter.
+    Each major period splits into 7 sub-periods ruled by the same sequence."""
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        result = firdaria(natal_jd, req.target_date,
+                          lat=req.lat, lon=req.lon)
         return _present(result)
     except HTTPException:
         raise
@@ -1533,6 +1640,103 @@ def calc_davison(req: PersonPair):
                                jd2, req.lat2, req.lon2, req.utc2,
                                houses_system=req.houses)
         return _safe(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── COMPENSATORY PRACTICES ────────────────────────────────────────────────────
+
+class CompensatoryRequest(BaseModel):
+    date:        str;  time:   str
+    lat:         float; lon:   float; utc: float
+    target_date: str
+    target_time: str = "12:00"
+    context:     Optional[str] = None   # travel|work|home|crisis|creative
+    intensity:   str = "medium"         # light|medium|deep
+    houses:      str = "placidus"
+
+
+@app.post("/compensatory/practices")
+def compensatory_practices(req: CompensatoryRequest):
+    """Компенсаторные практики по транзитам к натальной карте.
+
+    Три слоя: одиночные транзитные планеты → практики, аспектные пары,
+    фоновые нарративы 2025-2026. Плюс характеристика натального Солнца.
+    """
+    if not _COMPENSATORY_OK:
+        raise HTTPException(503, "Compensatory engine not available")
+    try:
+        from astro_engine import calc_aspects as _calc_asp
+        natal_jd   = _to_jd(req.date, req.time, req.utc)
+        transit_jd = _to_jd(req.target_date, req.target_time, req.utc)
+        natal_chart   = calc_chart(natal_jd,   req.lat, req.lon,
+                                   houses_system=req.houses)
+        transit_chart = calc_chart(transit_jd, req.lat, req.lon,
+                                   houses_system=req.houses,
+                                   include_aspects=False,
+                                   include_patterns=False,
+                                   include_dignities=False,
+                                   include_arabic=False,
+                                   include_sect=False,
+                                   include_dispositors=False)
+        # Transit-to-transit aspects
+        tr_planets = {
+            p: v.get("longitude", v) if isinstance(v, dict) else v
+            for p, v in transit_chart.get("planets", {}).items()
+        }
+        transit_aspects = _calc_asp(tr_planets)
+        report = build_compensatory_report(
+            natal_chart    = natal_chart,
+            transit_chart  = transit_chart,
+            transit_aspects= transit_aspects,
+            target_date    = req.target_date,
+            intensity      = req.intensity,
+            context        = req.context,
+        )
+        return _present(report)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/compensatory/current")
+def compensatory_current(target_date: Optional[str] = None,
+                         intensity: str = "medium"):
+    """Компенсаторные практики только по текущим транзитам (без натальной карты).
+
+    Возвращает практики для активных транзитных планет и аспектных пар.
+    """
+    if not _COMPENSATORY_OK:
+        raise HTTPException(503, "Compensatory engine not available")
+    try:
+        from astro_engine import calc_aspects as _calc_asp
+        if not target_date:
+            from datetime import datetime, timezone
+            target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        transit_jd = calc_jd(target_date, "12:00", 0)
+        transit_chart = calc_chart(transit_jd, 0, 0,
+                                   include_aspects=False,
+                                   include_patterns=False,
+                                   include_dignities=False,
+                                   include_arabic=False,
+                                   include_sect=False,
+                                   include_dispositors=False)
+        tr_planets = {
+            p: v.get("longitude", v) if isinstance(v, dict) else v
+            for p, v in transit_chart.get("planets", {}).items()
+        }
+        transit_aspects = _calc_asp(tr_planets)
+        report = build_compensatory_report(
+            natal_chart    = {},
+            transit_chart  = transit_chart,
+            transit_aspects= transit_aspects,
+            target_date    = target_date,
+            intensity      = intensity,
+        )
+        return _present(report)
     except HTTPException:
         raise
     except Exception as e:
@@ -2239,8 +2443,14 @@ def health():
         "features": {
             "human_design": _HUMAN_DESIGN_OK,
             "jyotish": _JYOTISH_OK,
-            "swiss_ephemeris": _se_module is not None,
+            "swiss_ephemeris": _SE_OK,
         },
+        "ephemeris_accuracy": (
+            "high — Swiss Ephemeris (pyswisseph), precision < 1\""
+            if _SE_OK else
+            "low — built-in VSOP87/Meeus (~1-5′). "
+            "Install pyswisseph>=2.10.3 for professional accuracy."
+        ),
     }
 
 

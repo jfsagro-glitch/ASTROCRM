@@ -428,6 +428,121 @@ def profections(natal_jd_utc, target_date_str, houses_system="placidus",
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# FIRDARIA (Firdariyyat) — Hellenistic planetary periods
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Sect order and durations (years) per Vettius Valens / Bonatti
+# Day chart: Sun leads; Night chart: Moon leads
+_FIRDARIA_DAY   = [("sun",7),("venus",8),("mercury",13),("moon",9),
+                   ("saturn",11),("jupiter",12),("mars",7)]
+_FIRDARIA_NIGHT = [("moon",9),("saturn",11),("mercury",13),("mars",7),
+                   ("venus",8),("sun",7),("jupiter",12)]
+# Dragon (nodes) sub-period appended after every full cycle by some traditions;
+# we include North Node (rahu) and South Node as final mini-periods (3 years each)
+_FIRDARIA_NODES = [("node",3),("lilith",2)]   # optional extension
+
+
+def firdaria(natal_jd_utc: float, target_date_str: str,
+             lat: float = 0, lon: float = 0) -> dict:
+    """
+    Hellenistic Firdaria (Firdariyyat): unequal planetary periods.
+
+    Day chart order (Sun above horizon):
+        Sun 7 → Venus 8 → Mercury 13 → Moon 9 → Saturn 11 → Jupiter 12 → Mars 7
+    Night chart order:
+        Moon 9 → Saturn 11 → Mercury 13 → Mars 7 → Venus 8 → Sun 7 → Jupiter 12
+
+    Each major period is divided into 7 sub-periods (each lord rules ~period/7 years).
+
+    Returns the active major period, active sub-period, and the full schedule.
+    """
+    natal_planets = calc_planets(natal_jd_utc)
+    natal_houses  = calc_houses(natal_jd_utc, lat, lon)
+    asc_lon = natal_houses.get("h1", 0)
+    sun_lon = natal_planets.get("sun", 0)
+
+    # Determine sect: day if Sun above horizon (arc from ASC ≥ 180°)
+    is_day = (sun_lon - asc_lon) % 360 >= 180
+    sequence = _FIRDARIA_DAY if is_day else _FIRDARIA_NIGHT
+
+    # Reconstruct natal date from JD
+    Z = math.floor(natal_jd_utc + 0.5)
+    alpha = math.floor((Z - 1867216.25) / 36524.25)
+    A = Z + 1 + alpha - math.floor(alpha / 4) if Z >= 2299161 else Z
+    B = A + 1524; C = math.floor((B - 122.1) / 365.25)
+    D = math.floor(365.25 * C); E = math.floor((B - D) / 30.6001)
+    mo_n = E - 1 if E < 14 else E - 13
+    yr_n = C - 4716 if mo_n > 2 else C - 4715
+    dy_n = int(B - D - math.floor(30.6001 * E))
+
+    yr_t, mo_t, dy_t = parse_date_arg(target_date_str)
+
+    # Decimal age at target
+    from astro_time import decimal_year
+    natal_dec = decimal_year(int(yr_n), int(mo_n), int(dy_n))
+    target_dec = decimal_year(yr_t, mo_t, dy_t)
+    age_dec = target_dec - natal_dec
+    if age_dec < 0:
+        age_dec = 0.0
+
+    # Build full schedule (up to 120 years / 2 full cycles)
+    schedule = []
+    cursor = 0.0
+    for cycle in range(3):                  # enough for 3 full cycles (>120 yr)
+        for planet, years in sequence:
+            major_start = cursor
+            major_end   = cursor + years
+            # 7 sub-periods: each lord of the sequence rules in turn
+            sub_len = years / 7.0
+            subs = []
+            for i, (sub_pl, _) in enumerate(sequence):
+                s_start = major_start + i * sub_len
+                s_end   = s_start + sub_len
+                subs.append({
+                    "sub_lord":      sub_pl,
+                    "start_age":     round(s_start, 4),
+                    "end_age":       round(s_end,   4),
+                    "start_year":    round(natal_dec + s_start, 4),
+                    "end_year":      round(natal_dec + s_end,   4),
+                })
+            schedule.append({
+                "major_lord": planet,
+                "years":      years,
+                "start_age":  round(major_start, 4),
+                "end_age":    round(major_end,   4),
+                "start_year": round(natal_dec + major_start, 4),
+                "end_year":   round(natal_dec + major_end,   4),
+                "sub_periods": subs,
+            })
+            cursor = major_end
+        if cursor > age_dec + 20:
+            break
+
+    # Find active major and sub period
+    active_major = None
+    active_sub   = None
+    for period in schedule:
+        if period["start_age"] <= age_dec < period["end_age"]:
+            active_major = period
+            for sp in period["sub_periods"]:
+                if sp["start_age"] <= age_dec < sp["end_age"]:
+                    active_sub = sp
+                    break
+            break
+
+    return {
+        "type":         "firdaria",
+        "sect":         "day" if is_day else "night",
+        "sequence":     [p for p, _ in sequence],
+        "age":          round(age_dec, 4),
+        "target_date":  target_date_str,
+        "active_major": active_major,
+        "active_sub":   active_sub,
+        "schedule":     schedule,
+    }
+
+
+
 # TRANSITS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1226,7 +1341,9 @@ def find_eclipses(start_date_str, count=5):
                 if dist > 180: dist = 360 - dist
                 if dist < 18.5:
                     if dist < 10.0:
-                        eclipse_class = 'total/annular'
+                        # Cannot distinguish total vs annular without lunar distance;
+                        # label as 'central' — subtype requires angular diameter comparison
+                        eclipse_class = 'central'
                     elif dist < 15.0:
                         eclipse_class = 'partial'
                     else:
@@ -1245,8 +1362,8 @@ def find_eclipses(start_date_str, count=5):
                 # Lunar eclipse: Full Moon near node
                 dist = abs(n360(m_lon - nd_lon + 180) - 180)
                 if dist > 180: dist = 360 - dist
-                if dist < 12.5:
-                    if dist < 4.5:
+                if dist < 14.0:
+                    if dist < 4.6:
                         eclipse_class = 'total'
                     elif dist < 9.5:
                         eclipse_class = 'partial'

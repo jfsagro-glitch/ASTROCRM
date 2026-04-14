@@ -851,6 +851,162 @@ def lunar_phase(JD):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# VOID OF COURSE MOON
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Major aspects Moon can form (classic set)
+_MOON_ASPECTS = {0: "conjunction", 60: "sextile", 90: "square",
+                 120: "trine", 180: "opposition"}
+_MOON_ASPECT_ORB = 1.0   # degrees, tight scan window
+
+
+def void_of_course_moon(jd_start: float, look_ahead_days: float = 3.0,
+                        lat: float = 0, lon: float = 0) -> dict:
+    """
+    Determine if the Moon is Void of Course (VoC) at jd_start, and if so,
+    when it ends (Moon enters next sign).
+
+    Scans forward minute-by-minute (using 10-minute steps) from jd_start
+    to find:
+      a) The last exact aspect Moon makes to a classical planet before
+         changing sign (VoC start).
+      b) The exact JD when Moon crosses into the next sign (VoC end).
+
+    Classical planets for VoC: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn
+    (traditional 7 — outer planets excluded per Hellenistic tradition).
+
+    Returns:
+        {
+          "is_void": bool,
+          "moon_lon": float,          # current Moon longitude
+          "moon_sign": str,
+          "last_aspect": {planet, aspect, exact_jd, exact_dt_utc} | None,
+          "void_start_jd": float | None,
+          "void_end_jd": float | None,   # Moon enters next sign
+          "void_end_sign": str | None,
+          "void_duration_hours": float | None,
+        }
+    """
+    _CLASSICAL = {"sun", "mercury", "venus", "mars", "jupiter", "saturn"}
+
+    step = 10 / (24 * 60)   # 10 minutes in JD units
+    planets_now = calc_planets(jd_start)
+    moon_lon_now = planets_now.get("moon", 0)
+    current_sign = sign_name(moon_lon_now)
+
+    def _sign_index(lon):
+        return int(lon % 360 / 30)
+
+    current_sign_idx = _sign_index(moon_lon_now)
+
+    # --- Find next sign ingress (VoC end candidate)
+    void_end_jd = None
+    void_end_sign = None
+    jd_scan = jd_start
+    prev_idx = current_sign_idx
+    for _ in range(int(look_ahead_days * 24 * 6)):   # 10-min steps
+        jd_scan += step
+        pls = calc_planets(jd_scan)
+        idx = _sign_index(pls.get("moon", 0))
+        if idx != prev_idx:
+            # Binary search for precise crossing
+            lo, hi = jd_scan - step, jd_scan
+            for _ in range(16):
+                mid = (lo + hi) / 2
+                mi  = _sign_index(calc_planets(mid).get("moon", 0))
+                if mi == prev_idx:
+                    lo = mid
+                else:
+                    hi = mid
+            void_end_jd  = hi
+            void_end_sign = sign_name(calc_planets(hi).get("moon", 0))
+            break
+        prev_idx = idx
+
+    if void_end_jd is None:
+        # Could not find ingress within look_ahead window
+        return {
+            "is_void": False,
+            "moon_lon": round(moon_lon_now, 4),
+            "moon_sign": current_sign,
+            "last_aspect": None,
+            "void_start_jd": None,
+            "void_end_jd": None,
+            "void_end_sign": None,
+            "void_duration_hours": None,
+            "note": f"No sign ingress found within {look_ahead_days} days"
+        }
+
+    # --- Scan from jd_start to void_end_jd for all Moon aspects
+    last_aspect = None
+    jd_scan = jd_start
+    prev_moon = moon_lon_now
+
+    while jd_scan < void_end_jd:
+        jd_scan += step
+        pls = calc_planets(jd_scan)
+        moon_lon = pls.get("moon", 0)
+
+        for planet in _CLASSICAL:
+            if planet == "moon":
+                continue
+            p_lon = pls.get(planet, 0)
+            raw_diff = (moon_lon - p_lon) % 360
+            for angle in _MOON_ASPECTS:
+                dist = min(abs(raw_diff - angle), 360 - abs(raw_diff - angle))
+                if dist < _MOON_ASPECT_ORB:
+                    # Check if we're near exact (within 0.3°)
+                    prev_pls  = calc_planets(jd_scan - step)
+                    prev_moon = prev_pls.get("moon", 0)
+                    prev_plon = prev_pls.get(planet, 0)
+                    prev_diff = (prev_moon - prev_plon) % 360
+                    prev_dist = min(abs(prev_diff - angle),
+                                    360 - abs(prev_diff - angle))
+                    if prev_dist > dist:   # Moon approaching this aspect
+                        last_aspect = {
+                            "planet":       planet,
+                            "aspect":       _MOON_ASPECTS[angle],
+                            "exact_jd":     round(jd_scan, 6),
+                            "exact_dt_utc": _jd_to_iso(jd_scan),
+                        }
+
+    is_void = last_aspect is None  # no aspects found = already void
+    void_start_jd = last_aspect["exact_jd"] if last_aspect else jd_start
+
+    duration_h = None
+    if void_end_jd is not None and void_start_jd is not None:
+        duration_h = round((void_end_jd - void_start_jd) * 24, 2)
+
+    return {
+        "is_void":              is_void,
+        "moon_lon":             round(moon_lon_now, 4),
+        "moon_sign":            current_sign,
+        "last_aspect":          last_aspect,
+        "void_start_jd":        round(void_start_jd, 6) if void_start_jd else None,
+        "void_end_jd":          round(void_end_jd,   6) if void_end_jd   else None,
+        "void_end_sign":        void_end_sign,
+        "void_duration_hours":  duration_h,
+    }
+
+
+def _jd_to_iso(jd: float) -> str:
+    """Convert Julian Day to ISO-8601 UTC string."""
+    Z = math.floor(jd + 0.5)
+    F = (jd + 0.5) - Z
+    alpha = math.floor((Z - 1867216.25) / 36524.25)
+    A = Z + 1 + alpha - math.floor(alpha / 4) if Z >= 2299161 else Z
+    B = A + 1524; C = math.floor((B - 122.1) / 365.25)
+    D = math.floor(365.25 * C); E = math.floor((B - D) / 30.6001)
+    day   = int(B - D - math.floor(30.6001 * E))
+    month = int(E - 1 if E < 14 else E - 13)
+    year  = int(C - 4716 if month > 2 else C - 4715)
+    frac  = F
+    hour  = int(frac * 24); frac = frac * 24 - hour
+    minute = int(frac * 60); frac = frac * 60 - minute
+    second = int(frac * 60)
+    return f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:02d}Z"
+
+
 # ARABIC PARTS (LOTS)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -873,7 +1029,13 @@ def arabic_parts(planets_dict, houses_dict):
 
     pof = lot(asc, m, s) if is_day else lot(asc, s, m)   # Fortune
     pos = lot(asc, s, m) if is_day else lot(asc, m, s)   # Spirit
-    pom = lot(asc, dsc, v)                                # Marriage
+    # Marriage lots — traditional variants (Bonatti / Al-Biruni)
+    # Universal (Zoller): ASC + DSC - Venus  ≡  ASC + (ASC+180°) - Venus
+    pom_universal   = lot(asc, dsc, v)
+    # Male chart — day: ASC+Venus-Saturn; night: ASC+Saturn-Venus
+    pom_male        = lot(asc, v, sa)   if is_day else lot(asc, sa, v)
+    # Female chart — day: ASC+Mars-Moon (Part of Husbands); night: ASC+Moon-Mars
+    pom_female      = lot(asc, ma, m)   if is_day else lot(asc, m, ma)
     poc = lot(asc, me, s) if is_day else lot(asc, s, me) # Commerce / Merchants
     pok = lot(asc, j, sa) if is_day else lot(asc, sa, j) # Kingdom / Eminence
     pov = lot(asc, sa, s) if is_day else lot(asc, s, sa) # Nemesis / Death (simplified)
@@ -884,7 +1046,9 @@ def arabic_parts(planets_dict, houses_dict):
     return {
         "fortune":   fmt(pof),
         "spirit":    fmt(pos),
-        "marriage":  fmt(pom),
+        "marriage":  fmt(pom_universal),   # universal lot (Zoller): ASC + DSC - Venus
+        "marriage_male":   fmt(pom_male),  # Bonatti: day=ASC+Venus-Saturn, night=ASC+Saturn-Venus
+        "marriage_female": fmt(pom_female),# Bonatti: day=ASC+Mars-Moon, night=ASC+Moon-Mars
         "commerce":  fmt(poc),
         "eminence":  fmt(pok),
         "nemesis":   fmt(pov),
@@ -1386,7 +1550,10 @@ def calc_chart(yr, mo, dy, h, mi, sc, lat, lon_deg, utc_off,
 
     # ── Dispositors ──────────────────────────────────────────────────────────
     if include_dispositors:
-        result["dispositors"] = calc_dispositors(planets)
+        disp = calc_dispositors(planets)
+        result["dispositors"] = disp
+        # Expose mutual_receptions at top level for easy access
+        result["mutual_receptions"] = disp.get("mutual_receptions", [])
 
     # ── Optional ─────────────────────────────────────────────────────────────
     if include_midpoints:
