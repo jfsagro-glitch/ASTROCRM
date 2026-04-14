@@ -22,6 +22,7 @@ from astro_engine import (
     calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
     void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
     lunar_mansion_full, calc_asteroids, calc_lilith_extended,
+    planetary_hours, calc_sidereal_chart, ayanamsa, list_ayanamsa_systems,
 )
 from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
@@ -2864,6 +2865,85 @@ def numerology_profile_endpoint(req: NumerologyRequest):
         return _present(profile)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PLANETARY HOURS
+# ═════════════════════════════════════════════════════════════════════════════
+
+class PlanetaryHoursRequest(BaseModel):
+    date: str           # YYYY-MM-DD
+    lat:  float
+    lon:  float
+    utc:  float
+
+@app.post("/planetary-hours")
+def get_planetary_hours(req: PlanetaryHoursRequest):
+    """
+    Calculate all 24 planetary hours for a given date and location.
+    Day hours = sunrise to sunset divided by 12.
+    Night hours = sunset to next sunrise divided by 12.
+    """
+    try:
+        result = planetary_hours(req.date, req.lat, req.lon, req.utc)
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/planetary-hours/today")
+def get_planetary_hours_today(lat: float, lon: float, utc: float):
+    """Shortcut: planetary hours for today."""
+    from datetime import date
+    today = date.today().isoformat()
+    try:
+        result = planetary_hours(today, lat, lon, utc)
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SIDEREAL / TROPICAL SWITCH
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SiderealRequest(BaseModel):
+    date:    str    # YYYY-MM-DD
+    time:    str    # HH:MM
+    lat:     float
+    lon:     float
+    utc:     float
+    system:  str = "lahiri"   # lahiri | raman | fagan_bradley | krishnamurti | ...
+
+@app.post("/natal/sidereal")
+def natal_sidereal(req: SiderealRequest):
+    """
+    Return natal chart in sidereal zodiac using the selected ayanamsa system.
+    Includes both tropical and sidereal positions for comparison.
+    """
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        sidereal = calc_sidereal_chart(natal_jd, req.system)
+        ayan = ayanamsa(natal_jd, req.system)
+        return _present({
+            "date":    req.date,
+            "time":    req.time,
+            "lat":     req.lat,
+            "lon":     req.lon,
+            "system":  req.system,
+            "ayanamsa_deg": round(ayan, 4),
+            "ayanamsa_str": f"{int(ayan)}°{int((ayan%1)*60):02d}'",
+            "planets": sidereal,
+            "available_systems": list_ayanamsa_systems(),
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/natal/sidereal/systems")
+def sidereal_systems():
+    """List all available ayanamsa systems."""
+    return {"systems": list_ayanamsa_systems()}
 
 
 # ═════════════════════════════════════════════════════════════════════════════

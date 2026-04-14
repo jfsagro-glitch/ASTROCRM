@@ -31,6 +31,8 @@ import PAReportBlock from './PAReportBlock';
 import DashboardView from './DashboardView';
 import NumerologyBlock from './NumerologyBlock';
 import AsteroidsLilithBlock from './AsteroidsLilithBlock';
+import PlanetaryHoursBlock from './PlanetaryHoursBlock';
+import SiderealBlock from './SiderealBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2113,7 +2115,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2218,6 +2220,8 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
     { key: 'numerology',     icon: Sparkles,  label: '🔢 Нумерология' },
     { key: 'asteroids',      icon: Star,      label: '⚳ Астероиды' },
+    { key: 'planetary-hours', icon: Clock,    label: '⏱ Планет.часы' },
+    { key: 'sidereal',       icon: Globe,     label: '🌐 Сидерич.' },
     { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2425,6 +2429,28 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>Введите данные рождения для расчёта астероидов и Лилит</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'planetary-hours' && (
+            <div id="pdf-section-planetary-hours">
+              <PlanetaryHoursBlock
+                birthData={{ lat: birth.lat, lon: birth.lon, utc: birth.utc }}
+                theme={theme}
+              />
+            </div>
+          )}
+
+          {activeTab === 'sidereal' && (
+            <div id="pdf-section-sidereal">
+              {birth.date && birth.time ? (
+                <SiderealBlock birthData={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для сидерической карты</p>
                 </div>
               )}
             </div>

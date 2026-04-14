@@ -1873,6 +1873,300 @@ def parse_time_arg(s):
     return int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
 
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLANETARY HOURS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Chaldean order (Saturday=Saturn, Sunday=Sun, Monday=Moon, ...)
+_CHALDEAN = ["saturn", "jupiter", "mars", "sun", "venus", "mercury", "moon"]
+
+# Day of week → index into first daytime hour planet
+# 0=Mon,1=Tue,...,6=Sun (Python weekday)
+_DAY_RULER = {0: "moon", 1: "mars", 2: "mercury", 3: "jupiter", 4: "venus", 5: "saturn", 6: "sun"}
+_DAY_RULER_START = {
+    "saturn": 0, "jupiter": 1, "mars": 2, "sun": 3, "venus": 4, "mercury": 5, "moon": 6,
+}
+
+_PLANET_RU = {
+    "sun": "Солнце", "moon": "Луна", "mars": "Марс", "mercury": "Меркурий",
+    "jupiter": "Юпитер", "venus": "Венера", "saturn": "Сатурн",
+}
+
+_PLANET_GLYPHS = {
+    "sun": "☉", "moon": "☽", "mars": "♂", "mercury": "☿",
+    "jupiter": "♃", "venus": "♀", "saturn": "♄",
+}
+
+_PLANET_KEYWORDS = {
+    "sun": "Успех, власть, лидерство, публичность",
+    "moon": "Интуиция, семья, эмоции, женщины",
+    "mars": "Активность, конкуренция, спорт, конфликты",
+    "mercury": "Переговоры, документы, путешествия, обучение",
+    "jupiter": "Удача, юридические вопросы, философия, расширение",
+    "venus": "Любовь, красота, искусство, партнёрство",
+    "saturn": "Ограничения, дисциплина, структура, долгосрочное",
+}
+
+
+def _sunrise_sunset_approx(date_str: str, lat: float, lon: float, utc: float):
+    """
+    Approximate sunrise/sunset times using NOAA simplified formula.
+    Returns (sunrise_jd, sunset_jd) in Julian Day (UT).
+    """
+    try:
+        yr, mo, dy = [int(x) for x in date_str.split("-")]
+    except ValueError:
+        from datetime import date as _d
+        today = _d.today()
+        yr, mo, dy = today.year, today.month, today.day
+
+    jd = jd_from_calendar(yr, mo, dy, 12.0)
+
+    # Julian century from J2000
+    n = jd - 2451545.0
+    lat_r = math.radians(lat)
+
+    # Mean longitude and anomaly
+    L = n360(280.460 + 0.9856474 * n)
+    g = math.radians(n360(357.528 + 0.9856003 * n))
+    lam = math.radians(n360(L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)))
+    eps = math.radians(23.439 - 0.0000004 * n)
+
+    # Sun's declination
+    sin_dec = math.sin(eps) * math.sin(lam)
+    dec = math.asin(sin_dec)
+
+    # Hour angle for sunrise (solar zenith 90.833°)
+    cos_ha = (math.cos(math.radians(90.833)) - math.sin(lat_r) * math.sin(dec)) \
+             / (math.cos(lat_r) * math.cos(dec))
+    if abs(cos_ha) > 1:
+        # Polar day/night — default to 6:00/18:00
+        ha_deg = 90.0
+    else:
+        ha_deg = math.degrees(math.acos(cos_ha))
+
+    # Equation of time (minutes)
+    RA = math.degrees(math.atan2(math.cos(eps) * math.sin(lam), math.cos(lam))) / 15.0
+    eot = (L / 15.0 - RA) * 60  # minutes
+
+    # Noon, sunrise, sunset in UTC hours
+    solar_noon_utc = 12.0 - lon / 15.0 - eot / 60.0 - utc
+    sunrise_utc = solar_noon_utc - ha_deg / 15.0 + utc
+    sunset_utc  = solar_noon_utc + ha_deg / 15.0 + utc
+
+    sunrise_jd = jd_from_calendar(yr, mo, dy, sunrise_utc)
+    sunset_jd  = jd_from_calendar(yr, mo, dy, sunset_utc)
+    return sunrise_jd, sunset_jd, sunrise_utc, sunset_utc
+
+
+def jd_from_calendar(yr, mo, dy, hour_utc=0.0):
+    """Julian Day from calendar date (Gregorian)."""
+    if mo <= 2:
+        yr -= 1; mo += 12
+    a = yr // 100
+    b = 2 - a + a // 4
+    return (int(365.25 * (yr + 4716)) + int(30.6001 * (mo + 1))
+            + dy + hour_utc / 24.0 + b - 1524.5)
+
+
+def planetary_hours(date_str: str, lat: float, lon: float, utc: float) -> dict:
+    """
+    Calculate all 24 planetary hours for a given date and location.
+    Returns day hours (sunrise to sunset) and night hours (sunset to next sunrise).
+
+    Each hour entry:
+      hour_number: 1-24
+      period: 'day' | 'night'
+      planet: lowercase name
+      planet_ru: Russian name
+      glyph: astrological glyph
+      start_utc: float (hours)
+      end_utc: float (hours)
+      start_str: "HH:MM" in local time
+      end_str: "HH:MM" in local time
+      keyword: activity recommendation
+      is_current: bool (whether this hour is active now)
+    """
+    from datetime import datetime, timezone, timedelta
+
+    rise_jd, set_jd, rise_h, set_h = _sunrise_sunset_approx(date_str, lat, lon, utc)
+
+    # Next day's sunrise
+    try:
+        yr, mo, dy = [int(x) for x in date_str.split("-")]
+    except ValueError:
+        from datetime import date as _d
+        today = _d.today()
+        yr, mo, dy = today.year, today.month, today.day
+
+    # Next sunrise approximate (same params, +1 day)
+    from datetime import date as _date, timedelta as _td
+    from_date = _date(yr, mo, dy)
+    next_date = from_date + _td(days=1)
+    _, _, rise_next_h, _ = _sunrise_sunset_approx(next_date.isoformat(), lat, lon, utc)
+    rise_next_h_adj = rise_next_h + 24.0  # shift by 24h for continuity
+
+    # Day/night duration in hours
+    day_dur   = set_h - rise_h
+    night_dur = rise_next_h_adj - set_h
+    day_hour_len   = day_dur / 12.0
+    night_hour_len = night_dur / 12.0
+
+    # Determine ruling planet for this weekday (hour 1 of day)
+    weekday = from_date.weekday()  # 0=Mon ... 6=Sun
+    day_ruler = _DAY_RULER[weekday]
+    start_idx = _DAY_RULER_START[day_ruler]
+
+    # Current time for is_current detection
+    now_utc = datetime.now(timezone.utc)
+    now_h = now_utc.hour + now_utc.minute / 60.0 + now_utc.second / 3600.0
+
+    def _fmt(h_utc):
+        h_local = h_utc  # already in local time via UTC offset convention
+        h_local_mod = h_local % 24
+        hh = int(h_local_mod)
+        mm = int((h_local_mod % 1) * 60)
+        return f"{hh:02d}:{mm:02d}"
+
+    hours = []
+    # Day hours (1-12)
+    for i in range(12):
+        planet = _CHALDEAN[(start_idx + i) % 7]
+        start  = rise_h + i * day_hour_len
+        end    = start + day_hour_len
+        hours.append({
+            "hour_number": i + 1,
+            "period":      "day",
+            "planet":      planet,
+            "planet_ru":   _PLANET_RU[planet],
+            "glyph":       _PLANET_GLYPHS[planet],
+            "start_utc":   round(start, 4),
+            "end_utc":     round(end, 4),
+            "start_str":   _fmt(start),
+            "end_str":     _fmt(end),
+            "keyword":     _PLANET_KEYWORDS[planet],
+            "is_current":  start <= now_h < end,
+        })
+    # Night hours (13-24)
+    for i in range(12):
+        planet = _CHALDEAN[(start_idx + 12 + i) % 7]
+        start  = set_h + i * night_hour_len
+        end    = start + night_hour_len
+        start_disp = start % 24
+        end_disp   = end % 24
+        hours.append({
+            "hour_number": 13 + i,
+            "period":      "night",
+            "planet":      planet,
+            "planet_ru":   _PLANET_RU[planet],
+            "glyph":       _PLANET_GLYPHS[planet],
+            "start_utc":   round(start_disp, 4),
+            "end_utc":     round(end_disp, 4),
+            "start_str":   _fmt(start_disp),
+            "end_str":     _fmt(end_disp),
+            "keyword":     _PLANET_KEYWORDS[planet],
+            "is_current":  start_disp <= now_h < end_disp,
+        })
+
+    current = next((h for h in hours if h["is_current"]), None)
+    return {
+        "date":           date_str,
+        "lat":            lat,
+        "lon":            lon,
+        "day_ruler":      day_ruler,
+        "day_ruler_ru":   _PLANET_RU[day_ruler],
+        "day_ruler_glyph":_PLANET_GLYPHS[day_ruler],
+        "sunrise_local":  _fmt(rise_h),
+        "sunset_local":   _fmt(set_h),
+        "day_hour_len_min":  round(day_hour_len * 60, 1),
+        "night_hour_len_min":round(night_hour_len * 60, 1),
+        "hours":          hours,
+        "current_hour":   current,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIDEREAL / AYANAMSA
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Ayanamsa values for popular systems (at J2000.0 + rate °/year)
+_AYANAMSA_SYSTEMS = {
+    "lahiri":   {"base": 23.8559720, "rate": 0.013972},   # Official Indian (Chitrapaksha)
+    "raman":    {"base": 22.4600000, "rate": 0.013972},   # B.V. Raman
+    "fagan_bradley": {"base": 24.0424370, "rate": 0.013960},
+    "krishnamurti": {"base": 23.8500000, "rate": 0.013972},
+    "yukteshwar": {"base": 22.4600000, "rate": 0.013972},
+    "de_luce":  {"base": 29.5800000, "rate": 0.013972},
+    "djwhal_khul": {"base": 23.8600000, "rate": 0.013972},
+}
+
+# J2000.0 = 2451545.0
+_J2000 = 2451545.0
+_JULIAN_YEAR = 365.25
+
+
+def ayanamsa(JD: float, system: str = "lahiri") -> float:
+    """
+    Calculate ayanamsa (tropical - sidereal offset) in degrees for a given Julian Day.
+    Uses Swiss Ephemeris if available for Lahiri, otherwise polynomial approximation.
+    """
+    system = system.lower()
+
+    if system == "lahiri" and _SE_OK:
+        try:
+            import swisseph as _swe
+            _swe.set_sid_mode(_swe.SIDM_LAHIRI)
+            return _swe.get_ayanamsa_ut(JD)
+        except Exception:
+            pass
+
+    params = _AYANAMSA_SYSTEMS.get(system, _AYANAMSA_SYSTEMS["lahiri"])
+    years_from_j2000 = (JD - _J2000) / _JULIAN_YEAR
+    return params["base"] + params["rate"] * years_from_j2000
+
+
+def tropical_to_sidereal(lon: float, JD: float, system: str = "lahiri") -> float:
+    """Convert tropical longitude to sidereal (subtract ayanamsa)."""
+    return n360(lon - ayanamsa(JD, system))
+
+
+def sidereal_to_tropical(lon: float, JD: float, system: str = "lahiri") -> float:
+    """Convert sidereal longitude to tropical (add ayanamsa)."""
+    return n360(lon + ayanamsa(JD, system))
+
+
+def calc_sidereal_chart(JD: float, system: str = "lahiri") -> dict:
+    """
+    Return planet longitudes in sidereal zodiac for a given ayanamsa system.
+    Returns {planet: {tropical_lon, sidereal_lon, sign_tropical, sign_sidereal, ayanamsa, deg_min}}
+    """
+    tropical_planets = calc_planets(JD)
+    ayan = ayanamsa(JD, system)
+    result = {}
+    for planet, t_lon in tropical_planets.items():
+        s_lon = n360(t_lon - ayan)
+        t_idx = int(t_lon / 30)
+        s_idx = int(s_lon / 30)
+        s_d_in = s_lon % 30.0
+        result[planet] = {
+            "tropical_lon":   round(t_lon, 4),
+            "sidereal_lon":   round(s_lon, 4),
+            "sign_tropical":  SIGN_NAMES[t_idx],
+            "sign_sidereal":  SIGN_NAMES[s_idx],
+            "deg_in_sign":    round(s_d_in, 4),
+            "deg_min":        f"{int(s_d_in)}°{int((s_d_in % 1) * 60):02d}'",
+            "ayanamsa":       round(ayan, 4),
+        }
+    return result
+
+
+def list_ayanamsa_systems() -> list:
+    """Return list of available ayanamsa systems."""
+    return list(_AYANAMSA_SYSTEMS.keys()) + ["lahiri"]
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CLI OUTPUT FORMATTING
 # ══════════════════════════════════════════════════════════════════════════════
