@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
     calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
     void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
-    lunar_mansion_full,
+    lunar_mansion_full, calc_asteroids, calc_lilith_extended,
 )
 from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
@@ -2767,6 +2767,103 @@ if HAS_FRONTEND_BUILD:
             return _file_response_with_cache(requested_path, "public, max-age=3600")
         # Always revalidate index.html so clients pick up the latest asset hashes.
         return _file_response_with_cache(FRONTEND_INDEX_FILE, "no-cache, no-store, must-revalidate")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ASTEROIDS & LILITH EXTENDED
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.post("/natal/asteroids")
+def natal_asteroids(req: BirthData):
+    """Return asteroid positions for a natal chart: Ceres, Pallas, Juno, Vesta, Eros, Psyche."""
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        asteroids = calc_asteroids(natal_jd)
+        available = {k: v for k, v in asteroids.items() if v is not None}
+        unavailable = [k for k, v in asteroids.items() if v is None]
+
+        _ASTEROID_MEANINGS = {
+            "ceres":   {"name_ru": "Церера",  "keyword": "Питание, материнство, циклы потерь и обретения"},
+            "pallas":  {"name_ru": "Паллада", "keyword": "Стратегия, мудрость Афины, паттерны"},
+            "juno":    {"name_ru": "Юнона",   "keyword": "Партнёрство, тип идеального союза"},
+            "vesta":   {"name_ru": "Веста",   "keyword": "Посвящение, священный огонь, сосредоточенность"},
+            "eros":    {"name_ru": "Эрос",    "keyword": "Эротическое влечение, страстное желание"},
+            "psyche":  {"name_ru": "Психея",  "keyword": "Душа, трансформация через испытания"},
+        }
+        enriched = {}
+        for name, data in available.items():
+            enriched[name] = {**data, **_ASTEROID_MEANINGS.get(name, {})}
+        return _present({
+            "date": req.date,
+            "time": req.time,
+            "lat": req.lat, "lon": req.lon,
+            "asteroids": enriched,
+            "unavailable": unavailable,
+            "note": "Numbered asteroids (Eros, Psyche) require seas_18.se1 ephemeris file." if unavailable else "",
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/natal/lilith-extended")
+def natal_lilith_extended(req: BirthData):
+    """Return all three Lilith types: Mean, True/Oscillating, Interpolated."""
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        liliths = calc_lilith_extended(natal_jd)
+        _DESCRIPTIONS = {
+            "mean":         "Средняя Лилит (Mean BML) — плавное движение ~9 лет. Карма, тень, вытесненные желания.",
+            "true":         "Истинная Лилит (Oscillating) — точное положение апогея. Более резкая, дикая энергия.",
+            "interpolated": "Интерполированная Лилит (Дитер Кох) — среднее между Mean и True. Балансирует обе.",
+        }
+        result = {}
+        for ltype, data in liliths.items():
+            result[ltype] = {**data, "description": _DESCRIPTIONS.get(ltype, "")}
+        return _present({
+            "date": req.date,
+            "time": req.time,
+            "lat": req.lat, "lon": req.lon,
+            "lilith": result,
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# NUMEROLOGY / KABBALAH
+# ═════════════════════════════════════════════════════════════════════════════
+
+class NumerologyRequest(BaseModel):
+    date:         str           # YYYY-MM-DD (birth date)
+    name:         str = ""      # Full name for Kabbalah number
+    current_year: Optional[int] = None
+    natal_chart:  Optional[dict] = None  # If provided, adds Tree of Life mapping
+
+try:
+    from astro_numerology import numerology_profile as _numerology_profile
+    _NUMEROLOGY_OK = True
+except Exception as _num_err:
+    _NUMEROLOGY_OK = False
+    _numerology_profile = None  # type: ignore
+
+@app.post("/numerology/profile")
+def numerology_profile_endpoint(req: NumerologyRequest):
+    """
+    Full numerology & Kabbalah profile:
+    Life Path, Personal Year, Tikkun (72 angels), Kabbalah Number, Tree of Life.
+    """
+    if not _NUMEROLOGY_OK:
+        raise HTTPException(status_code=503, detail="Numerology module unavailable")
+    try:
+        profile = _numerology_profile(
+            date_str=req.date,
+            name=req.name,
+            current_year=req.current_year,
+            natal_chart=req.natal_chart,
+        )
+        return _present(profile)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ═════════════════════════════════════════════════════════════════════════════

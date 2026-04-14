@@ -326,6 +326,70 @@ def lilith(JD):
     t = T(JD)
     return n360(83.3532 + 4069.0137*t - 0.01032*t*t - t*t*t/80053 + 180)
 
+def lilith_true(JD):
+    """True (Oscillating/Osculating) Black Moon Lilith via Swiss Ephemeris."""
+    if _SE_OK:
+        r = _se.calc_body(JD, "lilith_true")
+        if r is not None:
+            return r["lon"]
+    return lilith(JD)  # fallback to mean
+
+def lilith_interpolated(JD):
+    """Interpolated Lilith (Dieter Koch method): midpoint of Mean and True."""
+    m = lilith(JD)
+    t = lilith_true(JD)
+    diff = (t - m + 180) % 360 - 180
+    return n360(m + diff / 2.0)
+
+def calc_lilith_extended(JD):
+    """Return all three Lilith types with full sign/deg metadata."""
+    def _fmt(lon):
+        s_idx = int(lon / 30)
+        d_in  = lon % 30.0
+        return {
+            "lon":         round(lon, 4),
+            "sign":        SIGN_NAMES[s_idx],
+            "deg_in_sign": round(d_in, 4),
+            "deg_min":     f"{int(d_in)}°{int((d_in % 1) * 60):02d}'",
+        }
+    return {
+        "mean":         _fmt(lilith(JD)),
+        "true":         _fmt(lilith_true(JD)),
+        "interpolated": _fmt(lilith_interpolated(JD)),
+    }
+
+def calc_asteroids(JD):
+    """Return positions of Ceres, Pallas, Juno, Vesta, Eros, Psyche."""
+    result = {}
+    def _make_entry(r):
+        lon = r["lon"]
+        s_idx = int(lon / 30)
+        d_in  = lon % 30.0
+        return {
+            "lon":         round(lon, 4),
+            "sign":        SIGN_NAMES[s_idx],
+            "deg_in_sign": round(d_in, 4),
+            "deg_min":     f"{int(d_in)}°{int((d_in % 1) * 60):02d}'",
+            "retrograde":  r.get("retrograde", False),
+            "speed":       round(r.get("speed", 0), 4),
+        }
+    for name in ("ceres", "pallas", "juno", "vesta"):
+        if _SE_OK:
+            r = _se.calc_body(JD, name)
+            if r is not None:
+                result[name] = _make_entry(r)
+                continue
+        result[name] = None
+    # Numbered asteroids
+    for aname, anum in (("eros", 433), ("psyche", 16)):
+        if _SE_OK:
+            r = _se.calc_asteroid(JD, anum)
+            if r is not None:
+                result[aname] = _make_entry(r)
+                continue
+        result[aname] = None
+    return result
+
 PLUTO_TBL = [
     [2422324.5,99.20],[2424151.5,109.00],[2425977.5,118.50],[2427803.5,124.70],[2429629.5,130.00],
     [2431456.5,155.00],[2433282.5,177.50],[2434012.5,166.50],[2434743.5,168.20],[2435473.5,168.50],

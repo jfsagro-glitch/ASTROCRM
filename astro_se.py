@@ -113,8 +113,14 @@ def _init():
             "pluto":      _swe.PLUTO,
             "true_node":  _swe.TRUE_NODE,
             "node":       _swe.MEAN_NODE,     # Mean Node
-            "lilith":     _swe.MEAN_APOG,     # Mean Black Moon Lilith
-            "chiron":     _swe.CHIRON,
+            "lilith":       _swe.MEAN_APOG,     # Mean Black Moon Lilith
+            "lilith_true":  _swe.OSCU_APOG,     # True/Oscillating Lilith
+            "chiron":       _swe.CHIRON,
+            # Main belt asteroids
+            "ceres":        _swe.CERES,
+            "pallas":       _swe.PALLAS,
+            "juno":         _swe.JUNO,
+            "vesta":        _swe.VESTA,
         }
 
         # Try to locate existing data files
@@ -212,6 +218,45 @@ def calc_all(jd_ut: float, names: list) -> dict:
     """
     _init()
     return {n: r for n in names if (r := calc_body(jd_ut, n)) is not None}
+
+
+def calc_asteroid(jd_ut: float, asteroid_number: int) -> Optional[dict]:
+    """
+    Calculate position of a numbered asteroid by its catalog number.
+    E.g. asteroid_number=433 for Eros, 16 for Psyche.
+    Requires seas_18.se1 file.
+    Returns same dict structure as calc_body(), or None if unavailable.
+    """
+    _init()
+    if not _SWE_AVAILABLE:
+        return None
+    try:
+        body_id = _swe.AST_OFFSET + asteroid_number
+        if _use_swieph and (EPHE_DIR / "seas_18.se1").exists():
+            flags = _swe.FLG_SWIEPH | _swe.FLG_SPEED
+        else:
+            flags = _swe.FLG_MOSEPH | _swe.FLG_SPEED
+        result, _ = _swe.calc_ut(jd_ut, body_id, flags)
+        lon  = float(result[0]) % 360.0
+        lat  = float(result[1])
+        dist = float(result[2])
+        spd  = float(result[3])
+        s_idx    = int(lon / 30)
+        d_in_sign = lon % 30.0
+        deg_i    = int(d_in_sign)
+        min_i    = int((d_in_sign % 1) * 60)
+        return {
+            "lon":         round(lon, 6),
+            "lat":         round(lat, 6),
+            "dist":        round(dist, 8),
+            "speed":       round(spd, 6),
+            "retrograde":  spd < 0.0,
+            "sign":        _SIGN_NAMES[s_idx],
+            "deg_in_sign": round(d_in_sign, 6),
+            "deg_min":     f"{deg_i}°{min_i:02d}'",
+        }
+    except Exception:
+        return None
 
 
 def julday(year: int, month: int, day: int, hour: float = 0.0) -> float:

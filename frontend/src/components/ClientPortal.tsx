@@ -29,6 +29,8 @@ import HoroscopeBlock from './HoroscopeBlock';
 import DateSegmentInput from './DateSegmentInput';
 import PAReportBlock from './PAReportBlock';
 import DashboardView from './DashboardView';
+import NumerologyBlock from './NumerologyBlock';
+import AsteroidsLilithBlock from './AsteroidsLilithBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2111,7 +2113,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2214,6 +2216,8 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'analysis',        icon: BookOpen,  label: '✦ Анализ' },
     { key: 'human-design',   icon: Layers,    label: 'Human Design' },
     { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
+    { key: 'numerology',     icon: Sparkles,  label: '🔢 Нумерология' },
+    { key: 'asteroids',      icon: Star,      label: '⚳ Астероиды' },
     { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2391,6 +2395,36 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту чтобы открыть анализ HOLOS</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'numerology' && (
+            <div id="pdf-section-numerology">
+              {birth.date ? (
+                <NumerologyBlock
+                  birthData={birth}
+                  theme={theme}
+                  natalChart={natalChart ?? undefined}
+                />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату рождения для нумерологического профиля</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'asteroids' && (
+            <div id="pdf-section-asteroids">
+              {birth.date && birth.time ? (
+                <AsteroidsLilithBlock birthData={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для расчёта астероидов и Лилит</p>
                 </div>
               )}
             </div>

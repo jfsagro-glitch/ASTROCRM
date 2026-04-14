@@ -477,3 +477,126 @@ export async function getDashboard(b: BirthInput, targetDate?: string): Promise<
     target_date: targetDate ?? new Date().toISOString().slice(0, 10),
   });
 }
+
+// ── Asteroids & Lilith Extended ───────────────────────────────────────────────
+
+export interface AsteroidEntry {
+  lon: number;
+  sign: string;
+  deg_in_sign: number;
+  deg_min: string;
+  retrograde: boolean;
+  speed: number;
+  name_ru?: string;
+  keyword?: string;
+}
+
+export interface AsteroidsData {
+  date: string;
+  asteroids: Record<string, AsteroidEntry>;
+  unavailable: string[];
+  note: string;
+}
+
+export interface LilithEntry {
+  lon: number;
+  sign: string;
+  deg_in_sign: number;
+  deg_min: string;
+  description: string;
+}
+
+export interface LilithExtendedData {
+  date: string;
+  lilith: { mean: LilithEntry; true: LilithEntry; interpolated: LilithEntry };
+}
+
+export async function getAsteroids(b: BirthInput): Promise<AsteroidsData> {
+  return post('/natal/asteroids', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+  });
+}
+
+export async function getLilithExtended(b: BirthInput): Promise<LilithExtendedData> {
+  return post('/natal/lilith-extended', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+  });
+}
+
+// ── Numerology / Kabbalah ─────────────────────────────────────────────────────
+
+export interface LifePathData {
+  number: number;
+  day_reduced: number;
+  month_reduced: number;
+  year_reduced: number;
+  total_before_reduction: number;
+  is_master: boolean;
+  meaning: string;
+}
+
+export interface PersonalYearData {
+  current_year: number;
+  personal_year: number;
+  theme: string;
+  next_year: number;
+  next_theme: string;
+  '9year_cycle': Array<{ year: number; py: number; theme: string }>;
+}
+
+export interface TikkunData {
+  tikkun_number: number;
+  angel: string;
+  zodiac_lon: number;
+  sign: string;
+  degree_in_sign: number;
+  description: string;
+}
+
+export interface KabbalahData {
+  number: number;
+  raw_sum: number;
+  letters: string;
+  meaning: string;
+}
+
+export interface SephirahEntry {
+  sephirah: string;
+  number: number;
+  planet: string;
+  sign: string;
+  lon: number;
+  pillar: string;
+  theme: string;
+}
+
+export interface TreeOfLifeData {
+  active_sephiroth: Record<string, SephirahEntry>;
+  vacant_sephiroth: string[];
+  pillar_counts: { right: number; left: number; middle: number };
+  dominant_pillar: string;
+  dominant_label: string;
+  balance_comment: string;
+}
+
+export interface NumerologyProfile {
+  life_path: LifePathData;
+  personal_year: PersonalYearData;
+  tikkun: TikkunData;
+  kabbalah?: KabbalahData;
+  tree_of_life?: TreeOfLifeData;
+}
+
+export async function getNumerologyProfile(
+  b: BirthInput,
+  name = '',
+  natalChart?: object,
+): Promise<NumerologyProfile> {
+  return post('/numerology/profile', {
+    date: b.date,
+    name,
+    current_year: new Date().getFullYear(),
+    natal_chart: natalChart ?? null,
+  });
+}
+
