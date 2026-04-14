@@ -24,9 +24,8 @@ import JyotishBlock from './JyotishBlock';
 import HolosBlock from './HolosBlock';
 import SynastryForecast from './SynastryForecast';
 import SynastryInteractionEngine from './SynastryInteractionEngine';
-import PredictiveExpanded from './PredictiveExpanded';
 import InteractionRelocationEngine from './InteractionRelocationEngine';
-import AstroSummaryBlock from './AstroSummaryBlock';
+import HoroscopeBlock from './HoroscopeBlock';
 import DateSegmentInput from './DateSegmentInput';
 import PAReportBlock from './PAReportBlock';
 import {
@@ -2111,7 +2110,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'astrosummary'|'predictive'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
+  const [activeTab, setActiveTab] = useState<'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'>('natal');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2165,12 +2164,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     setIsExporting(true);
     const savedTab = activeTab;
     const titles: Record<string, string> = {
-      natal: tr.natalChart, 'human-design': `Human Design (${HD_MODE_LABELS[humanDesignMode]})`, astrosummary: 'Астросводка', predictive: tr.predictive, synastry: tr.synastry,
+      natal: tr.natalChart, 'human-design': `Human Design (${HD_MODE_LABELS[humanDesignMode]})`, horoscope: '🔮 Гороскоп', synastry: tr.synastry,
       interpretation: tr.interpretation,
     };
     try {
       await downloadTabsPDF(
-        (['natal', 'human-design', 'astrosummary', 'predictive', 'synastry', 'interpretation'] as const).map(
+        (['natal', 'human-design', 'horoscope', 'synastry', 'interpretation'] as const).map(
           k => ({ id: `pdf-section-${k}`, title: titles[k] }),
         ),
         async (id) => {
@@ -2207,8 +2206,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
   const tabs = [
     { key: 'natal',          icon: Star,      label: tr.natalChart },
-    { key: 'astrosummary',   icon: Sun,       label: 'Астросводка' },
-    { key: 'predictive',     icon: Clock,     label: tr.predictive },
+    { key: 'horoscope',      icon: Sun,       label: '🔮 Гороскоп' },
     { key: 'synastry',       icon: Heart,     label: tr.synastry },
     { key: 'navigation',     icon: Globe,     label: '🌍 Релокация' },
     { key: 'analysis',        icon: BookOpen,  label: '✦ Анализ' },
@@ -2383,21 +2381,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
           )}
 
-          {activeTab === 'predictive' && (
-            <div id="pdf-section-predictive">
-              {natalChart
-                ? <PredictiveExpanded birth={birth} theme={theme} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
-              }
-            </div>
-          )}
-
-          {activeTab === 'astrosummary' && (
-            <div id="pdf-section-astrosummary">
-              <AstroSummaryBlock theme={theme} />
+          {activeTab === 'horoscope' && (
+            <div id="pdf-section-horoscope">
+              <HoroscopeBlock birth={birth} theme={theme} />
             </div>
           )}
 
