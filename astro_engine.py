@@ -814,13 +814,57 @@ def calc_dignity(planet_name, planet_lon):
     }
     for element, (signs, day_r, night_r, part_r) in TRIPLICITIES.items():
         if sign in signs and planet_name in (day_r, night_r, part_r):
-            return 2, f"triplicity ({element})"
+            return 3, f"triplicity ({element})"
+
+    # Ptolemaic Terms (bounded rulerships within sign) — each row:
+    # (sign, [(planet, 0-based end_deg_exclusive), ...])
+    # Source: Ptolemy / Lilly standard allocation
+    _TERMS = {
+        "aries":       [("jupiter",6),("venus",14),("mercury",21),("mars",26),("saturn",30)],
+        "taurus":      [("venus",8),("mercury",15),("jupiter",22),("saturn",26),("mars",30)],
+        "gemini":      [("mercury",7),("jupiter",13),("venus",17),("mars",24),("saturn",30)],
+        "cancer":      [("mars",7),("jupiter",13),("mercury",19),("venus",26),("saturn",30)],
+        "leo":         [("jupiter",6),("venus",12),("saturn",18),("mercury",24),("mars",30)],
+        "virgo":       [("mercury",7),("venus",13),("jupiter",18),("mars",24),("saturn",30)],
+        "libra":       [("saturn",6),("mercury",14),("jupiter",21),("venus",28),("mars",30)],
+        "scorpio":     [("mars",7),("jupiter",11),("venus",19),("mercury",24),("saturn",30)],
+        "sagittarius": [("jupiter",12),("venus",17),("mercury",21),("saturn",26),("mars",30)],
+        "capricorn":   [("mercury",7),("jupiter",14),("venus",22),("saturn",26),("mars",30)],
+        "aquarius":    [("mercury",7),("venus",13),("jupiter",20),("mars",25),("saturn",30)],
+        "pisces":      [("venus",12),("jupiter",16),("mercury",19),("mars",28),("saturn",30)],
+    }
+    d = deg_in_sign(planet_lon)
+    for ruler, end in _TERMS.get(sign, []):
+        if d < end:
+            if planet_name == ruler:
+                return 2, f"term ({sign})"
+            break
+
+    # Face / Decan (Chaldean order, 10° each)
+    # Chaldean sequence from Mars: ♂☉♀☿☽♄♃ cycling across 36 decans
+    _CHALDEAN = ["mars","sun","venus","mercury","moon","saturn","jupiter"]
+    # First decan of Aries = Mars (index 0 in sequence); full list indexed by decan number
+    _FACE_RULER = [_CHALDEAN[i % 7] for i in range(36)]
+    # Decan index = sign_idx * 3 + floor(deg_in_sign / 10)
+    decan_idx = sign_idx(planet_lon) * 3 + int(d / 10)
+    if planet_name == _FACE_RULER[decan_idx % 36]:
+        return 1, f"face (decan {decan_idx % 3 + 1} of {sign})"
 
     return 0, "peregrine"
 
 def calc_dignities(planets_dict):
-    return {p: {"score": calc_dignity(p,lon)[0], "label": calc_dignity(p,lon)[1]}
-            for p,lon in planets_dict.items()}
+    result = {}
+    for p, lon in planets_dict.items():
+        score, label = calc_dignity(p, lon)
+        result[p] = {"score": score, "label": label}
+    return result
+
+
+def essential_dignity_score(planet: str, lon: float) -> int:
+    """Summed essential dignity score per Lilly: domicile+5, exalt+4,
+    triplicity+3, term+2, face+1, peregrine 0, fall-4, detriment-5."""
+    score, _ = calc_dignity(planet, lon)
+    return score
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1011,7 +1055,14 @@ def _jd_to_iso(jd: float) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def arabic_parts(planets_dict, houses_dict):
-    """Compute the seven classical Arabic Parts/Lots."""
+    """Compute the fifteen classical Arabic Parts/Lots.
+
+    Scoring system (score field) uses essential dignity of the lot's sign ruler
+    as a rough strength indicator.
+
+    Sources: Vettius Valens (Anthologiae), Paulus Alexandrinus,
+             Al-Biruni, Bonatti (Liber Astronomiae).
+    """
     asc = houses_dict.get("h1", 0)
     dsc = n360(asc + 180)
     s   = planets_dict.get("sun",  0)
@@ -1027,33 +1078,69 @@ def arabic_parts(planets_dict, houses_dict):
 
     def lot(a, b, c): return n360(a + b - c)
 
-    pof = lot(asc, m, s) if is_day else lot(asc, s, m)   # Fortune
-    pos = lot(asc, s, m) if is_day else lot(asc, m, s)   # Spirit
-    # Marriage lots — traditional variants (Bonatti / Al-Biruni)
-    # Universal (Zoller): ASC + DSC - Venus  ≡  ASC + (ASC+180°) - Venus
-    pom_universal   = lot(asc, dsc, v)
-    # Male chart — day: ASC+Venus-Saturn; night: ASC+Saturn-Venus
-    pom_male        = lot(asc, v, sa)   if is_day else lot(asc, sa, v)
-    # Female chart — day: ASC+Mars-Moon (Part of Husbands); night: ASC+Moon-Mars
-    pom_female      = lot(asc, ma, m)   if is_day else lot(asc, m, ma)
-    poc = lot(asc, me, s) if is_day else lot(asc, s, me) # Commerce / Merchants
-    pok = lot(asc, j, sa) if is_day else lot(asc, sa, j) # Kingdom / Eminence
-    pov = lot(asc, sa, s) if is_day else lot(asc, s, sa) # Nemesis / Death (simplified)
-    pob = lot(asc, ma, s) if is_day else lot(asc, s, ma) # Passion / Courage
+    # ── Core lots ────────────────────────────────────────────────────────────
+    pof = lot(asc, m, s) if is_day else lot(asc, s, m)   # Fortuna
+    pos = lot(asc, s, m) if is_day else lot(asc, m, s)   # Spirit (Daemon)
 
-    def fmt(lon): return {"lon": round(lon,4), "sign": sign_name(lon),
-                          "deg_min": f"{int(deg_in_sign(lon))}°{int((deg_in_sign(lon)%1)*60):02d}'"}
+    # ── Marriage lots — Bonatti/Al-Biruni ────────────────────────────────────
+    pom_universal   = lot(asc, dsc, v)                           # Zoller universal
+    pom_male        = lot(asc, v, sa)  if is_day else lot(asc, sa, v)
+    pom_female      = lot(asc, ma, m)  if is_day else lot(asc, m, ma)
+
+    # ── Commerce/Eminence/Courage ─────────────────────────────────────────────
+    poc = lot(asc, me, s)  if is_day else lot(asc, s, me)   # Commerce/Merchants
+    pok = lot(asc, j, sa)  if is_day else lot(asc, sa, j)   # Eminence/Kingdom
+    pov = lot(asc, sa, s)  if is_day else lot(asc, s, sa)   # Nemesis
+    pob = lot(asc, ma, s)  if is_day else lot(asc, s, ma)   # Courage/Valor
+
+    # ── NEW: Eros (Desire) — Valens: ASC + Venus - Spirit ────────────────────
+    # Simplifies to: Moon + Venus - Sun (day), Sun + Venus - Moon (night)
+    poe = lot(asc, v, pos)  # Spirit already sect-adjusted above
+
+    # ── NEW: Victory (Nike) — Paulus: ASC + Jupiter - Spirit ─────────────────
+    poni = lot(asc, j, pos)
+
+    # ── NEW: Necessity (Ananke) — Paulus: Fortune + Mercury - ASC ────────────
+    # Day = Fortune + Saturn - Mercury; Night = Fortune + Mercury - Saturn
+    pon = lot(pof, sa, me) if is_day else lot(pof, me, sa)
+
+    # ── NEW: Father — Valens: day=ASC+Sun-Saturn; night=ASC+Saturn-Sun ───────
+    pof2 = lot(asc, s, sa) if is_day else lot(asc, sa, s)
+
+    # ── NEW: Mother — Valens: day=ASC+Moon-Venus; night=ASC+Venus-Moon ───────
+    pomo = lot(asc, m, v)  if is_day else lot(asc, v, m)
+
+    # ── NEW: Exaltation (Hypsoma) ─────────────────────────────────────────────
+    # Day:   ASC + 19°Aries - Sun  (Sun's exaltation = 19°, longitude = 19°)
+    # Night: ASC + 3°Taurus - Moon (Moon's exaltation = 3°, longitude = 33°)
+    pex = lot(asc, 19.0, s)  if is_day else lot(asc, 33.0, m)
+
+    def fmt(lon):
+        return {
+            "lon":     round(lon, 4),
+            "sign":    sign_name(lon),
+            "deg_min": f"{int(deg_in_sign(lon))}°{int((deg_in_sign(lon) % 1) * 60):02d}'",
+        }
+
     return {
-        "fortune":   fmt(pof),
-        "spirit":    fmt(pos),
-        "marriage":  fmt(pom_universal),   # universal lot (Zoller): ASC + DSC - Venus
-        "marriage_male":   fmt(pom_male),  # Bonatti: day=ASC+Venus-Saturn, night=ASC+Saturn-Venus
-        "marriage_female": fmt(pom_female),# Bonatti: day=ASC+Mars-Moon, night=ASC+Moon-Mars
-        "commerce":  fmt(poc),
-        "eminence":  fmt(pok),
-        "nemesis":   fmt(pov),
-        "courage":   fmt(pob),
-        "is_day":    is_day,
+        # Classic seven
+        "fortune":          fmt(pof),
+        "spirit":           fmt(pos),
+        "marriage":         fmt(pom_universal),    # Zoller: ASC + DSC - Venus
+        "marriage_male":    fmt(pom_male),         # Bonatti: day=ASC+Venus-Saturn
+        "marriage_female":  fmt(pom_female),       # Bonatti: day=ASC+Mars-Moon
+        "commerce":         fmt(poc),
+        "eminence":         fmt(pok),
+        "nemesis":          fmt(pov),
+        "courage":          fmt(pob),
+        # Extended lots (Valens / Paulus Alexandrinus)
+        "eros":             fmt(poe),   # ASC + Venus - Spirit
+        "victory":          fmt(poni),  # ASC + Jupiter - Spirit
+        "necessity":        fmt(pon),   # day=Fortune+Saturn-Mercury
+        "father":           fmt(pof2),  # day=ASC+Sun-Saturn
+        "mother":           fmt(pomo),  # day=ASC+Moon-Venus
+        "exaltation":       fmt(pex),   # day=ASC+19°Aries-Sun
+        "is_day":           is_day,
     }
 
 
@@ -1531,7 +1618,13 @@ def calc_chart(yr, mo, dy, h, mi, sc, lat, lon_deg, utc_off,
 
     # ── Dignities ─────────────────────────────────────────────────────────────
     if include_dignities:
-        result["dignities"] = calc_dignities(planets)
+        digs = calc_dignities(planets)
+        result["dignities"] = digs
+        # Embed essential_dignity_score into each planet entry for convenience
+        for pname, d in digs.items():
+            if pname in result["planets"]:
+                result["planets"][pname]["essential_dignity_score"] = d["score"]
+                result["planets"][pname]["essential_dignity_label"] = d["label"]
 
     # ── Lunar phase ───────────────────────────────────────────────────────────
     result["lunar_phase"] = lunar_phase(jd_tt)

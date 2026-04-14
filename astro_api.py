@@ -20,7 +20,7 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
     calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
-    void_of_course_moon, calc_planets, sign_name,
+    void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
 )
 from astro_predictive import (
     secondary_progressions, solar_arc, solar_return, lunar_return,
