@@ -852,3 +852,102 @@ export async function getTreeOfLife(b: BirthInput): Promise<TreeOfLifeResult> {
     utc: b.utc ?? 0,
   });
 }
+
+// ── Compensatory Practices ────────────────────────────────────────────────────
+
+export interface CompensatoryPractice {
+  emoji: string;
+  text: string;
+  category?: string;
+}
+
+export interface CompensatoryTransit {
+  planet: string;
+  sign: string;
+  function: string;
+  tension_signal: string;
+  practices: CompensatoryPractice[] | string[];
+}
+
+export interface CompensatoryAspectPair {
+  pair: string;
+  name: string;
+  image: string;
+  tension: string;
+  context: string;
+  practices: CompensatoryPractice[] | string[];
+}
+
+export interface CompensatoryBackground {
+  key: string;
+  title: string;
+  theme: string;
+  practice: string;
+}
+
+export interface CompensatoryReport {
+  target_date: string;
+  intensity: string;
+  context: string | null;
+  opening: string;
+  background: { active: CompensatoryBackground[] };
+  sun_sign_note: {
+    sign: string;
+    strength?: string;
+    challenge?: string;
+    daily?: string;
+  };
+  active_transits: CompensatoryTransit[];
+  aspect_pairs: CompensatoryAspectPair[];
+}
+
+export async function getCompensatoryPractices(
+  birth: BirthInput,
+  targetDate?: string,
+  intensity: 'light' | 'medium' | 'deep' = 'medium',
+  context?: string,
+): Promise<CompensatoryReport> {
+  const today = new Date().toISOString().split('T')[0];
+  return post('/compensatory/practices', {
+    date: birth.date,
+    time: birth.time ?? '12:00',
+    lat: birth.lat ?? 0,
+    lon: birth.lon ?? 0,
+    utc: birth.utc ?? 0,
+    target_date: targetDate ?? today,
+    target_time: '12:00',
+    intensity,
+    context: context ?? null,
+  });
+}
+
+// ── Report Generation ─────────────────────────────────────────────────────────
+
+export async function generateReportHtml(
+  birth: BirthInput,
+  name: string,
+  depth: 'brief' | 'full' | 'professional' = 'full',
+  targetDate?: string,
+): Promise<string> {
+  const today = new Date().toISOString().split('T')[0];
+  const res = await fetch(`${API_URL}/report/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      date: birth.date,
+      time: birth.time ?? '12:00',
+      lat: birth.lat ?? 0,
+      lon: birth.lon ?? 0,
+      utc: birth.utc ?? 0,
+      name,
+      depth,
+      format: 'html',
+      target_date: targetDate ?? today,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.text();
+}

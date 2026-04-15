@@ -46,6 +46,8 @@ import { FixedStarsBlock } from './FixedStarsBlock';
 import SaturnCycleBlock from './SaturnCycleBlock';
 import { HeliocentricBlock } from './HeliocentricBlock';
 import { KabbalahTreeBlock } from './KabbalahTreeBlock';
+import { CompensatoryPracticesCard } from './CompensatoryPracticesCard';
+import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2133,7 +2135,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'compensatory'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2182,6 +2184,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [birth, tr]);
+
+  const { exporting: reportExporting, exportFullReport } = usePdfExport();
+
+  const handleFullReport = useCallback(async (depth: 'brief' | 'full' | 'professional' = 'full') => {
+    await exportFullReport(birth, birth.name || 'Клиент', depth);
+  }, [exportFullReport, birth]);
 
   const handleExportAll = useCallback(async () => {
     setIsExporting(true);
@@ -2252,6 +2260,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'fixed-stars',         icon: Star,      label: '✦ Неп. звёзды' },
     { key: 'heliocentric',        icon: Globe,     label: '☉ Гелиоцентр.' },
     { key: 'kabbalah-tree',       icon: Sparkles,  label: '✡ Древо Жизни' },
+    { key: 'compensatory',        icon: Sparkles,  label: '🌿 Компенсация' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2325,6 +2334,14 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {isExporting
                 ? <><Spin /><span>{tr.exportPdf}…</span></>
                 : <><Download className="h-4 w-4 inline mr-1.5" /><span>{tr.exportPdf}</span></>}
+            </button>
+          )}
+          {birth.date && (
+            <button onClick={() => handleFullReport('full')} disabled={reportExporting}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50`}>
+              {reportExporting
+                ? <><Spin /><span>Генерация…</span></>
+                : <><Download className="h-4 w-4 inline mr-1.5" /><span>Полный отчёт PDF</span></>}
             </button>
           )}
           {activeTab === 'human-design' && (
@@ -2523,6 +2540,21 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <h2 className={`text-base font-bold font-serif ${theme.header}`}>Древо Жизни (Каббала)</h2>
                 </div>
                 <KabbalahTreeBlock birthData={birth} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'compensatory' && (
+            <div id="pdf-section-compensatory">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">🌿</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Компенсаторные практики</h2>
+                  <span className={`text-xs ${theme.text} opacity-50 ml-auto`}>
+                    Три слоя: фон · транзиты · аспекты
+                  </span>
+                </div>
+                <CompensatoryPracticesCard birthData={birth} />
               </div>
             </div>
           )}
