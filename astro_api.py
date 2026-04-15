@@ -29,6 +29,7 @@ from astro_predictive import (
     profections, firdaria, transits, tertiary_progressions, converse_progressions,
     ingress_chart, find_eclipses, find_stations, prenatal_syzygy,
     transit_exact_dates, ephemerides_table, astro_summary, rectify_birth_time,
+    zodiacal_releasing, primary_directions,
 )
 from astro_synastry import (
     synastry_aspects, composite_chart, davison_chart, synastry_score,
@@ -2944,6 +2945,356 @@ def natal_sidereal(req: SiderealRequest):
 def sidereal_systems():
     """List all available ayanamsa systems."""
     return {"systems": list_ayanamsa_systems()}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ZODIACAL RELEASING
+# ═════════════════════════════════════════════════════════════════════════════
+
+class ZodiacalReleasingRequest(BaseModel):
+    date:    str
+    time:    str
+    lat:     float
+    lon:     float
+    utc:     float
+    target_date:   str
+    lot:           str = "fortune"   # "fortune" | "spirit"
+    houses:        str = "placidus"
+    lookahead_years: int = 10
+
+@app.post("/predictive/zodiacal-releasing")
+def zodiacal_releasing_endpoint(req: ZodiacalReleasingRequest):
+    """
+    Zodiacal Releasing (Vettius Valens) — major and sub-periods from Lot of Fortune or Spirit.
+    Identifies current period, upcoming periods, and Loosing of the Bond dates.
+    """
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        result = zodiacal_releasing(
+            natal_jd, req.target_date, req.lat, req.lon,
+            lot=req.lot, houses_system=req.houses,
+            lookahead_years=req.lookahead_years,
+        )
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRIMARY DIRECTIONS
+# ═════════════════════════════════════════════════════════════════════════════
+
+class PrimaryDirectionsRequest(BaseModel):
+    date:    str
+    time:    str
+    lat:     float
+    lon:     float
+    utc:     float
+    target_date: str
+    houses:  str = "placidus"
+    key:     str = "naibod"   # "ptolemy" | "naibod"
+    orb:     float = 1.5
+
+@app.post("/predictive/primary-directions")
+def primary_directions_endpoint(req: PrimaryDirectionsRequest):
+    """
+    Primary Directions (Ptolemy/Placidus semi-arc method).
+    Naibod key: 0.9856° RA per year. Ptolemy key: 1° RA per year.
+    Returns directed planets and aspects to natal points within orb.
+    """
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        result = primary_directions(
+            natal_jd, req.lat, req.lon, req.target_date,
+            houses_system=req.houses, key=req.key, orb=req.orb,
+        )
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PROBABILITY MODEL (Seth/Monroe/Castaneda)
+# ═════════════════════════════════════════════════════════════════════════════
+
+try:
+    from astro_probability import probability_tree as _probability_tree, assembly_point_index as _api_index
+    _PROBABILITY_OK = True
+except Exception as _prob_err:
+    _PROBABILITY_OK = False
+    _probability_tree = None  # type: ignore
+    _api_index = None          # type: ignore
+
+class ProbabilityRequest(BaseModel):
+    date:        str
+    time:        str
+    lat:         float
+    lon:         float
+    utc:         float
+    target_date: str
+    context:     str = ""
+
+@app.post("/predictive/probability-tree")
+def probability_tree_endpoint(req: ProbabilityRequest):
+    """
+    Seth-style probability tree for all active transits.
+    Calculates Assembly Point Index (Tonal/Nagual balance),
+    probability branches per transit, dominant life spheres, recommendations.
+    """
+    if not _PROBABILITY_OK:
+        raise HTTPException(status_code=503, detail="Probability module unavailable")
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        natal_chart = calc_chart(
+            *[int(x) for x in req.date.split("-")],
+            *[int(x) for x in req.time.replace(":", " ").split()[:2]], 0,
+            req.lat, req.lon, req.utc,
+            include_aspects=False, include_patterns=False,
+            include_dignities=True, include_arabic=False,
+        )
+        # Get active transits
+        transit_data = transits(
+            natal_jd, req.target_date, lat=req.lat, lon=req.lon,
+            transit_orb_major=3.0, transit_orb_minor=2.0,
+        )
+        transit_aspects = transit_data.get("transit_aspects", [])
+        result = _probability_tree(natal_chart, transit_aspects,
+                                   target_date=req.target_date, context=req.context)
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# REPORT GENERATOR (HTML/PDF)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class ReportRequest(BaseModel):
+    date:        str
+    time:        str
+    lat:         float
+    lon:         float
+    utc:         float
+    name:        str = ""
+    target_date: Optional[str] = None
+    depth:       str = "full"   # "brief" | "full" | "professional"
+    format:      str = "html"   # "html" | "json"
+    include: list = []  # ["natal","transits","firdaria","profections","numerology","probability"]
+
+@app.post("/report/generate")
+def generate_report(req: ReportRequest):
+    """
+    Generate a comprehensive astrological report.
+    Aggregates: natal chart, transits, firdaria, profections, numerology, probability tree.
+    Returns HTML (printable as PDF via browser) or JSON.
+    """
+    try:
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        yr, mo, dy = [int(x) for x in req.date.split("-")]
+        h, mi = [int(x) for x in req.time.split(":")[:2]]
+        target = req.target_date or __import__('datetime').date.today().isoformat()
+
+        report_data: dict = {
+            "name": req.name or "Без имени",
+            "birth_date": req.date,
+            "birth_time": req.time,
+            "target_date": target,
+            "depth": req.depth,
+        }
+
+        # Sections based on depth
+        sections = req.include or (
+            ["natal", "transits"]                      if req.depth == "brief" else
+            ["natal", "transits", "firdaria", "profections", "numerology"]  if req.depth == "full" else
+            ["natal", "transits", "firdaria", "profections", "numerology", "solar-arc", "probability"]
+        )
+
+        # Natal chart
+        if "natal" in sections:
+            chart = calc_chart(yr, mo, dy, h, mi, 0, req.lat, req.lon, req.utc,
+                               include_aspects=True, include_patterns=True,
+                               include_dignities=True, include_arabic=True)
+            report_data["natal"] = chart
+
+        # Transits
+        if "transits" in sections:
+            report_data["transits"] = transits(
+                natal_jd, target, lat=req.lat, lon=req.lon,
+                transit_orb_major=2.0, transit_orb_minor=1.0,
+            )
+
+        # Firdaria
+        if "firdaria" in sections:
+            report_data["firdaria"] = firdaria(natal_jd, target)
+
+        # Profections
+        if "profections" in sections:
+            report_data["profections"] = profections(natal_jd, target, lat=req.lat, lon=req.lon)
+
+        # Solar arc
+        if "solar-arc" in sections:
+            report_data["solar_arc"] = solar_arc(natal_jd, req.lat, req.lon, target)
+
+        # Numerology
+        if "numerology" in sections and _NUMEROLOGY_OK:
+            from astro_numerology import numerology_profile as _np
+            report_data["numerology"] = _np(req.date, req.name, int(target[:4]),
+                                            report_data.get("natal"))
+
+        # Probability tree
+        if "probability" in sections and _PROBABILITY_OK:
+            natal_for_prob = report_data.get("natal") or {}
+            transit_aspects = report_data.get("transits", {}).get("transit_aspects", [])
+            report_data["probability"] = _probability_tree(natal_for_prob, transit_aspects, target)
+
+        if req.format == "json":
+            return _present(report_data)
+
+        # Build HTML report
+        html = _build_html_report(report_data, req.depth)
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html, status_code=200)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _build_html_report(data: dict, depth: str) -> str:
+    """Build a printable HTML report from aggregated report data."""
+    name         = data.get("name", "")
+    birth_date   = data.get("birth_date", "")
+    target_date  = data.get("target_date", "")
+    natal        = data.get("natal", {})
+    transits_d   = data.get("transits", {})
+    firdaria_d   = data.get("firdaria", {})
+    profections_d= data.get("profections", {})
+    numerology   = data.get("numerology", {})
+    probability  = data.get("probability", {})
+
+    _SIGN_GLYPHS = {'aries':'♈','taurus':'♉','gemini':'♊','cancer':'♋','leo':'♌','virgo':'♍',
+                    'libra':'♎','scorpio':'♏','sagittarius':'♐','capricorn':'♑','aquarius':'♒','pisces':'♓'}
+    _PLANET_GLYPHS = {'sun':'☉','moon':'☽','mercury':'☿','venus':'♀','mars':'♂',
+                      'jupiter':'♃','saturn':'♄','uranus':'♅','neptune':'♆','pluto':'♇',
+                      'node':'☊','lilith':'⚸','chiron':'⚷'}
+    _PLANET_RU = {'sun':'Солнце','moon':'Луна','mercury':'Меркурий','venus':'Венера',
+                  'mars':'Марс','jupiter':'Юпитер','saturn':'Сатурн','uranus':'Уран',
+                  'neptune':'Нептун','pluto':'Плутон','node':'Сев. Узел',
+                  'lilith':'Лилит','chiron':'Хирон'}
+    _SIGN_RU = {'aries':'Овен','taurus':'Телец','gemini':'Близнецы','cancer':'Рак',
+                'leo':'Лев','virgo':'Дева','libra':'Весы','scorpio':'Скорпион',
+                'sagittarius':'Стрелец','capricorn':'Козерог','aquarius':'Водолей','pisces':'Рыбы'}
+
+    def _planet_row(pname, pdata):
+        sign = pdata.get('sign','')
+        dm   = pdata.get('deg_min','')
+        ret  = '℞' if pdata.get('retrograde') else ''
+        g    = _PLANET_GLYPHS.get(pname,'●')
+        sg   = _SIGN_GLYPHS.get(sign,'')
+        pru  = _PLANET_RU.get(pname, pname)
+        sru  = _SIGN_RU.get(sign, sign)
+        return f"<tr><td>{g} {pru}</td><td>{sg} {sru} {dm} {ret}</td></tr>"
+
+    # Planets table
+    planets_html = ""
+    for pname, pdata in natal.get("planets", {}).items():
+        planets_html += _planet_row(pname, pdata)
+
+    # Transits list
+    transits_html = ""
+    for asp in (transits_d.get("transit_aspects") or [])[:15]:
+        tp  = asp.get("transiting_planet","")
+        np  = asp.get("natal_planet","")
+        a   = asp.get("aspect","")
+        o   = asp.get("orb",0)
+        tg  = _PLANET_GLYPHS.get(tp,'')
+        ng  = _PLANET_GLYPHS.get(np,'')
+        transits_html += f"<tr><td>{tg} {_PLANET_RU.get(tp,tp)}</td><td>{a}</td><td>{ng} {_PLANET_RU.get(np,np)}</td><td>{o:.2f}°</td></tr>"
+
+    # Firdaria
+    firdaria_html = ""
+    if firdaria_d:
+        cp = firdaria_d.get("current_period",{})
+        cs = firdaria_d.get("current_sub",{})
+        pg = _PLANET_GLYPHS.get(cp.get("planet",""),'')
+        sg = _PLANET_GLYPHS.get(cs.get("planet",""),'')
+        firdaria_html = f"""
+        <p><strong>Текущий период:</strong> {pg} {_PLANET_RU.get(cp.get('planet',''), cp.get('planet',''))}</p>
+        <p><strong>Субпериод:</strong> {sg} {_PLANET_RU.get(cs.get('planet',''), cs.get('planet',''))}</p>
+        """
+
+    # Numerology
+    num_html = ""
+    if numerology:
+        lp = numerology.get("life_path", {})
+        py = numerology.get("personal_year", {})
+        tk = numerology.get("tikkun", {})
+        num_html = f"""
+        <p>Путь Жизни: <strong>{lp.get('number','')}</strong> — {lp.get('meaning','')}</p>
+        <p>Личный год {py.get('current_year','')}: <strong>{py.get('personal_year','')}</strong> — {py.get('theme','')}</p>
+        <p>Тиккун #{tk.get('tikkun_number','')} — Ангел {tk.get('angel','')}</p>
+        """
+
+    # Probability
+    prob_html = ""
+    if probability:
+        api_d = probability.get("assembly_point",{})
+        prob_html = f"""
+        <p><strong>Индекс точки сборки:</strong> {api_d.get('zone','')} ({api_d.get('index',0):+.2f})</p>
+        <p>{api_d.get('zone_description','')}</p>
+        <p><strong>Рекомендация:</strong> {api_d.get('recommendation','')}</p>
+        <p>{probability.get('summary','')}</p>
+        """
+
+    depth_label = {"brief": "Краткий", "full": "Полный", "professional": "Профессиональный"}.get(depth, depth)
+
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroCRM — {depth_label} отчёт {name}</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: 'Georgia', serif; background: #0a0a1a; color: #e8d5a3; padding: 2rem; }}
+  .report {{ max-width: 900px; margin: 0 auto; }}
+  h1 {{ font-size: 2rem; color: #ffd700; border-bottom: 1px solid #ffd70040; padding-bottom: 0.5rem; margin-bottom: 1.5rem; }}
+  h2 {{ font-size: 1.2rem; color: #d4af37; margin: 1.5rem 0 0.75rem; border-left: 3px solid #d4af37; padding-left: 0.75rem; }}
+  .meta {{ color: #b8a070; font-size: 0.9rem; margin-bottom: 2rem; }}
+  table {{ width: 100%; border-collapse: collapse; margin-bottom: 1rem; }}
+  th {{ background: #1a1a3a; color: #ffd700; padding: 0.5rem 0.75rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; }}
+  td {{ padding: 0.5rem 0.75rem; border-bottom: 1px solid #ffffff15; font-size: 0.9rem; }}
+  tr:hover td {{ background: #ffffff08; }}
+  .section {{ background: #0f0f2a; border: 1px solid #ffd70020; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; }}
+  p {{ line-height: 1.6; margin-bottom: 0.5rem; }}
+  @media print {{ body {{ background: white; color: black; }} table {{ border: 1px solid #ccc; }} }}
+</style>
+</head>
+<body>
+<div class="report">
+  <h1>✦ AstroCRM — {depth_label} Астрологический Отчёт</h1>
+  <div class="meta">
+    <p>Имя: <strong>{name}</strong></p>
+    <p>Дата рождения: <strong>{birth_date}</strong></p>
+    <p>Дата анализа: <strong>{target_date}</strong></p>
+    <p>Глубина: {depth_label}</p>
+  </div>
+
+  {'<div class="section"><h2>☽ Натальная Карта</h2><table><tr><th>Планета</th><th>Позиция</th></tr>' + planets_html + '</table></div>' if planets_html else ''}
+
+  {'<div class="section"><h2>⟳ Транзиты</h2><table><tr><th>Транзит</th><th>Аспект</th><th>Натальная</th><th>Орб</th></tr>' + transits_html + '</table></div>' if transits_html else ''}
+
+  {'<div class="section"><h2>⏳ Фирдарии</h2>' + firdaria_html + '</div>' if firdaria_html else ''}
+
+  {'<div class="section"><h2>🔢 Нумерология & Каббала</h2>' + num_html + '</div>' if num_html else ''}
+
+  {'<div class="section"><h2>🌀 Матрица Вероятностей (по Сету)</h2>' + prob_html + '</div>' if prob_html else ''}
+
+  <div class="meta" style="margin-top: 2rem; font-size: 0.75rem; color: #7a6a4a;">
+    Отчёт сгенерирован AstroCRM · {target_date}
+  </div>
+</div>
+</body>
+</html>"""
 
 
 # ═════════════════════════════════════════════════════════════════════════════

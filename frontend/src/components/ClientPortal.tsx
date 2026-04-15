@@ -33,6 +33,9 @@ import NumerologyBlock from './NumerologyBlock';
 import AsteroidsLilithBlock from './AsteroidsLilithBlock';
 import PlanetaryHoursBlock from './PlanetaryHoursBlock';
 import SiderealBlock from './SiderealBlock';
+import ZodiacalReleasingBlock from './ZodiacalReleasingBlock';
+import PrimaryDirectionsBlock from './PrimaryDirectionsBlock';
+import ProbabilityTreeBlock from './ProbabilityTreeBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2115,7 +2118,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2221,8 +2224,11 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'numerology',     icon: Sparkles,  label: '🔢 Нумерология' },
     { key: 'asteroids',      icon: Star,      label: '⚳ Астероиды' },
     { key: 'planetary-hours', icon: Clock,    label: '⏱ Планет.часы' },
-    { key: 'sidereal',       icon: Globe,     label: '🌐 Сидерич.' },
-    { key: 'holos',          icon: Sparkles,  label: '✦ HOLOS' },
+    { key: 'sidereal',            icon: Globe,     label: '🌐 Сидерич.' },
+    { key: 'zodiacal-releasing',  icon: Clock,     label: '⏳ Зод.Высв.' },
+    { key: 'primary-directions',  icon: Star,      label: '✦ Примарные' },
+    { key: 'probability',         icon: Sparkles,  label: '🌀 Вероятн.' },
+    { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
   return (
@@ -2451,6 +2457,63 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>Введите данные рождения для сидерической карты</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'zodiacal-releasing' && (
+            <div id="pdf-section-zodiacal-releasing">
+              {birth.date && birth.time ? (
+                <ZodiacalReleasingBlock
+                  birthDate={birth.date}
+                  birthTime={birth.time}
+                  lat={birth.lat ?? 0}
+                  lon={birth.lon ?? 0}
+                  utc={birth.utc ?? 0}
+                />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Зодиакального Высвобождения</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'primary-directions' && (
+            <div id="pdf-section-primary-directions">
+              {birth.date && birth.time ? (
+                <PrimaryDirectionsBlock
+                  birthDate={birth.date}
+                  birthTime={birth.time}
+                  lat={birth.lat ?? 0}
+                  lon={birth.lon ?? 0}
+                  utc={birth.utc ?? 0}
+                />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Примарных Дирекций</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'probability' && (
+            <div id="pdf-section-probability">
+              {birth.date && birth.time ? (
+                <ProbabilityTreeBlock
+                  birthDate={birth.date}
+                  birthTime={birth.time}
+                  lat={birth.lat ?? 0}
+                  lon={birth.lon ?? 0}
+                  utc={birth.utc ?? 0}
+                />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Матрицы Вероятностей</p>
                 </div>
               )}
             </div>

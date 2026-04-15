@@ -1723,6 +1723,402 @@ def ingress_chart(year, sign_name_or_lon, lat, lon_geo, houses_system='placidus'
     return chart
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ZODIACAL RELEASING (Vettius Valens)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Planetary years assigned to each sign (Valens, Anthologiae)
+_ZR_SIGN_YEARS = {
+    "aries": 15, "taurus": 8, "gemini": 20, "cancer": 25, "leo": 19,
+    "virgo": 20, "libra": 8, "scorpio": 15, "sagittarius": 12,
+    "capricorn": 27, "aquarius": 30, "pisces": 12,
+}
+_SIGN_INDEX = {s: i for i, s in enumerate(SIGN_NAMES)}
+_SIGN_YEARS_BY_IDX = [_ZR_SIGN_YEARS[s] for s in SIGN_NAMES]
+
+
+def _zr_periods(start_lon: float, start_jd: float) -> list:
+    """
+    Generate Zodiacal Releasing major periods from a lot longitude.
+    Returns list of {sign, start_jd, end_jd, years, level} dicts.
+    """
+    periods = []
+    jd_cursor = start_jd
+    sign_idx  = int(start_lon / 30) % 12
+
+    for _ in range(144):  # ~12 cycles × 12 signs
+        sign      = SIGN_NAMES[sign_idx]
+        dur_years = _SIGN_YEARS_BY_IDX[sign_idx]
+        dur_days  = dur_years * 365.25
+        end_jd    = jd_cursor + dur_days
+
+        # Sub-periods: each major year distributed across 12 signs starting from same sign
+        sub_cursor = jd_cursor
+        sub_sign_idx = sign_idx
+        subs = []
+        for _ in range(12):
+            sub_sign  = SIGN_NAMES[sub_sign_idx]
+            sub_years = _SIGN_YEARS_BY_IDX[sub_sign_idx]
+            sub_frac  = sub_years / 129.0  # Valens: 12 signs total = 129 years for full cycle; here proportional
+            sub_dur   = dur_days * (sub_years / sum(_SIGN_YEARS_BY_IDX))
+            sub_end   = sub_cursor + sub_dur
+            subs.append({
+                "sign":      sub_sign,
+                "start_jd":  round(sub_cursor, 2),
+                "end_jd":    round(sub_end, 2),
+                "years":     round(sub_dur / 365.25, 2),
+            })
+            sub_cursor = sub_end
+            sub_sign_idx = (sub_sign_idx + 1) % 12
+
+        periods.append({
+            "sign":      sign,
+            "years":     dur_years,
+            "start_jd":  round(jd_cursor, 2),
+            "end_jd":    round(end_jd, 2),
+            "sub_periods": subs,
+        })
+        jd_cursor = end_jd
+        sign_idx  = (sign_idx + 1) % 12
+
+    return periods
+
+
+def _jd_to_iso(jd_val: float) -> str:
+    """Convert Julian Day to ISO date string."""
+    import calendar
+    # Meeus algorithm
+    z = int(jd_val + 0.5)
+    f = (jd_val + 0.5) - z
+    if z < 2299161:
+        a = z
+    else:
+        alpha = int((z - 1867216.25) / 36524.25)
+        a = z + 1 + alpha - alpha // 4
+    b = a + 1524
+    c = int((b - 122.1) / 365.25)
+    d = int(365.25 * c)
+    e = int((b - d) / 30.6001)
+    day = b - d - int(30.6001 * e)
+    month = e - 1 if e < 14 else e - 13
+    year = c - 4716 if month > 2 else c - 4715
+    return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def zodiacal_releasing(
+    natal_jd_utc: float,
+    target_date_str: str,
+    lat: float = 0,
+    lon: float = 0,
+    lot: str = "fortune",        # "fortune" | "spirit"
+    houses_system: str = "placidus",
+    lookahead_years: int = 10,
+) -> dict:
+    """
+    Zodiacal Releasing (Vettius Valens, Anthologiae).
+
+    Generates major and sub periods from the Lot of Fortune (circumstances)
+    or Lot of Spirit (career/will), identifying active periods and
+    'Loosing of the Bond' (peak transformation moments).
+
+    Returns:
+        lot_used, lot_lon, lot_sign, current_period, current_sub_period,
+        upcoming_periods, loosing_of_bond_dates, all_periods (first 48)
+    """
+    from datetime import date as _date
+
+    # Build natal chart to get lots
+    try:
+        yr, mo, dy = [int(x) for x in _jd_to_iso(natal_jd_utc).split("-")]
+    except Exception:
+        yr, mo, dy = 1990, 1, 1
+
+    # Compute approximate birth time from JD
+    frac = (natal_jd_utc + 0.5) % 1.0
+    h  = int(frac * 24)
+    mi = int((frac * 24 % 1) * 60)
+
+    natal_chart = calc_chart(yr, mo, dy, h, mi, 0, lat, lon, 0,
+                              houses_system=houses_system,
+                              include_aspects=False, include_patterns=False,
+                              include_dignities=False, include_arabic=True)
+
+    parts = natal_chart.get("arabic_parts", {})
+    lot_data = parts.get(lot) or parts.get("fortune", {})
+    lot_lon  = lot_data.get("lon", 0) if isinstance(lot_data, dict) else 0
+
+    # Parse target date
+    try:
+        tyr, tmo, tdy = [int(x) for x in target_date_str.split("-")]
+    except ValueError:
+        from datetime import date as _d
+        today = _d.today()
+        tyr, tmo, tdy = today.year, today.month, today.day
+    target_jd = jd(tyr, tmo, tdy, 12, 0, 0)
+
+    # Generate all periods from birth
+    all_periods = _zr_periods(lot_lon, natal_jd_utc)
+
+    # Find current period & sub-period
+    current_period = None
+    current_sub    = None
+    for p in all_periods:
+        if p["start_jd"] <= target_jd < p["end_jd"]:
+            current_period = p
+            for sp in p["sub_periods"]:
+                if sp["start_jd"] <= target_jd < sp["end_jd"]:
+                    current_sub = sp
+                    break
+            break
+
+    # Upcoming periods (next 10 years)
+    lookahead_jd = target_jd + lookahead_years * 365.25
+    upcoming = []
+    for p in all_periods:
+        if p["start_jd"] > target_jd and p["start_jd"] < lookahead_jd:
+            upcoming.append({**p, "start_date": _jd_to_iso(p["start_jd"]),
+                              "end_date": _jd_to_iso(p["end_jd"])})
+
+    # Loosing of the Bond: sign changes from Cardinal/Fixed to Mutable (Valens)
+    # These are peaks of intensity; specifically sign changes TO the 8th/10th from lot
+    lob_signs   = {"aries", "cancer", "libra", "capricorn"}  # cardinal = peak activity
+    lob_dates   = []
+    for p in all_periods:
+        if p["sign"] in lob_signs and p["start_jd"] >= target_jd:
+            lob_dates.append({
+                "date": _jd_to_iso(p["start_jd"]),
+                "sign": p["sign"],
+                "years": p["years"],
+                "note":  "Loosing of the Bond — начало пикового периода",
+            })
+            if len(lob_dates) >= 5:
+                break
+
+    # Enrich current period with dates
+    if current_period:
+        current_period = {
+            **current_period,
+            "start_date": _jd_to_iso(current_period["start_jd"]),
+            "end_date":   _jd_to_iso(current_period["end_jd"]),
+        }
+    if current_sub:
+        current_sub = {
+            **current_sub,
+            "start_date": _jd_to_iso(current_sub["start_jd"]),
+            "end_date":   _jd_to_iso(current_sub["end_jd"]),
+        }
+
+    # Interpretation of sign types
+    _SIGN_TYPE = {
+        "aries": "кардинальный", "cancer": "кардинальный",
+        "libra": "кардинальный", "capricorn": "кардинальный",
+        "taurus": "фиксированный", "leo": "фиксированный",
+        "scorpio": "фиксированный", "aquarius": "фиксированный",
+        "gemini": "мутабельный", "virgo": "мутабельный",
+        "sagittarius": "мутабельный", "pisces": "мутабельный",
+    }
+    _SIGN_RU = {
+        "aries": "Овен", "taurus": "Телец", "gemini": "Близнецы", "cancer": "Рак",
+        "leo": "Лев", "virgo": "Дева", "libra": "Весы", "scorpio": "Скорпион",
+        "sagittarius": "Стрелец", "capricorn": "Козерог", "aquarius": "Водолей", "pisces": "Рыбы",
+    }
+
+    def _enrich_period(p):
+        if p is None:
+            return None
+        s = p.get("sign", "")
+        return {**p, "sign_ru": _SIGN_RU.get(s, s), "sign_type": _SIGN_TYPE.get(s, "")}
+
+    return {
+        "lot_used":          lot,
+        "lot_lon":           round(lot_lon, 4),
+        "lot_sign":          SIGN_NAMES[int(lot_lon / 30) % 12] if lot_lon else "",
+        "target_date":       target_date_str,
+        "current_period":    _enrich_period(current_period),
+        "current_sub_period":_enrich_period(current_sub),
+        "upcoming_periods":  [_enrich_period({**p, "sign_ru": _SIGN_RU.get(p["sign"],""), "sign_type": _SIGN_TYPE.get(p["sign"],"")}) for p in upcoming],
+        "loosing_of_bond":   lob_dates,
+        "all_periods":       [
+            {**p, "start_date": _jd_to_iso(p["start_jd"]), "end_date": _jd_to_iso(p["end_jd"]),
+             "sign_ru": _SIGN_RU.get(p["sign"],""), "sign_type": _SIGN_TYPE.get(p["sign"],""),
+             "sub_periods": [{**sp, "start_date": _jd_to_iso(sp["start_jd"]), "end_date": _jd_to_iso(sp["end_jd"])} for sp in p["sub_periods"]]}
+            for p in all_periods[:48]
+        ],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PRIMARY DIRECTIONS (Ptolemy)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _oblique_ascension(lon: float, lat_deg: float, eps_deg: float = 23.4367) -> float:
+    """
+    Calculate oblique ascension of an ecliptic point.
+    lon: ecliptic longitude (degrees)
+    lat_deg: geographic latitude (degrees)
+    eps_deg: obliquity of the ecliptic (degrees)
+    """
+    eps = math.radians(eps_deg)
+    lat = math.radians(lat_deg)
+    l   = math.radians(lon)
+
+    # Right ascension
+    ra = math.atan2(math.sin(l) * math.cos(eps), math.cos(l))
+
+    # Declination
+    sin_dec = math.sin(eps) * math.sin(l)
+    dec = math.asin(max(-1.0, min(1.0, sin_dec)))
+
+    # Ascensional difference (AD)
+    tan_lat_tan_dec = math.tan(lat) * math.tan(dec)
+    if abs(tan_lat_tan_dec) > 1:
+        ad = 0.0
+    else:
+        ad = math.asin(max(-1.0, min(1.0, tan_lat_tan_dec)))
+
+    oa = math.degrees(ra - ad) % 360
+    return oa, math.degrees(dec)
+
+
+def _semi_arc(dec_deg: float, lat_deg: float, is_day: bool) -> float:
+    """
+    Semi-arc (diurnal or nocturnal) of a point with given declination.
+    Returns semi-arc in degrees of RA.
+    """
+    lat = math.radians(lat_deg)
+    dec = math.radians(dec_deg)
+    cos_ha = -math.tan(lat) * math.tan(dec)
+    if abs(cos_ha) > 1:
+        return 180.0 if cos_ha < 0 else 0.0
+    ha = math.degrees(math.acos(cos_ha))
+    return ha if is_day else (180 - ha)
+
+
+def primary_directions(
+    natal_jd_utc: float,
+    lat: float,
+    lon: float,
+    target_date_str: str,
+    houses_system: str = "placidus",
+    key: str = "naibod",   # "ptolemy" | "naibod"
+    orb: float = 1.5,
+) -> dict:
+    """
+    Primary Directions by Ptolemy (Placidus semi-arc method).
+
+    Each degree of the equator's rotation = 1 year of life (Ptolemy key)
+    or 0.9856° RA = 1 year (Naibod key, more accurate).
+
+    Returns directed planets/angles and aspects to natal points within orb.
+    """
+    from datetime import date as _date
+
+    # Birth date from JD
+    iso = _jd_to_iso(natal_jd_utc)
+    yr, mo, dy = [int(x) for x in iso.split("-")]
+    frac = (natal_jd_utc + 0.5) % 1.0
+    h  = int(frac * 24)
+    mi = int((frac * 24 % 1) * 60)
+
+    # Target JD and age in years
+    try:
+        tyr, tmo, tdy = [int(x) for x in target_date_str.split("-")]
+    except ValueError:
+        today = _date.today()
+        tyr, tmo, tdy = today.year, today.month, today.day
+
+    target_jd = jd(tyr, tmo, tdy, 12, 0, 0)
+    age_years  = (target_jd - natal_jd_utc) / 365.25
+
+    # Arc per year
+    arc_per_year = 0.9856 if key == "naibod" else 1.0
+    total_arc    = age_years * arc_per_year
+
+    # Natal chart
+    chart = calc_chart(yr, mo, dy, h, mi, 0, lat, lon, 0,
+                       houses_system=houses_system,
+                       include_aspects=False, include_patterns=False,
+                       include_dignities=False, include_arabic=False)
+
+    natal_planets = chart.get("planets", {})
+    natal_houses  = chart.get("houses", {})
+
+    # Ecliptic obliquity (mean, simplified)
+    eps_deg = 23.4367 - 0.013004 * ((natal_jd_utc - 2451545.0) / 36525)
+
+    # For each natal planet, compute its OA and apply arc
+    directed = {}
+    for pname, pdata in natal_planets.items():
+        n_lon = float(pdata.get("longitude") or pdata.get("lon") or 0)
+        oa, dec = _oblique_ascension(n_lon, lat, eps_deg)
+        directed_oa = (oa + total_arc) % 360
+        # Convert directed OA back to approximate ecliptic lon
+        # (simplified: add arc directly to ecliptic lon)
+        directed_lon = (n_lon + total_arc) % 360
+        s_idx  = int(directed_lon / 30)
+        d_in   = directed_lon % 30.0
+        directed[pname] = {
+            "natal_lon":    round(n_lon, 4),
+            "directed_lon": round(directed_lon, 4),
+            "natal_oa":     round(oa, 4),
+            "directed_oa":  round(directed_oa, 4),
+            "sign":         SIGN_NAMES[s_idx],
+            "deg_min":      f"{int(d_in)}°{int((d_in%1)*60):02d}'",
+            "arc_applied":  round(total_arc, 4),
+        }
+
+    # Find aspects: directed planets → natal planets/angles (orb < 1.5°)
+    aspects_found = []
+    ASPECT_ORBS = {0: "conjunction", 60: "sextile", 90: "square",
+                   120: "trine", 180: "opposition"}
+    def _lon(v):
+        if isinstance(v, dict):
+            return float(v.get("longitude") or v.get("lon") or 0)
+        return float(v or 0)
+
+    natal_points = {**{p: _lon(natal_planets[p]) for p in natal_planets},
+                    "asc": _lon(natal_houses.get("h1", 0)),
+                    "mc":  _lon(natal_houses.get("h10", 0))}
+
+    for dpname, ddata in directed.items():
+        d_lon = ddata["directed_lon"]
+        for npname, n_lon in natal_points.items():
+            diff = abs((d_lon - n_lon + 180) % 360 - 180)
+            for asp_angle, asp_name in ASPECT_ORBS.items():
+                asp_orb = abs(diff - asp_angle)
+                if asp_orb <= orb:
+                    # Date of exact aspect
+                    remaining_arc = asp_angle - (d_lon - n_lon + 180) % 360 + 180
+                    remaining_arc = (remaining_arc + 180) % 360 - 180
+                    years_to_exact = remaining_arc / arc_per_year
+                    exact_jd = target_jd + years_to_exact * 365.25
+                    aspects_found.append({
+                        "directed_planet": dpname,
+                        "natal_point":     npname,
+                        "aspect":          asp_name,
+                        "orb":             round(asp_orb, 3),
+                        "current_orb":     round(diff, 3),
+                        "applying":        d_lon < n_lon + asp_angle,
+                        "exact_date":      _jd_to_iso(exact_jd) if 0 < exact_jd - natal_jd_utc < 200 * 365 else None,
+                    })
+
+    aspects_found.sort(key=lambda x: x["orb"])
+
+    return {
+        "type":           "primary_directions",
+        "target_date":    target_date_str,
+        "age_years":      round(age_years, 2),
+        "key":            key,
+        "arc_per_year":   arc_per_year,
+        "total_arc":      round(total_arc, 4),
+        "lat":            lat,
+        "directed_planets": directed,
+        "aspects":        aspects_found[:30],
+        "orb_used":       orb,
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CLI
 # ══════════════════════════════════════════════════════════════════════════════
