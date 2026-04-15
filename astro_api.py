@@ -3025,6 +3025,13 @@ except Exception as _prob_err:
     _probability_tree = None  # type: ignore
     _api_index = None          # type: ignore
 
+try:
+    from astro_gene_keys import calc_gene_keys_profile as _calc_gk
+    _GENE_KEYS_OK = True
+except Exception as _gk_err:
+    _GENE_KEYS_OK = False
+    _calc_gk = None  # type: ignore
+
 class ProbabilityRequest(BaseModel):
     date:        str
     time:        str
@@ -3060,6 +3067,37 @@ def probability_tree_endpoint(req: ProbabilityRequest):
         transit_aspects = transit_data.get("transit_aspects", [])
         result = _probability_tree(natal_chart, transit_aspects,
                                    target_date=req.target_date, context=req.context)
+        return _present(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# GENE KEYS
+# ═════════════════════════════════════════════════════════════════════════════
+
+class GeneKeysRequest(BaseModel):
+    date: str
+    time: str
+    lat:  float
+    lon:  float
+    utc:  float
+    name: str = ""
+
+@app.post("/gene-keys/profile")
+def gene_keys_profile(req: GeneKeysRequest):
+    """
+    Gene Keys Golden Path profile (3 sequences):
+    - Activation Sequence (4 spheres): Life's Work, Evolution, Radiance, Purpose
+    - Venus Sequence (6 spheres): Core Wound, IQ, EQ, SQ, Vocation, Culture
+    - Pearl Sequence (3 spheres): Brand, Pearl, Prosperity
+    Uses the I Ching 64-hexagram mandala (same as Human Design).
+    Shadow → Gift → Siddhi triad for each sphere.
+    """
+    if not _GENE_KEYS_OK:
+        raise HTTPException(status_code=503, detail="Gene Keys module unavailable")
+    try:
+        result = _calc_gk(req.date, req.time, req.lat, req.lon, req.utc, name=req.name)
         return _present(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

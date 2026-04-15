@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import type { NatalChart } from '../types/astro';
 import { PLANET_SYMBOLS, SIGN_COLORS } from '../types/astro';
 
@@ -140,6 +140,39 @@ function detectPatterns(aspects: NatalChart['aspects']): PatternShape[] {
 export default function ChartWheel({ chart, size = 580, theme = 'dark' }: ChartWheelProps) {
   const cx = size / 2, cy = size / 2;
 
+  // ── Interactive state ──────────────────────────────────────────────────
+  const [selectedPlanet, setSelectedPlanet] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
+  const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const handlePlanetClick = useCallback((name: string) => {
+    setSelectedPlanet(prev => prev === name ? null : name);
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { dist: Math.hypot(dx, dy), scale };
+    }
+  }, [scale]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const ratio   = newDist / pinchRef.current.dist;
+      setScale(Math.min(3, Math.max(0.5, pinchRef.current.scale * ratio)));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    pinchRef.current = null;
+  }, []);
+
   // ── Radius layout ─────────────────────────────────────────────────────────
   const R       = size * 0.455;
   const rZIn    = R * 0.858;   // zodiac inner / house band outer
@@ -265,10 +298,38 @@ export default function ChartWheel({ chart, size = 580, theme = 'dark' }: ChartW
     polarToCartesian(cx, cy, rZIn, lonToAngle(icLon)),
   ];
 
+  // ── Planet popup data ─────────────────────────────────────────────────
+  const popupPlanet = selectedPlanet ? chart.planets?.[selectedPlanet] : null;
+  const popupEntry  = selectedPlanet ? planetEntries.find(e => e.name === selectedPlanet) : null;
+
+  const PLANET_NAME_RU: Record<string, string> = {
+    sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
+    mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
+    neptune: 'Нептун', pluto: 'Плутон', node: 'Сев. Узел',
+    lilith: 'Лилит', chiron: 'Хирон', ceres: 'Церера',
+  };
+  const SIGN_NAME_RU: Record<string, string> = {
+    aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак',
+    leo: 'Лев', virgo: 'Дева', libra: 'Весы', scorpio: 'Скорпион',
+    sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
+  };
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-      style={{ userSelect: 'none', background: bg, borderRadius: '50%', overflow: 'visible' }}
-    >
+    <div style={{ position: 'relative', display: 'inline-block', touchAction: 'none' }}>
+      <svg
+        ref={svgRef}
+        width={size} height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        style={{
+          userSelect: 'none', background: bg, borderRadius: '50%', overflow: 'visible',
+          transform: `scale(${scale})`, transformOrigin: 'center',
+          cursor: selectedPlanet ? 'pointer' : 'default',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => setSelectedPlanet(null)}
+      >
       <defs>
         <radialGradient id="zodG" cx="50%" cy="50%" r="50%">
           <stop offset="80%" stopColor={isDark ? '#13133a' : '#f0ead8'} />
@@ -463,8 +524,13 @@ export default function ChartWheel({ chart, size = 580, theme = 'dark' }: ChartW
         const pStr  = retrograde ? '#f87171' : plStroke;
         const gapRaw  = ((displayAngle - origAngle) % 360 + 360) % 360;
         const gapNorm = gapRaw > 180 ? 360 - gapRaw : gapRaw;
+        const isSelected = selectedPlanet === name;
         return (
-          <g key={name}>
+          <g
+            key={name}
+            style={{ cursor: 'pointer' }}
+            onClick={(e) => { e.stopPropagation(); handlePlanetClick(name); }}
+          >
             {/* Tick at actual ecliptic position */}
             <line x1={tickO.x} y1={tickO.y} x2={tickI.x} y2={tickI.y}
               stroke={pClr} strokeWidth={1.8} opacity={0.75}
@@ -479,15 +545,23 @@ export default function ChartWheel({ chart, size = 580, theme = 'dark' }: ChartW
                 stroke={pClr} strokeWidth={0.6} strokeDasharray="2,3" opacity={0.35}
               />
             )}
+            {/* Selection halo */}
+            {isSelected && (
+              <circle cx={pt.x} cy={pt.y} r={pCircR + 5}
+                fill="none" stroke="#ffd700" strokeWidth={1.5} opacity={0.8}
+                strokeDasharray="3,2"
+              />
+            )}
             {/* Planet circle */}
             <circle cx={pt.x} cy={pt.y} r={pCircR}
-              fill={planetCirc} stroke={pStr}
-              strokeWidth={retrograde ? 1.5 : 1.0}
+              fill={isSelected ? '#ffd70020' : planetCirc}
+              stroke={isSelected ? '#ffd700' : pStr}
+              strokeWidth={isSelected ? 2.0 : retrograde ? 1.5 : 1.0}
             />
             {/* Symbol */}
             <text x={pt.x} y={pt.y}
               textAnchor="middle" dominantBaseline="central"
-              fontSize={size * 0.029} fill={pClr}
+              fontSize={size * 0.029} fill={isSelected ? '#ffd700' : pClr}
               fontFamily="serif" fontWeight="bold"
             >{symbol}</text>
             {/* Degree */}
@@ -533,5 +607,98 @@ export default function ChartWheel({ chart, size = 580, theme = 'dark' }: ChartW
         );
       })()}
     </svg>
+
+    {/* ── Planet Popup ─────────────────────────────────────── */}
+    {selectedPlanet && popupPlanet && (
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          bottom: '105%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(10,10,30,0.97)',
+          border: '1px solid #ffd70060',
+          borderRadius: 10,
+          padding: '0.85rem 1.1rem',
+          minWidth: 220,
+          maxWidth: 300,
+          zIndex: 50,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+          fontFamily: 'Georgia, serif',
+          color: '#e8d5a3',
+        }}
+      >
+        <button
+          onClick={() => setSelectedPlanet(null)}
+          style={{
+            position: 'absolute', top: 6, right: 8,
+            background: 'transparent', border: 'none',
+            color: '#6a6a8a', cursor: 'pointer', fontSize: '1rem',
+          }}
+        >✕</button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <span style={{ fontSize: '1.4rem', color: '#ffd700' }}>
+            {popupEntry?.symbol || selectedPlanet}
+          </span>
+          <div>
+            <div style={{ fontWeight: 'bold', color: '#ffd700', fontSize: '0.95rem' }}>
+              {PLANET_NAME_RU[selectedPlanet] || selectedPlanet}
+            </div>
+            <div style={{ color: '#b0bec5', fontSize: '0.78rem' }}>
+              {(popupPlanet as any).sign && (
+                <>{SIGN_GLYPHS[SIGN_NAMES_ORD.indexOf((popupPlanet as any).sign)] || ''}{' '}
+                {SIGN_NAME_RU[(popupPlanet as any).sign] || (popupPlanet as any).sign} · </>
+              )}
+              {(popupPlanet as any).deg_min}
+              {(popupPlanet as any).retrograde && <span style={{ color: '#fca5a5', marginLeft: 4 }}>℞ ретро</span>}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', color: '#90a4ae', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+          {(popupPlanet as any).house && (
+            <span>🏠 Дом {(popupPlanet as any).house}</span>
+          )}
+          {(popupPlanet as any).dignity && (
+            <span>⚡ {(popupPlanet as any).dignity}</span>
+          )}
+          {(popupPlanet as any).dignity_score != null && (
+            <span style={{ color: (popupPlanet as any).dignity_score > 0 ? '#43a047' : (popupPlanet as any).dignity_score < 0 ? '#ef5350' : '#90a4ae' }}>
+              {(popupPlanet as any).dignity_score > 0 ? '+' : ''}{(popupPlanet as any).dignity_score} баллов
+            </span>
+          )}
+        </div>
+
+        {(popupPlanet as any).speed != null && (
+          <div style={{ fontSize: '0.75rem', color: '#6a6a8a' }}>
+            Скорость: {((popupPlanet as any).speed as number).toFixed(3)}°/д ({(popupPlanet as any).speed_status || ''})
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* ── Zoom controls ─────────────────────────────────────── */}
+    {scale !== 1 && (
+      <div style={{
+        position: 'absolute', bottom: 8, right: 8,
+        display: 'flex', gap: '0.3rem', zIndex: 10,
+      }}>
+        <button
+          onClick={() => setScale(s => Math.max(0.5, s - 0.2))}
+          style={{ background: '#0f0f2a', color: '#ffd700', border: '1px solid #ffd70040', borderRadius: 4, width: 28, height: 28, cursor: 'pointer', fontSize: '1rem' }}
+        >−</button>
+        <button
+          onClick={() => setScale(1)}
+          style={{ background: '#0f0f2a', color: '#b0bec5', border: '1px solid #ffd70020', borderRadius: 4, width: 28, height: 28, cursor: 'pointer', fontSize: '0.7rem' }}
+        >1:1</button>
+        <button
+          onClick={() => setScale(s => Math.min(3, s + 0.2))}
+          style={{ background: '#0f0f2a', color: '#ffd700', border: '1px solid #ffd70040', borderRadius: 4, width: 28, height: 28, cursor: 'pointer', fontSize: '1rem' }}
+        >+</button>
+      </div>
+    )}
+  </div>
   );
 }

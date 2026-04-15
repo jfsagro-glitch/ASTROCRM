@@ -33,7 +33,7 @@ import NumerologyBlock from './NumerologyBlock';
 import AsteroidsLilithBlock from './AsteroidsLilithBlock';
 import PlanetaryHoursBlock from './PlanetaryHoursBlock';
 import SiderealBlock from './SiderealBlock';
-import ZodiacalReleasingBlock from './ZodiacalReleasingBlock';
+import GeneKeysBlock from './GeneKeysBlock';
 import PrimaryDirectionsBlock from './PrimaryDirectionsBlock';
 import ProbabilityTreeBlock from './ProbabilityTreeBlock';
 import {
@@ -2118,7 +2118,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2228,6 +2228,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'zodiacal-releasing',  icon: Clock,     label: '⏳ Зод.Высв.' },
     { key: 'primary-directions',  icon: Star,      label: '✦ Примарные' },
     { key: 'probability',         icon: Sparkles,  label: '🌀 Вероятн.' },
+    { key: 'gene-keys',           icon: Sparkles,  label: '✦ Gene Keys' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2514,6 +2515,25 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>Введите данные рождения для Матрицы Вероятностей</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'gene-keys' && (
+            <div id="pdf-section-gene-keys">
+              {birth.date && birth.time ? (
+                <GeneKeysBlock
+                  birthDate={birth.date}
+                  birthTime={birth.time}
+                  lat={birth.lat ?? 0}
+                  lon={birth.lon ?? 0}
+                  utc={birth.utc ?? 0}
+                />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Gene Keys профиля</p>
                 </div>
               )}
             </div>
