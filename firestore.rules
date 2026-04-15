@@ -152,8 +152,13 @@ service cloud.firestore {
                        areImmutableFieldsUnchanged(['createdAt', 'clientId']);
       allow delete: if isOwner();
     }
-    // users/{uid}/people � private birth profiles (one per user subtree)
+    // users/{uid}/people — private birth profiles (one per user subtree)
     match /users/{uid}/people/{personId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // users/{uid}/people/{personId}/consultations — per-person session history
+    match /users/{uid}/people/{personId}/consultations/{noteId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
   }

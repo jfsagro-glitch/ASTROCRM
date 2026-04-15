@@ -34,8 +34,10 @@ import AsteroidsLilithBlock from './AsteroidsLilithBlock';
 import PlanetaryHoursBlock from './PlanetaryHoursBlock';
 import SiderealBlock from './SiderealBlock';
 import GeneKeysBlock from './GeneKeysBlock';
+import { ClientHistoryPanel } from './ClientHistoryPanel';
 import PrimaryDirectionsBlock from './PrimaryDirectionsBlock';
 import ProbabilityTreeBlock from './ProbabilityTreeBlock';
+import ZodiacalReleasingBlock from './ZodiacalReleasingBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2118,7 +2120,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
-  const [activeTab, setActiveTab] = useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'>('dashboard');
+  // Match birth form name to a saved person for the History tab
+  const currentPerson = useMemo(
+    () => people.find(p => p.name === birth.name) ?? null,
+    [people, birth.name],
+  );
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2229,6 +2236,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'primary-directions',  icon: Star,      label: '✦ Примарные' },
     { key: 'probability',         icon: Sparkles,  label: '🌀 Вероятн.' },
     { key: 'gene-keys',           icon: Sparkles,  label: '✦ Gene Keys' },
+    { key: 'history',             icon: Sparkles,  label: '📋 История' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2393,6 +2401,18 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
                   <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
                   <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div id="pdf-section-history">
+              {user ? (
+                <ClientHistoryPanel uid={user.uid} person={currentPerson} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <p className={`${theme.text} text-sm`}>Войдите в систему для доступа к истории</p>
                 </div>
               )}
             </div>
