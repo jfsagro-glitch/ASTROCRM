@@ -1865,6 +1865,36 @@ def calc_ingress(req: IngressRequest):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+
+# ── SATURN CYCLE ──────────────────────────────────────────────────────────────
+
+class SaturnCycleRequest(BaseModel):
+    date:    str
+    time:    str = "12:00"
+    lat:     float = 0.0
+    lon:     float = 0.0
+    utc:     float = 0.0
+    max_age: int   = 90
+
+@app.post("/predictive/saturn-cycle")
+def calc_saturn_cycle(req: SaturnCycleRequest):
+    """
+    Calculate Saturn cycle milestones for a native (returns, squares, oppositions).
+    Returns all conjunction/square/opposition dates up to max_age years.
+    """
+    try:
+        from astro_predictive import saturn_cycle as _saturn_cycle
+        result = _saturn_cycle(
+            req.date, req.time, req.lat, req.lon, req.utc,
+            max_age=req.max_age,
+        )
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 
 # ── SYNASTRY ──────────────────────────────────────────────────────────────────
 @app.post("/synastry/aspects")

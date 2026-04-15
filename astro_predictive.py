@@ -1089,6 +1089,155 @@ def ephemerides_table(start_date_str, days=30, time_str="12:00"):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SATURN CYCLE
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SATURN_CYCLE_ASPECTS = [
+    ("conjunction",  0,   "Возврат Сатурна",         "critical"),
+    ("square_1",    90,   "Первый квадрат",           "important"),
+    ("opposition", 180,   "Оппозиция Сатурна",        "important"),
+    ("square_2",   270,   "Третий квадрат (обратный)","important"),
+]
+
+_SATURN_CYCLE_DESCRIPTIONS = {
+    "conjunction":  "Старт нового 29.5-летнего цикла. Пересмотр долгосрочных целей, завершение старых структур и закладка фундамента.",
+    "square_1":     "Кризис роста (~7.4 года). Требуется адаптация начатого — появляются первые серьёзные испытания выбранного курса.",
+    "opposition":   "Кризис осознанности (~14.75 лет). Пик конфликта между долгом и желаниями; кульминация структур, созданных на возврате.",
+    "square_2":     "Кризис пересборки (~22 года). Освобождение от устаревших паттернов перед финальным урожаем цикла.",
+}
+
+def saturn_cycle(natal_date_str, natal_time_str, lat, lon, utc_off,
+                 max_age=90, scan_step_days=15):
+    """
+    Calculate Saturn cycle milestones for a native:
+    - Conjunction (return) every ~29.5 years
+    - First square  every ~7.4  years
+    - Opposition    every ~14.75 years
+    - Third square  every ~22    years
+
+    Returns: {
+        natal_saturn_lon, natal_saturn_sign,
+        milestones: [{type, angle, label, description, date_utc, age_years, ...}],
+        current_cycle: {...},
+        cycle_number: int, cycle_age: float
+    }
+    """
+    from astro_engine import calc_planets, sign_name, sign_glyph, deg_in_sign
+
+    # Natal Saturn
+    natal_yr, natal_mo, natal_dy = parse_date_arg(natal_date_str)
+    natal_hh, natal_mi, natal_sc = parse_time_arg(natal_time_str)
+    natal_jd_utc = jd(natal_yr, natal_mo, natal_dy, natal_hh, natal_mi, natal_sc) - utc_off / 24.0
+
+    natal_planets = calc_planets(natal_jd_utc)
+    natal_saturn_lon = natal_planets["saturn"]
+
+    # Target longitudes for each milestone type
+    targets = [(name, angle, label, desc)
+               for name, angle, label, desc in _SATURN_CYCLE_ASPECTS]
+
+    milestones = []
+    scan_jd = natal_jd_utc + 365.25          # start 1 year after birth (avoid false trigger at 0)
+    max_jd  = natal_jd_utc + max_age * 365.25
+
+    # Track previous signed diff for each target to detect zero-crossings
+    # signed_diff = transit_saturn - target_lon, normalised to [-180, 180]
+    def _signed_diff(a, b):
+        d = (a - b) % 360.0
+        return d - 360.0 if d > 180.0 else d
+
+    prev_sd = {name: None for name, _, _, _ in targets}
+
+    while scan_jd < max_jd:
+        transit_saturn = calc_planets(scan_jd)["saturn"]
+        for name, angle, label, desc in targets:
+            target_lon = n360(natal_saturn_lon + angle)
+            sd = _signed_diff(transit_saturn, target_lon)
+            prev = prev_sd[name]
+            if prev is not None and prev < 0 and sd >= 0:
+                # Zero-crossing detected — binary search for exact date
+                lo_jd, hi_jd = scan_jd - scan_step_days, scan_jd
+                for _ in range(22):
+                    mid_jd = (lo_jd + hi_jd) * 0.5
+                    mid_sat = calc_planets(mid_jd)["saturn"]
+                    if _signed_diff(mid_sat, target_lon) < 0:
+                        lo_jd = mid_jd
+                    else:
+                        hi_jd = mid_jd
+                exact_jd = (lo_jd + hi_jd) * 0.5
+
+                # Convert JD to calendar date
+                z = int(exact_jd + 0.5)
+                f = exact_jd + 0.5 - z
+                a_v = z
+                if z >= 2299161:
+                    alpha = int((z - 1867216.25) / 36524.25)
+                    a_v = z + 1 + alpha - alpha // 4
+                b_v = a_v + 1524
+                c_v = int((b_v - 122.1) / 365.25)
+                d_v = int(365.25 * c_v)
+                e_v = int((b_v - d_v) / 30.6001)
+                day_f = b_v - d_v - int(30.6001 * e_v) + f
+                month = e_v - 1 if e_v < 14 else e_v - 13
+                year  = c_v - 4716 if month > 2 else c_v - 4715
+                day_int = int(day_f)
+                hour_f = (day_f - day_int) * 24
+                hour_int = int(hour_f)
+                min_int = int((hour_f - hour_int) * 60)
+
+                age_years_val = (exact_jd - natal_jd_utc) / 365.25
+                exact_sat = calc_planets(exact_jd)["saturn"]
+                milestones.append({
+                    "type":        name,
+                    "angle":       angle,
+                    "label":       label,
+                    "description": desc,
+                    "date_utc":    f"{year:04d}-{month:02d}-{day_int:02d} {hour_int:02d}:{min_int:02d}",
+                    "age_years":   round(age_years_val, 2),
+                    "age_display": f"{int(age_years_val)} лет {int((age_years_val % 1) * 12)} мес.",
+                    "saturn_lon":  round(exact_sat, 3),
+                    "saturn_sign": sign_name(exact_sat),
+                    "orb_at_exact": round(abs(_signed_diff(exact_sat, target_lon)), 3),
+                    "cycle_number": int(age_years_val / 29.5) + 1,
+                })
+            prev_sd[name] = sd
+        scan_jd += scan_step_days
+
+    milestones.sort(key=lambda m: m["date_utc"])
+
+    # Current Saturn position and cycle status
+    from astro_engine import calc_planets as _cp
+    now_jd = jd(*[int(x) for x in __import__('datetime').date.today().isoformat().split('-')], 12, 0, 0)
+    current_saturn = _cp(now_jd)["saturn"]
+    years_lived = (now_jd - natal_jd_utc) / 365.25
+    cycle_num = int(years_lived / 29.5) + 1
+    cycle_age = years_lived % 29.5
+
+    # Find current phase (which milestone are we between)
+    current_phase = "conjunction"
+    for m in milestones:
+        if m["date_utc"] <= __import__('datetime').date.today().isoformat():
+            current_phase = m["type"]
+
+    d_natal = deg_in_sign(natal_saturn_lon)
+    return {
+        "type":                "saturn_cycle",
+        "natal_saturn_lon":    round(natal_saturn_lon, 3),
+        "natal_saturn_sign":   sign_name(natal_saturn_lon),
+        "natal_saturn_deg":    f"{int(d_natal)}°{int((d_natal%1)*60):02d}'",
+        "natal_saturn_glyph":  sign_glyph(natal_saturn_lon),
+        "milestones":          milestones,
+        "cycle_number":        cycle_num,
+        "cycle_age_years":     round(cycle_age, 2),
+        "years_lived":         round(years_lived, 2),
+        "current_phase":       current_phase,
+        "current_saturn_sign": sign_name(current_saturn),
+        "current_saturn_lon":  round(current_saturn, 3),
+        "total_milestones":    len(milestones),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # TEXT FORMATTING
 # ══════════════════════════════════════════════════════════════════════════════
 

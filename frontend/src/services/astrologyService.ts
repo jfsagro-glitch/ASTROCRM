@@ -725,4 +725,48 @@ export async function getVoCWindows(
   });
 }
 
+// ── Saturn Cycle ─────────────────────────────────────────────────────────────
 
+export interface SaturnMilestone {
+  type: string;          // "conjunction" | "square_1" | "opposition" | "square_2"
+  angle: number;
+  label: string;
+  description: string;
+  date_utc: string;
+  age_years: number;
+  age_display: string;
+  saturn_sign: string;
+  saturn_lon: number;
+  orb_at_exact: number;
+  cycle_number: number;
+}
+
+export interface SaturnCycleResult {
+  type: 'saturn_cycle';
+  natal_saturn_lon: number;
+  natal_saturn_sign: string;
+  natal_saturn_deg: string;
+  natal_saturn_glyph: string;
+  milestones: SaturnMilestone[];
+  cycle_number: number;
+  cycle_age_years: number;
+  years_lived: number;
+  current_phase: string;
+  current_saturn_sign: string;
+  current_saturn_lon: number;
+  total_milestones: number;
+}
+
+export async function getSaturnCycle(
+  b: BirthInput,
+  maxAge = 90,
+): Promise<SaturnCycleResult> {
+  return post('/predictive/saturn-cycle', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+    max_age: maxAge,
+  });
+}

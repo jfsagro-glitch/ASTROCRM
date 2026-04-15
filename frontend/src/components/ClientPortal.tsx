@@ -42,6 +42,8 @@ import { ChartAnalysisSection } from './ChartAnalysisSection';
 import DailyPersonalBlock from './DailyPersonalBlock';
 import { IngressCalendarBlock } from './IngressCalendarBlock';
 import { VoCWindowsPanel } from './VoCWindowsPanel';
+import { FixedStarsBlock } from './FixedStarsBlock';
+import SaturnCycleBlock from './SaturnCycleBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2129,7 +2131,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2244,6 +2246,8 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'daily',               icon: Zap,       label: '📅 День' },
     { key: 'ingress',             icon: Globe,     label: '🌠 Ингрессы' },
     { key: 'voc',                 icon: Clock,     label: '🌙 VoC Луна' },
+    { key: 'saturn-cycle',        icon: Clock,     label: '♄ Цикл Сатурна' },
+    { key: 'fixed-stars',         icon: Star,      label: '✦ Неп. звёзды' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2376,6 +2380,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   {natalChart.chart_analysis && (
                     <ChartAnalysisSection analysis={natalChart.chart_analysis} />
                   )}
+                  {natalChart.fixed_stars && natalChart.fixed_stars.length > 0 && (
+                    <FixedStarsBlock stars={natalChart.fixed_stars} />
+                  )}
                 </>
               ) : (
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
@@ -2457,6 +2464,37 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             <div id="pdf-section-voc">
               <div className={`rounded-xl border ${theme.card} p-4`}>
                 <VoCWindowsPanel birthData={birth} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'saturn-cycle' && (
+            <div id="pdf-section-saturn-cycle">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">♄</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Цикл Сатурна</h2>
+                </div>
+                <SaturnCycleBlock birthData={birth} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'fixed-stars' && (
+            <div id="pdf-section-fixed-stars">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">✦</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Неподвижные звёзды</h2>
+                </div>
+                {natalChart?.fixed_stars ? (
+                  <FixedStarsBlock stars={natalChart.fixed_stars} />
+                ) : (
+                  <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                    <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                    <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту для анализа звёзд</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
