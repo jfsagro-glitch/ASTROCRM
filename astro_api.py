@@ -19,7 +19,7 @@ except ImportError:
 # ── Engine imports ────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
-    calc_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
+    calc_chart, calc_chart_analysis, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
     void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
     lunar_mansion_full, calc_asteroids, calc_lilith_extended,
     planetary_hours, calc_sidereal_chart, ayanamsa, list_ayanamsa_systems,
@@ -158,6 +158,28 @@ def _to_jd(date: str, time: str, utc: float) -> float:
     yr, mo, dy = _parse_date(date)
     h, mi, sc  = _parse_time(time)
     return calc_jd(yr, mo, dy, h - utc, mi, sc)
+
+
+def _utc_for_tz(timezone_name: Optional[str], date: str, utc_fallback: float) -> float:
+    """Resolve UTC offset for a given IANA timezone name and date (handles DST)."""
+    if not timezone_name:
+        return utc_fallback
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:
+        try:
+            from backports.zoneinfo import ZoneInfo  # type: ignore
+        except ImportError:
+            return utc_fallback
+    try:
+        import datetime as _dt
+        yr, mo, dy = _parse_date(date)
+        tz = ZoneInfo(timezone_name)
+        dt_local = _dt.datetime(yr, mo, dy, 12, 0, 0, tzinfo=tz)
+        offset_sec = dt_local.utcoffset().total_seconds()  # type: ignore[union-attr]
+        return offset_sec / 3600
+    except Exception:
+        return utc_fallback
 
 
 def _safe(data: Any) -> Any:
@@ -445,6 +467,7 @@ class PredictiveRequest(BaseModel):
     target_lon:   Optional[float] = None
     houses:       str = "placidus"
     advanced:     bool = False           # unlock tertiary/converse progressions
+    timezone_name: Optional[str] = None  # IANA tz e.g. "Europe/Moscow" (improves DST accuracy)
 
 
 class EphemeridesRequest(BaseModel):
@@ -1700,12 +1723,16 @@ def calc_converse(req: PredictiveRequest):
 @app.post("/predictive/solar-return")
 def calc_solar_return(req: PredictiveRequest):
     try:
-        natal_jd = _to_jd(req.date, req.time, req.utc)
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
         yr = int(req.target_date[:4])
         obs_lat = req.target_lat if req.target_lat is not None else req.lat
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = solar_return(natal_jd, yr, obs_lat, obs_lon,
                               houses_system=req.houses)
+        if req.timezone_name:
+            result["timezone_name"] = req.timezone_name
+            result["effective_utc"] = round(effective_utc, 2)
         result["interpretation"] = _gen_solar_return_interp(result)
         return _present(result)
     except HTTPException:
@@ -1717,11 +1744,15 @@ def calc_solar_return(req: PredictiveRequest):
 @app.post("/predictive/lunar-return")
 def calc_lunar_return(req: PredictiveRequest):
     try:
-        natal_jd = _to_jd(req.date, req.time, req.utc)
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
         obs_lat = req.target_lat if req.target_lat is not None else req.lat
         obs_lon = req.target_lon if req.target_lon is not None else req.lon
         result = lunar_return(natal_jd, req.target_date, obs_lat, obs_lon,
                               houses_system=req.houses)
+        if req.timezone_name:
+            result["timezone_name"] = req.timezone_name
+            result["effective_utc"] = round(effective_utc, 2)
         result["interpretation"] = _gen_lunar_return_interp(result)
         return _present(result)
     except HTTPException:
@@ -3333,6 +3364,310 @@ def _build_html_report(data: dict, depth: str) -> str:
 </div>
 </body>
 </html>"""
+
+
+# ─── VOID OF COURSE (multi-window) ───────────────────────────────────────────
+
+class VoCRequest(BaseModel):
+    date:       str
+    time:       str = "12:00"
+    utc:        float = 0
+    lat:        float = 0
+    lon:        float = 0
+    count:      int = 5          # number of VoC windows to return
+    look_ahead: float = 30.0     # days to scan total
+
+
+@app.post("/natal/void-of-course")
+def get_voc_windows(req: VoCRequest):
+    """Return the current + next N Void-of-Course Moon windows.
+
+    Scans forward up to **look_ahead** days from **date/time** and returns
+    up to **count** distinct VoC periods.
+
+    Each window includes start/end JD, duration, void sign, and what ingress ends it.
+    """
+    try:
+        jd_start = _to_jd(req.date, req.time, req.utc)
+        windows = []
+        scan_jd = jd_start
+        step_days = 1.5   # step between successive VoC scans (slightly longer than avg VoC)
+        max_jd = jd_start + req.look_ahead
+
+        while len(windows) < req.count and scan_jd < max_jd:
+            voc = void_of_course_moon(scan_jd, look_ahead_days=min(3.0, max_jd - scan_jd),
+                                      lat=req.lat, lon=req.lon)
+            if not voc:
+                scan_jd += step_days
+                continue
+
+            if voc.get("is_void"):
+                void_end_jd = voc.get("void_end_jd") or (scan_jd + 0.5)
+                # Avoid duplicate windows: skip if same start as last
+                if windows and abs(windows[-1].get("void_start_jd", 0) - (voc.get("void_start_jd") or scan_jd)) < 0.01:
+                    scan_jd = void_end_jd + 0.05
+                    continue
+                windows.append({**voc, "void_start_jd": voc.get("void_start_jd") or scan_jd})
+                scan_jd = void_end_jd + 0.05
+            else:
+                # Not in VoC now; advance to just after next ingress
+                void_end_jd = voc.get("void_end_jd") or (scan_jd + step_days)
+                scan_jd = void_end_jd + 0.05
+
+        return _present({
+            "query_date": req.date,
+            "query_time": req.time,
+            "utc_offset": req.utc,
+            "windows_returned": len(windows),
+            "windows": windows,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ─── DAILY PERSONAL ──────────────────────────────────────────────────────────
+
+class DailyPersonalRequest(BaseModel):
+    # Birth data
+    date:  str; time: str
+    lat:   float; lon: float; utc: float
+    # Target date (defaults to today)
+    target_date: Optional[str] = None
+    target_time: str = "12:00"
+    name:  Optional[str] = None
+
+
+@app.post("/daily/personal")
+def daily_personal(req: DailyPersonalRequest):
+    """Personalised daily astrology summary.
+
+    Combines:
+    - Current Moon sign, phase, and Void-of-Course status
+    - Transits to natal chart (top aspects by orb)
+    - Profection house for the current year
+    - Current Firdaria period
+    - Compensatory advice for top 3 transit aspects
+    """
+    try:
+        target = req.target_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        natal_jd  = _to_jd(req.date, req.time, req.utc)
+        target_jd = _to_jd(target, req.target_time, req.utc)
+
+        # ── Moon ─────────────────────────────────────────────────────────────
+        planets_now = calc_planets(target_jd)
+        moon_lon = planets_now.get("moon", 0)
+        sun_lon  = planets_now.get("sun",  0)
+        phase_angle = (moon_lon - sun_lon) % 360
+        if   phase_angle <  45: phase_name = "new_moon"
+        elif phase_angle <  90: phase_name = "waxing_crescent"
+        elif phase_angle < 135: phase_name = "first_quarter"
+        elif phase_angle < 180: phase_name = "waxing_gibbous"
+        elif phase_angle < 225: phase_name = "full_moon"
+        elif phase_angle < 270: phase_name = "waning_gibbous"
+        elif phase_angle < 315: phase_name = "last_quarter"
+        else:                   phase_name = "waning_crescent"
+
+        voc = void_of_course_moon(target_jd, look_ahead_days=3.0,
+                                  lat=req.lat, lon=req.lon)
+
+        moon_info = {
+            "sign":        sign_name(moon_lon),
+            "degree":      round(moon_lon % 30, 2),
+            "phase":       phase_name,
+            "phase_angle": round(phase_angle, 2),
+            "void_of_course": voc,
+        }
+
+        # ── Transits to natal ─────────────────────────────────────────────────
+        try:
+            from astro_predictive import transits as calc_transits
+            transit_result = calc_transits(natal_jd, target,
+                                           req.lat, req.lon, req.utc)
+            top_transits = sorted(
+                transit_result.get("transit_aspects", []),
+                key=lambda x: x.get("orb", 99),
+            )[:5]
+        except Exception:
+            top_transits = []
+
+        # ── Profections ───────────────────────────────────────────────────────
+        try:
+            from astro_predictive import profections as calc_profs
+            birth_yr = int(req.date[:4])
+            target_yr = int(target[:4])
+            # approximate age from year difference
+            age = target_yr - birth_yr
+            prof_result = calc_profs(natal_jd, target)
+            profection_info = {
+                "age": age,
+                "profected_house": prof_result.get("profected_house"),
+                "lord_of_year":    prof_result.get("lord_of_year"),
+            }
+        except Exception:
+            profection_info = {}
+
+        # ── Firdaria ──────────────────────────────────────────────────────────
+        try:
+            from astro_predictive import firdaria as calc_fird
+            fird_result = calc_fird(natal_jd, target)
+            firdaria_info = {
+                "current_period": fird_result.get("current_period"),
+                "current_sub":    fird_result.get("current_sub"),
+            }
+        except Exception:
+            firdaria_info = {}
+
+        # ── Compensatory advice for top transits ──────────────────────────────
+        advice = []
+        if _COMPENSATORY_OK and top_transits:
+            try:
+                natal_chart = calc_chart(
+                    *_parse_date(req.date), *_parse_time(req.time),
+                    req.lat, req.lon, req.utc,
+                    include_aspects=False, include_patterns=False,
+                    include_dignities=True, include_arabic=False,
+                )
+                comp = build_compensatory_report(  # type: ignore[misc]
+                    natal_chart=natal_chart,
+                    transit_aspects=top_transits,
+                    depth="light",
+                )
+                advice = comp.get("practices", [])[:3]
+            except Exception:
+                pass
+
+        return _present({
+            "name":        req.name,
+            "birth_date":  req.date,
+            "target_date": target,
+            "moon":        moon_info,
+            "top_transits": top_transits,
+            "profection":  profection_info,
+            "firdaria":    firdaria_info,
+            "advice":      advice,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ─── INGRESS CALENDAR ─────────────────────────────────────────────────────────
+
+# Planets whose sign changes (ingresses) to track
+_INGRESS_PLANETS = {
+    "sun":     ("☉", 30),   # ~1 month per sign
+    "moon":    ("☽", 2.5),  # ~2.5 days per sign
+    "mercury": ("☿", 20),
+    "venus":   ("♀", 25),
+    "mars":    ("♂", 45),
+    "jupiter": ("♃", 365),
+    "saturn":  ("♄", 900),
+}
+
+
+@app.get("/ephemeris/ingress-calendar")
+def ingress_calendar(
+    year:          int = Query(..., description="Calendar year, e.g. 2026"),
+    include_moon:  bool = Query(False, description="Include fast Moon ingresses (~54/year)"),
+    planets:       str  = Query("sun,mercury,venus,mars,jupiter,saturn",
+                                description="Comma-separated planet list"),
+):
+    """Yearly calendar of all planetary sign ingresses.
+
+    Returns a chronological list of exact moments when each planet enters a
+    new zodiac sign, accurate to ±6 minutes (binary search, 12-min steps).
+
+    Set **include_moon=true** to also get the 50–54 annual Moon ingresses.
+    """
+    try:
+        requested = {p.strip().lower() for p in planets.split(",") if p.strip()}
+        if include_moon:
+            requested.add("moon")
+        # Validate
+        unknown = requested - set(_INGRESS_PLANETS)
+        if unknown:
+            raise HTTPException(400, f"Unknown planets: {unknown}. Allowed: {list(_INGRESS_PLANETS)}")
+
+        start_jd = calc_jd(year, 1, 1, 0, 0, 0)
+        end_jd   = calc_jd(year + 1, 1, 1, 0, 0, 0)
+
+        ingresses = []
+
+        for pname in requested:
+            _, step_days = _INGRESS_PLANETS[pname]
+            # Scan with 0.1× step to catch all ingresses
+            scan_step = step_days * 0.08
+            jd_cur = start_jd
+
+            prev_planets = calc_planets(jd_cur)
+            prev_sign = int(prev_planets.get(pname, 0) % 360 / 30)
+
+            while jd_cur < end_jd:
+                jd_next = min(jd_cur + scan_step, end_jd)
+                cur_planets = calc_planets(jd_next)
+                cur_lon = cur_planets.get(pname, 0)
+                cur_sign = int(cur_lon % 360 / 30)
+
+                if cur_sign != prev_sign:
+                    # Binary search for exact crossing moment
+                    lo, hi = jd_cur, jd_next
+                    for _ in range(18):  # 18 iterations → ~6 min accuracy
+                        mid = (lo + hi) / 2
+                        mid_lon = calc_planets(mid).get(pname, 0)
+                        mid_sign = int(mid_lon % 360 / 30)
+                        if mid_sign == prev_sign:
+                            lo = mid
+                        else:
+                            hi = mid
+                    exact_jd = (lo + hi) / 2
+
+                    # Convert JD to calendar date (standard algorithm)
+                    z = int(exact_jd + 0.5)
+                    f = (exact_jd + 0.5) - z
+                    if z < 2299161:
+                        a = z
+                    else:
+                        alpha = int((z - 1867216.25) / 36524.25)
+                        a = z + 1 + alpha - alpha // 4
+                    b = a + 1524
+                    c = int((b - 122.1) / 365.25)
+                    d = int(365.25 * c)
+                    e = int((b - d) / 30.6001)
+                    day_f = b - d - int(30.6001 * e) + f
+                    dy_r = int(day_f)
+                    h_r  = (day_f - dy_r) * 24
+                    mo_r = (e - 1) if e < 14 else (e - 13)
+                    yr_r = (c - 4716) if mo_r > 2 else (c - 4715)
+                    dt_str = f"{int(yr_r):04d}-{int(mo_r):02d}-{int(dy_r):02d} {int(h_r):02d}:{int((h_r % 1)*60):02d} UTC"
+
+                    ingresses.append({
+                        "planet":     pname,
+                        "sign":       SIGN_NAMES[cur_sign % 12],
+                        "sign_idx":   cur_sign % 12,
+                        "jd":         round(exact_jd, 4),
+                        "datetime_utc": dt_str,
+                    })
+                    prev_sign = cur_sign
+
+                prev_planets = cur_planets
+                jd_cur = jd_next
+
+        # Sort chronologically
+        ingresses.sort(key=lambda x: x["jd"])
+
+        return _present({
+            "year":     year,
+            "planets":  sorted(requested),
+            "count":    len(ingresses),
+            "ingresses": ingresses,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 # ═════════════════════════════════════════════════════════════════════════════

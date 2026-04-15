@@ -168,13 +168,13 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 
 | Пункт | Описание | Статус |
 |-------|----------|--------|
-| `POST /daily/personal` | Персональный день: транзиты + луна + совет | 🔲 не реализовано |
-| `GET /ephemeris/ingress-calendar` | Календарь ингрессов на год | 🔲 не реализовано |
-| `POST /natal/void-of-course` | Текущий/следующий VoC для пользователя | 🔲 не реализовано |
-| `chart_shape` в `/natal` | bundle/bowl/bucket/locomotive/seesaw/splash/splay | 🔲 не реализовано |
-| `dominant_element/modality` | Подсчёт стихий и модальностей | 🔲 не реализовано |
-| `unaspected_planets` | Список планет без аспектов | 🔲 не реализовано |
-| `timezone_name` в PredictiveRequest | Для точного Solar/Lunar Return | 🔲 не реализовано |
+| `POST /daily/personal` | Персональный день: транзиты + луна + совет | ✅ реализовано |
+| `GET /ephemeris/ingress-calendar` | Календарь ингрессов на год | ✅ реализовано |
+| `POST /natal/void-of-course` | Текущий/следующий VoC для пользователя | ✅ реализовано |
+| `chart_shape` в `/natal` | bundle/bowl/bucket/locomotive/seesaw/splash/splay | ✅ реализовано |
+| `dominant_element/modality` | Подсчёт стихий и модальностей | ✅ реализовано |
+| `unaspected_planets` | Список планет без аспектов | ✅ реализовано |
+| `timezone_name` в PredictiveRequest | Для точного Solar/Lunar Return | ✅ реализовано |
 
 ---
 
@@ -185,6 +185,10 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 | `a1ceff4` | 2026-04 | Arabic Parts, Eclipse thresholds, CORS, pyswisseph warning, PWA |
 | `75e09d4` | 2026-04 | SYSTEM_DESCRIPTION.md — полная документация системы |
 | `78e9b02` | 2026-04-14 | Firdaria, VoC Moon, mutual_receptions, daily/moon, compensatory engine, advanced flag |
+| `fc7117a` | 2026-04 | Phase 3-4: ZR, primary directions, probability tree, HTML report generator |
+| `d6a78c5` | 2026-04 | Phase 4: Gene Keys engine + frontend, SVG touch/pinch-zoom |
+| `5d6f88e` | 2026-04 | CRM history module: consultation notes timeline (Firestore sub-collection) |
+| current  | 2026-04-15 | Audit Section III: chart_analysis, ingress calendar, VoC windows, daily/personal, timezone_name |
 
 ---
 
@@ -192,4 +196,4 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 
 Из 10 ключевых пунктов аудита — **10 / 10 выполнено** ✅
 
-Из 7 дополнительных пожеланий (раздел III аудита) — **0 / 7** (низкий приоритет, по необходимости).
+Из 7 дополнительных пожеланий (раздел III аудита) — **7 / 7 выполнено** ✅

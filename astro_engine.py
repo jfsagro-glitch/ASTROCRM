@@ -1853,7 +1853,157 @@ def calc_chart(yr, mo, dy, h, mi, sc, lat, lon_deg, utc_off,
     if include_fixed_stars:
         result["fixed_stars"] = calc_fixed_stars(jd_tt, planets)
 
+    # ── Chart analysis (shape, elements, modalities, unaspected) ────────────
+    result["chart_analysis"] = calc_chart_analysis(
+        planets,
+        result.get("aspects", []),
+    )
+
     return result
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHART ANALYSIS — shape, elements, modalities, unaspected
+# ══════════════════════════════════════════════════════════════════════════════
+
+# 10 traditional planets for shape / element analysis (exclude nodes/lilith/chiron)
+_SHAPE_PLANETS = ["sun","moon","mercury","venus","mars","jupiter","saturn",
+                  "uranus","neptune","pluto"]
+
+# Planet weights for element/modality scoring (personal → generational)
+_PLANET_WEIGHTS = {
+    "sun": 3, "moon": 3,
+    "mercury": 2, "venus": 2, "mars": 2,
+    "jupiter": 1.5, "saturn": 1.5,
+    "uranus": 1, "neptune": 1, "pluto": 1,
+}
+
+# Major aspects for unaspected detection
+_MAJOR_ASP = {"conjunction", "sextile", "square", "trine", "opposition"}
+
+
+def _chart_shape(lons: list) -> dict:
+    """Marc Edmund Jones 7 chart patterns.
+
+    Returns {shape, spread_deg, max_gap_deg}.
+    """
+    if len(lons) < 2:
+        return {"shape": "splash", "spread_deg": 360, "max_gap_deg": 0}
+
+    srt = sorted(float(lon) % 360 for lon in lons)
+    n = len(srt)
+    gaps = [((srt[(i + 1) % n] - srt[i]) % 360) for i in range(n)]
+    max_gap = max(gaps)
+    spread = 360 - max_gap
+
+    # Find planets that are isolated on both sides (handle candidates)
+    def _is_handle(i):
+        gap_before = gaps[(i - 1) % n]
+        gap_after  = gaps[i]
+        return gap_before > 60 and gap_after > 60
+
+    handle_count = sum(_is_handle(i) for i in range(n))
+
+    # Count significant gaps (> 60°)
+    sig_gaps = [g for g in gaps if g > 60]
+
+    if spread <= 120:
+        shape = "bundle"
+    elif max_gap >= 180:
+        shape = "bucket" if handle_count == 1 else "bowl"
+    elif max_gap >= 120:
+        shape = "locomotive"
+    elif len(sig_gaps) == 2:
+        shape = "seesaw"
+    elif len(sig_gaps) >= 3:
+        shape = "splay"
+    else:
+        shape = "splash"
+
+    return {
+        "shape":      shape,
+        "spread_deg": round(spread, 1),
+        "max_gap_deg": round(max_gap, 1),
+    }
+
+
+_ELEMENT_SIGNS = {
+    "fire":  {"aries","leo","sagittarius"},
+    "earth": {"taurus","virgo","capricorn"},
+    "air":   {"gemini","libra","aquarius"},
+    "water": {"cancer","scorpio","pisces"},
+}
+
+_MODALITY_SIGNS = {
+    "cardinal": {"aries","cancer","libra","capricorn"},
+    "fixed":    {"taurus","leo","scorpio","aquarius"},
+    "mutable":  {"gemini","virgo","sagittarius","pisces"},
+}
+
+
+def calc_chart_analysis(planets_dict: dict, aspects: list) -> dict:
+    """Compute chart shape, dominant element, dominant modality, unaspected planets.
+
+    Args:
+        planets_dict: {planet_name: longitude_float}
+        aspects:      list of aspect dicts from calc_aspects()
+
+    Returns dict with keys:
+        shape, spread_deg, max_gap_deg,
+        element_scores, dominant_element,
+        modality_scores, dominant_modality,
+        unaspected_planets
+    """
+    # ── Shape ───────────────────────────────────────────────────────────────
+    lons = [planets_dict[p] for p in _SHAPE_PLANETS if p in planets_dict]
+    shape_info = _chart_shape(lons)
+
+    # ── Elements & modalities ────────────────────────────────────────────────
+    element_scores: dict[str, float] = {e: 0.0 for e in _ELEMENT_SIGNS}
+    modality_scores: dict[str, float] = {m: 0.0 for m in _MODALITY_SIGNS}
+
+    for pname, lon in planets_dict.items():
+        if pname not in _PLANET_WEIGHTS:
+            continue
+        w = _PLANET_WEIGHTS[pname]
+        sname = sign_name(lon)
+        for elem, signs in _ELEMENT_SIGNS.items():
+            if sname in signs:
+                element_scores[elem] += w
+        for mod, signs in _MODALITY_SIGNS.items():
+            if sname in signs:
+                modality_scores[mod] += w
+
+    dominant_element  = max(element_scores,  key=element_scores.__getitem__)
+    dominant_modality = max(modality_scores, key=modality_scores.__getitem__)
+
+    # Round scores
+    element_scores  = {k: round(v, 1) for k, v in element_scores.items()}
+    modality_scores = {k: round(v, 1) for k, v in modality_scores.items()}
+
+    # ── Unaspected planets ───────────────────────────────────────────────────
+    # A planet is unaspected if it forms NO major aspect to any other planet
+    aspected: set[str] = set()
+    for asp in aspects:
+        if asp.get("aspect") in _MAJOR_ASP:
+            aspected.add(asp.get("p1", ""))
+            aspected.add(asp.get("p2", ""))
+    aspected.discard("")
+
+    unaspected = [
+        p for p in _SHAPE_PLANETS
+        if p in planets_dict and p not in aspected
+    ]
+
+    return {
+        **shape_info,
+        "element_scores":   element_scores,
+        "dominant_element": dominant_element,
+        "modality_scores":  modality_scores,
+        "dominant_modality": dominant_modality,
+        "unaspected_planets": unaspected,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
