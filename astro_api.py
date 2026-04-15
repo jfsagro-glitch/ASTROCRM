@@ -19,7 +19,7 @@ except ImportError:
 # ── Engine imports ────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
 from astro_engine import (
-    calc_chart, calc_chart_analysis, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
+    calc_chart, calc_chart_analysis, calc_heliocentric_chart, jd as calc_jd, SIGN_NAMES, SIGN_GLYPHS,
     void_of_course_moon, calc_planets, sign_name, essential_dignity_score,
     lunar_mansion_full, calc_asteroids, calc_lilith_extended,
     planetary_hours, calc_sidereal_chart, ayanamsa, list_ayanamsa_systems,
@@ -1194,11 +1194,19 @@ def dashboard(req: DashboardRequest):
             yr, mo, dy, h, mi, sc,
             req.lat, req.lon, req.utc,
             houses_system=req.houses, julian=req.julian,
-            include_aspects=False, include_patterns=False,
+            include_aspects=True, include_patterns=False,
             include_dignities=True, include_arabic=True,
             include_fixed_stars=False, include_sect=True,
             include_dispositors=False,
         )
+
+        # ── Chart analysis (shape / elements / modalities) ───────────────────
+        try:
+            planets_raw = {p: d["lon"] if isinstance(d, dict) else d
+                           for p, d in natal.get("planets", {}).items()}
+            chart_analysis = calc_chart_analysis(planets_raw, natal.get("aspects", []))
+        except Exception:
+            chart_analysis = {}
 
         # ── Today's transit aspects to natal ────────────────────────────────
         natal_jd = _to_jd(req.date, req.time, req.utc)
@@ -1298,6 +1306,7 @@ def dashboard(req: DashboardRequest):
             "profections":    prof_data,
             "fortune_today":  fortune_lot,
             "arabic_natal":   natal.get("arabic_parts", {}),
+            "chart_analysis": chart_analysis,
         })
     except HTTPException:
         raise
@@ -1342,7 +1351,29 @@ def natal(req: BirthData):
         raise HTTPException(500, str(e))
 
 
-@app.post("/human-design")
+# ── HELIOCENTRIC CHART ────────────────────────────────────────────────────────
+
+@app.post("/heliocentric")
+def heliocentric_chart(req: BirthData):
+    """
+    Heliocentric (Sun-centred) natal chart.
+    Uses Swiss Ephemeris FLG_HELCTR when available, falls back to geocentric approximation.
+    Earth replaces the Sun; inner planets show heliocentric longitudes.
+    """
+    try:
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        result = calc_heliocentric_chart(
+            yr, mo, dy, h, mi, sc,
+            req.lat, req.lon, req.utc,
+        )
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 def human_design(
     req: BirthData,
     mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
@@ -2925,6 +2956,99 @@ def numerology_profile_endpoint(req: NumerologyRequest):
             natal_chart=req.natal_chart,
         )
         return _present(profile)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/kabbalah/tree-mapping")
+def kabbalah_tree_mapping(req: BirthData):
+    """
+    Standalone Tree of Life mapping.
+    Computes natal chart and maps planets → Sephiroth.
+    Returns: active/vacant Sephiroth, pillar balance (left/middle/right),
+    dominant pillar, Tree visualization data.
+    """
+    if not _NUMEROLOGY_OK:
+        raise HTTPException(status_code=503, detail="Numerology module unavailable")
+    try:
+        from astro_numerology import tree_of_life_profile as _tree_profile
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        chart = calc_chart(
+            yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+            include_aspects=False, include_patterns=False,
+            include_dignities=False, include_arabic=False,
+            include_fixed_stars=False, include_sect=False,
+        )
+        # Build planets_raw for tree profile (must be wrapped in {"planets": ...})
+        planets_raw = {}
+        for pname, pdata in chart.get("planets", {}).items():
+            lon = pdata["lon"] if isinstance(pdata, dict) else pdata
+            planets_raw[pname] = {"lon": lon, "longitude": lon, "sign": sign_name(lon)}
+        raw = _tree_profile({"planets": planets_raw})
+
+        # Normalise to a frontend-friendly format
+        SEPH_NAMES_RU = {
+            "kether": "Кетер", "chokmah": "Хокма", "binah": "Бина",
+            "chesed": "Хесед", "geburah": "Гебура", "tiphareth": "Тиферет",
+            "netzach": "Нецах", "hod": "Ход", "yesod": "Йесод", "malkuth": "Малхут",
+        }
+        SEPH_NUMBERS = {
+            "kether": 1, "chokmah": 2, "binah": 3, "chesed": 4, "geburah": 5,
+            "tiphareth": 6, "netzach": 7, "hod": 8, "yesod": 9, "malkuth": 10,
+        }
+        SEPH_PILLARS = {
+            "kether": "middle", "chokmah": "right", "binah": "left",
+            "chesed": "right", "geburah": "left", "tiphareth": "middle",
+            "netzach": "right", "hod": "left", "yesod": "middle", "malkuth": "middle",
+        }
+        active_list = [
+            {
+                "number": v.get("number", SEPH_NUMBERS.get(k, 0)),
+                "name": SEPH_NAMES_RU.get(k, k),
+                "planet": v.get("planet", ""),
+                "sign": v.get("sign", ""),
+                "pillar": v.get("pillar", SEPH_PILLARS.get(k, "middle")),
+            }
+            for k, v in raw.get("active_sephiroth", {}).items()
+        ]
+        vacant_list = [
+            {
+                "number": SEPH_NUMBERS.get(k, 0),
+                "name": SEPH_NAMES_RU.get(k, k),
+                "pillar": SEPH_PILLARS.get(k, "middle"),
+            }
+            for k in raw.get("vacant_sephiroth", [])
+        ]
+        planet_sephirah: dict = {}
+        for k, v in raw.get("active_sephiroth", {}).items():
+            planet_name = v.get("planet", "")
+            if planet_name:
+                planet_sephirah[planet_name] = {
+                    "sephirah": v.get("sephirah", SEPH_NAMES_RU.get(k, k)),
+                    "number": v.get("number", SEPH_NUMBERS.get(k, 0)),
+                }
+        pc = raw.get("pillar_counts", {})
+        tree = {
+            "active_sephiroth": active_list,
+            "vacant_sephiroth": vacant_list,
+            "pillar_balance": {
+                "left": pc.get("left", 0),
+                "middle": pc.get("middle", 0),
+                "right": pc.get("right", 0),
+            },
+            "dominant_pillar": raw.get("dominant_pillar", "middle"),
+            "balance_comment": raw.get("balance_comment", ""),
+            "planet_sephirah": planet_sephirah,
+        }
+        return _present({
+            "type": "tree_of_life",
+            "date": req.date,
+            "tree": tree,
+            "metadata": chart.get("metadata", {}),
+        })
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

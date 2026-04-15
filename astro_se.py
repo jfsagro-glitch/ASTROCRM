@@ -148,7 +148,7 @@ def _init():
 
 def calc_body(jd_ut: float, name: str) -> Optional[dict]:
     """
-    Calculate position of one body at Julian Day (UT).
+    Calculate geocentric position of one body at Julian Day (UT).
 
     Returns dict:
         lon         – ecliptic longitude (degrees, 0–360)
@@ -162,17 +162,35 @@ def calc_body(jd_ut: float, name: str) -> Optional[dict]:
 
     Returns None if swisseph is not available or body is unsupported.
     """
+    return _calc_body_flags(jd_ut, name, heliocentric=False)
+
+
+def calc_body_helio(jd_ut: float, name: str) -> Optional[dict]:
+    """
+    Calculate heliocentric position of one body at Julian Day (UT).
+    For 'earth': returns the Earth's heliocentric position (= Sun_geo + 180°).
+    Returns same structure as calc_body().
+    """
+    return _calc_body_flags(jd_ut, name, heliocentric=True)
+
+
+def _calc_body_flags(jd_ut: float, name: str, heliocentric: bool = False) -> Optional[dict]:
+    """Internal: calculate body position with optional heliocentric flag."""
     _init()
     if not _SWE_AVAILABLE:
         return None
 
-    body_id = _BODY_IDS.get(name)
+    # Earth in heliocentric mode = 'earth' body (SE_EARTH = 14)
+    if heliocentric and name == 'earth':
+        body_id = 14  # SE_EARTH
+    else:
+        body_id = _BODY_IDS.get(name)
+
     if body_id is None:
         return None
 
-    # Choose flags
+    # Build flags
     if _use_swieph:
-        # For Chiron specifically, need seas_18.se1
         if name == "chiron" and not (EPHE_DIR / "seas_18.se1").exists():
             flags = _swe.FLG_MOSEPH | _swe.FLG_SPEED
         else:
@@ -180,12 +198,17 @@ def calc_body(jd_ut: float, name: str) -> Optional[dict]:
     else:
         flags = _swe.FLG_MOSEPH | _swe.FLG_SPEED
 
+    if heliocentric:
+        flags |= _swe.FLG_HELCTR
+
     try:
         result, _ = _swe.calc_ut(jd_ut, body_id, flags)
     except Exception:
-        # Fallback to Moshier if SE file missing for this body
         try:
-            result, _ = _swe.calc_ut(jd_ut, body_id, _swe.FLG_MOSEPH | _swe.FLG_SPEED)
+            fallback_flags = _swe.FLG_MOSEPH | _swe.FLG_SPEED
+            if heliocentric:
+                fallback_flags |= _swe.FLG_HELCTR
+            result, _ = _swe.calc_ut(jd_ut, body_id, fallback_flags)
         except Exception:
             return None
 
@@ -213,11 +236,28 @@ def calc_body(jd_ut: float, name: str) -> Optional[dict]:
 
 def calc_all(jd_ut: float, names: list) -> dict:
     """
-    Calculate positions for a list of body names.
+    Calculate geocentric positions for a list of body names.
     Returns {name: calc_body(...)} skipping None results.
     """
     _init()
-    return {n: r for n in names if (r := calc_body(jd_ut, n)) is not None}
+    return {n: r for n in names if (r := _calc_body_flags(jd_ut, n, heliocentric=False)) is not None}
+
+
+def calc_heliocentric_all(jd_ut: float) -> dict:
+    """
+    Calculate heliocentric positions for all major bodies.
+    Includes Earth (at Sun's geocentric position + 180°).
+    Sun is excluded (heliocentric chart doesn't include the Sun).
+    Returns {name: {lon, lat, dist, speed, retrograde, sign, deg_in_sign, deg_min}}.
+    """
+    _init()
+    helio_bodies = [
+        "earth", "moon", "mercury", "venus", "mars",
+        "jupiter", "saturn", "uranus", "neptune", "pluto",
+        "node", "true_node", "chiron",
+    ]
+    return {n: r for n in helio_bodies
+            if (r := _calc_body_flags(jd_ut, n, heliocentric=True)) is not None}
 
 
 def calc_asteroid(jd_ut: float, asteroid_number: int) -> Optional[dict]:

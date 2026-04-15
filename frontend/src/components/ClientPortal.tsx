@@ -44,6 +44,8 @@ import { IngressCalendarBlock } from './IngressCalendarBlock';
 import { VoCWindowsPanel } from './VoCWindowsPanel';
 import { FixedStarsBlock } from './FixedStarsBlock';
 import SaturnCycleBlock from './SaturnCycleBlock';
+import { HeliocentricBlock } from './HeliocentricBlock';
+import { KabbalahTreeBlock } from './KabbalahTreeBlock';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2131,7 +2133,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2248,6 +2250,8 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'voc',                 icon: Clock,     label: '🌙 VoC Луна' },
     { key: 'saturn-cycle',        icon: Clock,     label: '♄ Цикл Сатурна' },
     { key: 'fixed-stars',         icon: Star,      label: '✦ Неп. звёзды' },
+    { key: 'heliocentric',        icon: Globe,     label: '☉ Гелиоцентр.' },
+    { key: 'kabbalah-tree',       icon: Sparkles,  label: '✡ Древо Жизни' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2495,6 +2499,30 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                     <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту для анализа звёзд</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'heliocentric' && (
+            <div id="pdf-section-heliocentric">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">☉</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Гелиоцентрическая карта</h2>
+                </div>
+                <HeliocentricBlock birthData={birth} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'kabbalah-tree' && (
+            <div id="pdf-section-kabbalah-tree">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">✡</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Древо Жизни (Каббала)</h2>
+                </div>
+                <KabbalahTreeBlock birthData={birth} />
               </div>
             </div>
           )}

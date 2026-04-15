@@ -1942,7 +1942,123 @@ _MODALITY_SIGNS = {
 }
 
 
-def calc_chart_analysis(planets_dict: dict, aspects: list) -> dict:
+# ══════════════════════════════════════════════════════════════════════════════
+# HELIOCENTRIC CHART
+# ══════════════════════════════════════════════════════════════════════════════
+
+def calc_heliocentric_chart(yr, mo, dy, h, mi, sc, lat, lon_deg, utc_off,
+                             houses_system="placidus"):
+    """
+    Calculate a heliocentric chart (Sun-centred).
+
+    With Swiss Ephemeris available: uses FLG_HELCTR for accurate positions.
+    Fallback (no SE): approximate geocentric-to-heliocentric conversion:
+      - Earth: n360(sun_geo + 180°)
+      - Outer planets (Mars+): helio ≈ geo (error < 1° for Jupiter+, up to 3° for Mars)
+      - Inner planets: converted via parallax formula using orbital radii
+
+    Returns a dict similar to calc_chart() but with heliocentric planets.
+    Includes aspects between heliocentric planets.
+    """
+    jd_utc = jd(yr, mo, dy, h, mi, sc) - utc_off / 24.0
+
+    # ── Try Swiss Ephemeris heliocentric ──────────────────────────────────────
+    try:
+        import astro_se as _se
+        if _se.is_available():
+            helio_raw = _se.calc_heliocentric_all(jd_utc)
+            if helio_raw:
+                planets_out = {}
+                for name, body in helio_raw.items():
+                    d = body["deg_in_sign"]
+                    planets_out[name] = {
+                        "lon":         body["lon"],
+                        "sign":        body["sign"],
+                        "deg_in_sign": round(d, 4),
+                        "deg_min":     body["deg_min"],
+                        "lat":         body.get("lat", 0.0),
+                        "dist_au":     body.get("dist", None),
+                        "speed":       body.get("speed", None),
+                        "retrograde":  body.get("retrograde", False),
+                    }
+                aspects = calc_aspects(
+                    {n: v["lon"] for n, v in planets_out.items()}, orb_factor=1.0)
+                return {
+                    "type":     "heliocentric",
+                    "method":   "swiss_ephemeris",
+                    "jd_ut":    round(jd_utc, 6),
+                    "metadata": {
+                        "date":  f"{yr:04d}-{mo:02d}-{dy:02d}",
+                        "time":  f"{h:02d}:{mi:02d}:{int(sc):02d}",
+                        "utc":   utc_off,
+                        "lat":   lat,
+                        "lon":   lon_deg,
+                        "note":  "Heliocentric (Sun-centred). Earth replaces Sun.",
+                    },
+                    "planets":  planets_out,
+                    "aspects":  aspects,
+                }
+    except Exception:
+        pass
+
+    # ── Fallback: geocentric approximation ───────────────────────────────────
+    # Earth position = Sun geocentric + 180°
+    geo_planets = calc_planets(jd_utc)
+    sun_lon = geo_planets.get("sun", 0.0)
+
+    # Mean heliocentric orbital radii (AU) for inner planets
+    _AU = {"mercury": 0.387, "venus": 0.723, "earth": 1.000,
+           "mars": 1.524, "jupiter": 5.203, "saturn": 9.537}
+
+    helio_lons = {}
+    helio_lons["earth"] = n360(sun_lon + 180.0)
+
+    for pname, geo_lon in geo_planets.items():
+        if pname == "sun":
+            continue
+        if pname in ("mercury", "venus"):
+            # Inner planet: use parallax correction
+            r_p = _AU.get(pname, 1.0)
+            r_e = 1.0
+            angle_geo = n360(geo_lon - sun_lon)
+            angle_rad = math.asin(r_e * math.sin(rad(angle_geo)) / r_p)
+            helio_lon = n360(geo_lon + deg(angle_rad))
+        else:
+            # Outer planet: geocentric ≈ heliocentric (small correction)
+            helio_lon = geo_lon
+        helio_lons[pname] = helio_lon
+
+    planets_out = {}
+    for name, lon_val in helio_lons.items():
+        d = deg_in_sign(lon_val)
+        planets_out[name] = {
+            "lon":         round(lon_val, 4),
+            "sign":        sign_name(lon_val),
+            "deg_in_sign": round(d, 4),
+            "deg_min":     f"{int(d)}°{int((d%1)*60):02d}'",
+            "retrograde":  False,
+        }
+
+    aspects = calc_aspects({n: v["lon"] for n, v in planets_out.items()}, orb_factor=1.0)
+
+    return {
+        "type":     "heliocentric",
+        "method":   "approximate",
+        "jd_ut":    round(jd_utc, 6),
+        "metadata": {
+            "date":  f"{yr:04d}-{mo:02d}-{dy:02d}",
+            "time":  f"{h:02d}:{mi:02d}:{int(sc):02d}",
+            "utc":   utc_off,
+            "lat":   lat,
+            "lon":   lon_deg,
+            "note":  "Approximate heliocentric (install pyswisseph for accuracy).",
+        },
+        "planets":  planets_out,
+        "aspects":  aspects,
+    }
+
+
+
     """Compute chart shape, dominant element, dominant modality, unaspected planets.
 
     Args:

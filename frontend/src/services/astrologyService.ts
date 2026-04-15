@@ -770,3 +770,85 @@ export async function getSaturnCycle(
     max_age: maxAge,
   });
 }
+
+// ── Heliocentric Chart ───────────────────────────────────────────────────────
+
+export interface HeliocentricPlanet {
+  lon: number;
+  sign: string;
+  deg_in_sign: number;
+  deg_min: string;
+  lat?: number;
+  dist_au?: number;
+  speed?: number;
+  retrograde?: boolean;
+}
+
+export interface HeliocentricAspect {
+  planet1: string;
+  planet2: string;
+  aspect: string;
+  glyph: string;
+  orb: number;
+  angle: number;
+}
+
+export interface HeliocentricResult {
+  type: 'heliocentric';
+  method: 'swiss_ephemeris' | 'approximate';
+  jd_ut: number;
+  metadata: {
+    date: string;
+    time: string;
+    utc: number;
+    lat: number;
+    lon: number;
+    note: string;
+  };
+  planets: Record<string, HeliocentricPlanet>;
+  aspects: HeliocentricAspect[];
+}
+
+export async function getHeliocentricChart(b: BirthInput): Promise<HeliocentricResult> {
+  return post('/heliocentric', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+  });
+}
+
+// ── Kabbalah Tree Mapping ─────────────────────────────────────────────────────
+
+export interface TreeSephirah {
+  number: number;
+  name: string;
+  planet?: string;
+  sign?: string;
+  pillar: string;   // "left" | "middle" | "right"
+}
+
+export interface TreeOfLifeResult {
+  type: 'tree_of_life';
+  date: string;
+  tree: {
+    active_sephiroth: TreeSephirah[];
+    vacant_sephiroth: Array<{ number: number; name: string; pillar: string }>;
+    pillar_balance: { left: number; middle: number; right: number };
+    dominant_pillar: string;
+    balance_comment: string;
+    planet_sephirah: Record<string, { sephirah: string; number: number }>;
+  };
+  metadata?: Record<string, unknown>;
+}
+
+export async function getTreeOfLife(b: BirthInput): Promise<TreeOfLifeResult> {
+  return post('/kabbalah/tree-mapping', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+  });
+}
