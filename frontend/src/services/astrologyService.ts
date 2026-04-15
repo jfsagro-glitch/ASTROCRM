@@ -600,3 +600,129 @@ export async function getNumerologyProfile(
   });
 }
 
+// ─── Daily Personal ───────────────────────────────────────────────────────────
+
+export interface DailyTransitAspect {
+  transiting_planet: string;
+  natal_planet: string;
+  aspect: string;
+  orb: number;
+  applying: boolean;
+}
+
+export interface DailyMoonInfo {
+  sign: string;
+  degree: number;
+  phase: string;
+  phase_angle: number;
+  void_of_course: {
+    is_void: boolean;
+    moon_sign: string;
+    void_duration_hours?: number;
+    void_end_sign?: string;
+    last_aspect?: { planet: string; aspect: string };
+  } | null;
+}
+
+export interface DailyPersonalResult {
+  name: string | null;
+  birth_date: string;
+  target_date: string;
+  moon: DailyMoonInfo;
+  top_transits: DailyTransitAspect[];
+  profection: {
+    age?: number;
+    profected_house?: number;
+    lord_of_year?: string;
+  };
+  firdaria: {
+    current_period?: { planet: string; start: string; end: string };
+    current_sub?: { planet: string; start: string; end: string };
+  };
+  advice: Array<{ category: string; text: string; depth: string }>;
+}
+
+export async function getDailyPersonal(
+  b: BirthInput,
+  targetDate?: string,
+): Promise<DailyPersonalResult> {
+  return post('/daily/personal', {
+    date: b.date,
+    time: b.time,
+    lat: b.lat,
+    lon: b.lon,
+    utc: b.utc,
+    name: b.name ?? '',
+    target_date: targetDate ?? null,
+  });
+}
+
+// ─── Ingress Calendar ─────────────────────────────────────────────────────────
+
+export interface PlanetaryIngress {
+  planet: string;
+  sign: string;
+  sign_idx: number;
+  jd: number;
+  datetime_utc: string;
+}
+
+export interface IngressCalendarResult {
+  year: number;
+  planets: string[];
+  count: number;
+  ingresses: PlanetaryIngress[];
+}
+
+export async function getIngressCalendar(
+  year: number,
+  planets = 'sun,mercury,venus,mars,jupiter,saturn',
+  includeMoon = false,
+): Promise<IngressCalendarResult> {
+  const params = new URLSearchParams({
+    year: String(year),
+    planets,
+    include_moon: String(includeMoon),
+  });
+  const res = await fetch(`${API_URL}/ephemeris/ingress-calendar?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ─── VoC Windows ─────────────────────────────────────────────────────────────
+
+export interface VoCWindow {
+  is_void: boolean;
+  moon_sign: string;
+  void_start_jd: number;
+  void_end_jd?: number;
+  void_end_sign?: string;
+  void_duration_hours?: number;
+  last_aspect?: { planet: string; aspect: string } | null;
+}
+
+export interface VoCWindowsResult {
+  query_date: string;
+  query_time: string;
+  utc_offset: number;
+  windows_returned: number;
+  windows: VoCWindow[];
+}
+
+export async function getVoCWindows(
+  b: BirthInput,
+  date?: string,
+  count = 5,
+): Promise<VoCWindowsResult> {
+  return post('/natal/void-of-course', {
+    date: date ?? b.date,
+    time: '12:00',
+    utc: b.utc,
+    lat: b.lat,
+    lon: b.lon,
+    count,
+    look_ahead: 30,
+  });
+}
+
+

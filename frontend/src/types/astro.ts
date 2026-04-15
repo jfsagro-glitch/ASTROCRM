@@ -108,6 +108,17 @@ export interface ChartMetadata {
   houses_system: string;
 }
 
+export interface ChartAnalysis {
+  shape: 'bundle' | 'bowl' | 'bucket' | 'locomotive' | 'seesaw' | 'splash' | 'splay';
+  spread_deg: number;
+  max_gap_deg: number;
+  element_scores: Record<string, number>;
+  dominant_element: 'fire' | 'earth' | 'air' | 'water';
+  modality_scores: Record<string, number>;
+  dominant_modality: 'cardinal' | 'fixed' | 'mutable';
+  unaspected_planets: string[];
+}
+
 export interface NatalChart {
   metadata: ChartMetadata;
   planets: Record<string, PlanetData>;
@@ -120,6 +131,8 @@ export interface NatalChart {
   sect?: SectData;
   dispositors?: DispositorData;
   fixed_stars?: FixedStar[];
+  chart_analysis?: ChartAnalysis;
+  mutual_receptions?: string[][];
 }
 
 export interface SynastryResult {

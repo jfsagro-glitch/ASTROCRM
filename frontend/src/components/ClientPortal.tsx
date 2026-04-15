@@ -38,6 +38,10 @@ import { ClientHistoryPanel } from './ClientHistoryPanel';
 import PrimaryDirectionsBlock from './PrimaryDirectionsBlock';
 import ProbabilityTreeBlock from './ProbabilityTreeBlock';
 import ZodiacalReleasingBlock from './ZodiacalReleasingBlock';
+import { ChartAnalysisSection } from './ChartAnalysisSection';
+import DailyPersonalBlock from './DailyPersonalBlock';
+import { IngressCalendarBlock } from './IngressCalendarBlock';
+import { VoCWindowsPanel } from './VoCWindowsPanel';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
   getSolarReturn, getLunarReturn, getProfections, getTertiaryProgressions,
@@ -2125,7 +2129,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2237,6 +2241,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'probability',         icon: Sparkles,  label: '🌀 Вероятн.' },
     { key: 'gene-keys',           icon: Sparkles,  label: '✦ Gene Keys' },
     { key: 'history',             icon: Sparkles,  label: '📋 История' },
+    { key: 'daily',               icon: Zap,       label: '📅 День' },
+    { key: 'ingress',             icon: Globe,     label: '🌠 Ингрессы' },
+    { key: 'voc',                 icon: Clock,     label: '🌙 VoC Луна' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2366,6 +2373,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   </div>
                   <AspectList aspects={natalChart.aspects} theme={theme} />
                   <ExtraInfo chart={natalChart} theme={theme} />
+                  {natalChart.chart_analysis && (
+                    <ChartAnalysisSection analysis={natalChart.chart_analysis} />
+                  )}
                 </>
               ) : (
                 <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
@@ -2415,6 +2425,39 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <p className={`${theme.text} text-sm`}>Войдите в систему для доступа к истории</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'daily' && (
+            <div id="pdf-section-daily">
+              {birth.date && birth.time ? (
+                <DailyPersonalBlock birthData={birth} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для персонального дня</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'ingress' && (
+            <div id="pdf-section-ingress">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">🌠</span>
+                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Календарь ингрессов планет</h2>
+                </div>
+                <IngressCalendarBlock />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'voc' && (
+            <div id="pdf-section-voc">
+              <div className={`rounded-xl border ${theme.card} p-4`}>
+                <VoCWindowsPanel birthData={birth} />
+              </div>
             </div>
           )}
 
