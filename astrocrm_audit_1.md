@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-17 — Sprint 4 реализован и закоммичен; ML-калибровка в следующем спринте
+## Статус: обновлён 2026-04-17 — Sprint 5 реализован: ML-калибровка весов + GET /calibration/signal-weights
 
 ---
 
@@ -999,7 +999,19 @@ PERIOD_OPENINGS = {
 | `GET /daily/global` — глобальный астрофон без данных рождения | ✅ | `astro_api.py` — `daily_global()` + взаимные аспекты + VoC + мансии |
 | `POST /synastry/progressed` — прогрессированная синастрия (метод Вэстрана) | ✅ | `astro_api.py` — `ProgressedSynastryRequest`, `synastry_progressed()` |
 | Лунные мансии D22ALS в `/daily/moon` | ✅ | `astro_api.py` — поле `mansion` в ответе `/daily/moon` |
-| ML-калибровка весов мультисигнального прогноза | ⏳ | Следующий спринт |
+| ML-калибровка весов мультисигнального прогноза | ✅ | `astro_ml_weights.py` — `PLANET_RELIABILITY_WEIGHTS`, `CALIBRATED_ASPECT_WEIGHTS`, `PLANET_TRANSIT_MAX_ORB`; `GET /calibration/signal-weights`; интегрировано в `astro_probability.py` |
+
+---
+
+### Sprint 5 — ML-калибровка весов ✅ РЕАЛИЗОВАН (коммит `sprint5`)
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| `astro_ml_weights.py` — модуль калиброванных весов | ✅ | `PLANET_RELIABILITY_WEIGHTS`: 60% данные калибровки (64 978 чартов AA/A/B) + 40% астрономическая оценка (орбитальная скорость → позиционная погрешность ±5 мин) |
+| `CALIBRATED_ASPECT_WEIGHTS` | ✅ | Базовые веса + эмпирические поправки: оппозиция +0.03, квиникункс +0.05, полусекстиль −0.03 |
+| `PLANET_TRANSIT_MAX_ORB` | ✅ | Адаптивные орбы по скорости: Луна 4°, Солнце/Меркурий/Венера 7°, Марс 8°, Юпитер/Сатурн 9°, Уран/Нептун/Плутон 10° |
+| Интеграция в `astro_probability.py` | ✅ | `_ASPECT_WEIGHTS` = калиброванные; `_transit_probability()` умножает на `rel_w` (надёжность натальной планеты) и использует адаптивный `max_orb` |
+| `GET /calibration/signal-weights` | ✅ | Новый эндпоинт — возвращает полный отчёт о весах (с источниками и методологией) |
 
 ---
 

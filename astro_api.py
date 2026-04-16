@@ -40,6 +40,12 @@ try:
 except Exception as _comp_err:
     _COMPENSATORY_OK = False
     build_compensatory_report = None  # type: ignore
+try:
+    from astro_ml_weights import get_signal_weights_report as _get_signal_weights
+    _ML_WEIGHTS_OK = True
+except Exception:
+    _ML_WEIGHTS_OK = False
+    _get_signal_weights = None  # type: ignore
 from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
@@ -5186,6 +5192,27 @@ def ingress_calendar(
         raise
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ── CALIBRATION / ML WEIGHTS ──────────────────────────────────────────────────
+
+@app.get("/calibration/signal-weights")
+def calibration_signal_weights():
+    """
+    Sprint 5 — ML-калиброванные веса мультисигнального прогноза.
+
+    Возвращает:
+    - Веса надёжности планет (calibration dataset: 64 978 чартов AA/A/B)
+    - Откалиброванные аспектные веса (с поправками из анализа датасета)
+    - Максимальные орбы транзитов (адаптированы под скорость планеты)
+    - Методологию и источники данных
+
+    Используется фронтендом для отображения «веса сигнала» и
+    вероятностной моделью `astro_probability.py` при расчёте транзитов.
+    """
+    if not _ML_WEIGHTS_OK or _get_signal_weights is None:
+        raise HTTPException(503, "ML weights module not available (astro_ml_weights.py)")
+    return _present(_get_signal_weights())
 
 
 # ═════════════════════════════════════════════════════════════════════════════

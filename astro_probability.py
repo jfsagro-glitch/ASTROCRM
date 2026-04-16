@@ -20,6 +20,20 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+# Sprint 5 — ML-калиброванные веса (импортируем с fallback на дефолты)
+try:
+    from astro_ml_weights import (
+        CALIBRATED_ASPECT_WEIGHTS as _CAL_ASPECT_W,
+        PLANET_RELIABILITY_WEIGHTS as _CAL_PLANET_REL,
+        PLANET_TRANSIT_MAX_ORB as _CAL_TRANSIT_ORB,
+    )
+    _ML_WEIGHTS_OK = True
+except ImportError:
+    _CAL_ASPECT_W   = {}
+    _CAL_PLANET_REL = {}
+    _CAL_TRANSIT_ORB = {}
+    _ML_WEIGHTS_OK  = False
+
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -29,7 +43,8 @@ _NAGUAL_PLANETS = {"neptune", "pluto", "moon", "uranus"}   # chaos, transformati
 _BRIDGE_PLANETS = {"mars", "venus", "node", "chiron", "lilith"}  # bridge/catalyst
 
 # Aspect weights for probability score (0.0 → 1.0)
-_ASPECT_WEIGHTS = {
+# Sprint 5: if ML weights loaded, use calibrated values; else use originals.
+_ASPECT_WEIGHTS_BASE = {
     "conjunction":  1.0,
     "opposition":   0.85,
     "square":       0.80,
@@ -40,6 +55,7 @@ _ASPECT_WEIGHTS = {
     "sesquisquare": 0.30,
     "semisextile":  0.20,
 }
+_ASPECT_WEIGHTS = _CAL_ASPECT_W if _ML_WEIGHTS_OK else _ASPECT_WEIGHTS_BASE
 
 # Life sphere mapping for each planet
 _PLANET_SPHERES = {
@@ -93,12 +109,19 @@ def _transit_probability(
 ) -> float:
     """
     Base probability weight for a single transit aspect.
-    Combines: aspect weight × orb decay × dignity multiplier
+    Sprint 5: combines calibrated aspect weight × adaptive orb decay
+              × dignity multiplier × natal planet reliability weight.
     """
     asp_w = _ASPECT_WEIGHTS.get(aspect, 0.2)
-    orb_w = _orb_weight(orb, max_orb=10.0 if aspect == "conjunction" else 8.0)
+    # Sprint 5: use calibrated max orb for transiting planet if available
+    max_orb = (_CAL_TRANSIT_ORB.get(transiting_planet, 8.0)
+               if _ML_WEIGHTS_OK else
+               (10.0 if aspect == "conjunction" else 8.0))
+    orb_w = _orb_weight(orb, max_orb=max_orb)
     dig_m = _dignity_multiplier(natal_planet, natal_chart)
-    return round(asp_w * orb_w * dig_m, 4)
+    # Sprint 5: reliability weight for the natal planet
+    rel_w = _CAL_PLANET_REL.get(natal_planet, 1.0) if _ML_WEIGHTS_OK else 1.0
+    return round(asp_w * orb_w * dig_m * rel_w, 4)
 
 
 # ── Assembly Point Index ──────────────────────────────────────────────────────
