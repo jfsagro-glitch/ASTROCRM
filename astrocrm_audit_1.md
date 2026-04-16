@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-16 — Sprint 3 UX реализован; Sprint 4 (новые эндпоинты) в плане
+## Статус: обновлён 2026-04-17 — Sprint 4 реализован и закоммичен; ML-калибровка в следующем спринте
 
 ---
 
@@ -990,16 +990,16 @@ PERIOD_OPENINGS = {
 | Bottom-sheet для деталей на мобильном | ✅ | Реализовано в `ChartWheel.tsx` (мобильный drag-handle bottom-sheet) |
 | Кнопка «Полный отчёт» → PDF | ✅ | `handleFullReport()` в `ClientPortal.tsx` (L2189–L2193) |
 
-### Sprint 4 — Новые эндпоинты (запланировано)
+### Sprint 4 — Новые эндпоинты ✅ РЕАЛИЗОВАН (коммит `sprint4`)
 
-| Задача | Статус |
-|--------|--------|
-| `POST /predictive/eclipse-personal` — затмения в натальных домах + compensatory | ⏳ |
-| `POST /predictive/ingress-personal` — ингрессии через натальные дома | ⏳ |
-| `GET /daily/global` — глобальный астрофон без данных рождения | ⏳ |
-| `POST /synastry/progressed` — прогрессированная синастрия (метод Вэстрана) | ⏳ |
-| Лунные мансии D22ALS в `/daily/moon` | ⏳ |
-| ML-калибровка весов мультисигнального прогноза | ⏳ |
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| `POST /predictive/eclipse-personal` — затмения в натальных домах + compensatory | ✅ | `astro_api.py` — `EclipsePersonalRequest`, `eclipse_personal()` |
+| `POST /predictive/ingress-personal` — ингрессии через натальные дома | ✅ | `astro_api.py` — `IngressPersonalRequest`, `ingress_personal()` |
+| `GET /daily/global` — глобальный астрофон без данных рождения | ✅ | `astro_api.py` — `daily_global()` + взаимные аспекты + VoC + мансии |
+| `POST /synastry/progressed` — прогрессированная синастрия (метод Вэстрана) | ✅ | `astro_api.py` — `ProgressedSynastryRequest`, `synastry_progressed()` |
+| Лунные мансии D22ALS в `/daily/moon` | ✅ | `astro_api.py` — поле `mansion` в ответе `/daily/moon` |
+| ML-калибровка весов мультисигнального прогноза | ⏳ | Следующий спринт |
 
 ---
 

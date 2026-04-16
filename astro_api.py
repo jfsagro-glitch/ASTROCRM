@@ -1063,6 +1063,7 @@ def daily_moon(date: Optional[str] = None, time: str = "12:00",
             "phase_angle":  round(phase_angle, 2),
             "phase":        phase_name,
             "void_of_course": voc,
+            "mansion":      lunar_mansion_full(moon_lon),
         })
     except HTTPException:
         raise
@@ -2209,6 +2210,434 @@ def calc_saturn_cycle(req: SaturnCycleRequest):
             max_age=req.max_age,
         )
         return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+
+# ── ECLIPSE-PERSONAL ──────────────────────────────────────────────────────────
+
+class EclipsePersonalRequest(BaseModel):
+    date:        str
+    time:        str = "12:00"
+    lat:         float
+    lon:         float
+    utc:         float = 0.0
+    start_date:  Optional[str] = None   # default: today
+    count:       int = 6
+    houses:      str = "placidus"
+    include_compensatory: bool = True
+
+
+@app.post("/predictive/eclipse-personal")
+def eclipse_personal(req: EclipsePersonalRequest):
+    """
+    Find upcoming eclipses and map each one to the native's natal house.
+    Returns eclipse list enriched with natal_house, activated_theme, and
+    optional compensatory practices for that house theme.
+    """
+    # House theme keywords (for narrative)
+    _HOUSE_THEMES = {
+        1: "идентичность, тело, начинания",
+        2: "деньги, ценности, ресурсы",
+        3: "коммуникации, братья/сёстры, короткие поездки",
+        4: "дом, семья, корни",
+        5: "творчество, дети, удовольствие, риск",
+        6: "работа, здоровье, рутина",
+        7: "партнёрство, договоры, открытые враги",
+        8: "трансформация, наследство, совместные ресурсы",
+        9: "философия, путешествия, высшее образование",
+        10: "карьера, публичность, статус",
+        11: "друзья, сообщество, цели",
+        12: "тайны, изоляция, кармические уроки",
+    }
+    try:
+        from astro_engine import planet_in_house as _pih
+        start = req.start_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        eclipses = find_eclipses(start, count=req.count)
+
+        # Build natal chart for house cusps
+        yr, mo, dy = _parse_date(req.date)
+        h, mi, sc  = _parse_time(req.time)
+        natal = calc_chart(yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+                           houses_system=req.houses,
+                           include_aspects=False, include_dignities=False,
+                           include_arabic=False)
+        houses_dict = natal.get("houses", {})
+
+        enriched = []
+        for ecl in eclipses:
+            # Eclipse point: solar → Sun lon; lunar → Moon lon
+            ecl_lon = ecl.get("sun_lon" if ecl["type"] == "solar" else "moon_lon", 0)
+            natal_house = _pih(ecl_lon, houses_dict)
+            theme = _HOUSE_THEMES.get(natal_house, "")
+            entry = dict(ecl)
+            entry["natal_house"]      = natal_house
+            entry["activated_theme"]  = theme
+            entry["sign"]             = sign_name(ecl_lon)
+
+            # Compensatory: brief narrative for the activated house
+            if req.include_compensatory and _COMPENSATORY_OK and build_compensatory_report is not None:
+                try:
+                    # Synthesize a minimal "transit" dict representing eclipse point
+                    synth_aspect = {
+                        "transit_planet": "sun" if ecl["type"] == "solar" else "moon",
+                        "natal_planet":   f"house_{natal_house}",
+                        "aspect":         "conjunction",
+                        "orb":            0.0,
+                        "applying":       True,
+                    }
+                    comp = build_compensatory_report(natal_chart=natal,
+                                                     transit_aspects=[synth_aspect],
+                                                     depth="light")
+                    entry["compensatory"] = comp.get("practices", [])[:2]
+                except Exception:
+                    entry["compensatory"] = []
+
+            enriched.append(entry)
+
+        return _present({
+            "natal_date":  req.date,
+            "scan_from":   start,
+            "eclipses":    enriched,
+            "count":       len(enriched),
+            "interpretation": (
+                f"Найдено {len(enriched)} затмений. "
+                "Затмения активируют натальные дома, интенсифицируя их темы на 6–18 месяцев. "
+                "Солнечное затмение (новолуние) запускает новый цикл в доме; "
+                "лунное (полнолуние) — завершает или кульминирует тему."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── INGRESS-PERSONAL ──────────────────────────────────────────────────────────
+
+_ALL_SIGNS = ["aries","taurus","gemini","cancer","leo","virgo",
+              "libra","scorpio","sagittarius","capricorn","aquarius","pisces"]
+
+_SIGN_RU = {
+    "aries": "Овен", "taurus": "Телец", "gemini": "Близнецы",
+    "cancer": "Рак", "leo": "Лев", "virgo": "Дева",
+    "libra": "Весы", "scorpio": "Скорпион", "sagittarius": "Стрелец",
+    "capricorn": "Козерог", "aquarius": "Водолей", "pisces": "Рыбы",
+}
+
+class IngressPersonalRequest(BaseModel):
+    date:   str
+    time:   str = "12:00"
+    lat:    float
+    lon:    float
+    utc:    float = 0.0
+    year:   Optional[int] = None    # default: current year
+    houses: str = "placidus"
+
+
+@app.post("/predictive/ingress-personal")
+def ingress_personal(req: IngressPersonalRequest):
+    """
+    Compute all 12 solar ingresses for the given year and map each to the
+    native's natal house. Returns the 12 ingress events with house activation,
+    helping identify which life area each solar month emphasises.
+    """
+    _HOUSE_THEMES = {
+        1: "идентичность, тело, начинания",
+        2: "деньги, ценности, ресурсы",
+        3: "коммуникации, короткие поездки",
+        4: "дом, семья, корни",
+        5: "творчество, дети, удовольствие",
+        6: "работа, здоровье, рутина",
+        7: "партнёрство, договоры",
+        8: "трансформация, совместные ресурсы",
+        9: "философия, путешествия, учёба",
+        10: "карьера, публичность",
+        11: "друзья, сообщество, цели",
+        12: "тайны, изоляция, духовность",
+    }
+    try:
+        from astro_engine import planet_in_house as _pih
+        year = req.year or datetime.now(timezone.utc).year
+
+        # Build natal for house cusps
+        yr, mo, dy = _parse_date(req.date)
+        h, mi, sc  = _parse_time(req.time)
+        natal = calc_chart(yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+                           houses_system=req.houses,
+                           include_aspects=False, include_dignities=False,
+                           include_arabic=False)
+        houses_dict = natal.get("houses", {})
+
+        results = []
+        for sign in _ALL_SIGNS:
+            try:
+                chart = ingress_chart(year, sign, req.lat, req.lon,
+                                      houses_system=req.houses)
+            except Exception:
+                chart = None
+
+            if chart is None:
+                # Some signs may be in subsequent year edge cases — try year+1
+                try:
+                    chart = ingress_chart(year + 1, sign, req.lat, req.lon,
+                                         houses_system=req.houses)
+                except Exception:
+                    continue
+
+            meta = chart.get("ingress_metadata", {})
+            ingress_lon = meta.get("target_lon", 0)
+            ingress_date = meta.get("ingress_date_utc", "") or meta.get("date", "")
+            natal_house = _pih(ingress_lon, houses_dict)
+
+            results.append({
+                "sign":           sign,
+                "sign_ru":        _SIGN_RU.get(sign, sign),
+                "ingress_date":   ingress_date,
+                "ingress_lon":    round(ingress_lon, 2),
+                "natal_house":    natal_house,
+                "activated_theme": _HOUSE_THEMES.get(natal_house, ""),
+            })
+
+        # Sort by ingress date
+        results.sort(key=lambda x: x.get("ingress_date", ""))
+
+        return _present({
+            "natal_date": req.date,
+            "year":       year,
+            "ingresses":  results,
+            "interpretation": (
+                f"12 солнечных ингрессий {year} года с привязкой к натальным домам. "
+                "Каждая ингрессия — смена фокуса на ~30 дней. "
+                "Дом, куда входит Солнце, активирует соответствующую жизненную тему."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── DAILY GLOBAL ──────────────────────────────────────────────────────────────
+
+@app.get("/daily/global")
+def daily_global(
+    date: Optional[str] = None,
+    time: str = "12:00",
+    utc:  float = 0.0,
+):
+    """
+    Global astrological background — no birth data required.
+    Returns current transiting planets, mutual aspects between them,
+    Moon status (phase + VoC + mansion), and upcoming eclipses/stations.
+    Suitable for a public astro-weather widget.
+    """
+    _ASPECT_ORBS = {
+        "conjunction": 6.0, "opposition": 6.0, "trine": 5.0,
+        "square": 5.0, "sextile": 4.0,
+    }
+    _ASPECT_ANGLES = {"conjunction": 0, "opposition": 180, "trine": 120, "square": 90, "sextile": 60}
+
+    try:
+        if not date:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        jd_val = _to_jd(date, time, utc)
+        planets = calc_planets(jd_val)
+
+        # Build planet position dicts
+        planet_list = []
+        for name, lon in planets.items():
+            if name in ("lilith", "node"):
+                continue
+            planet_list.append({
+                "planet": name,
+                "lon":    round(lon, 4),
+                "sign":   sign_name(lon),
+                "degree": round(lon % 30, 2),
+            })
+
+        # Mutual transiting aspects
+        mutual_aspects = []
+        keys = [p["planet"] for p in planet_list]
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                lon1 = planets[keys[i]]
+                lon2 = planets[keys[j]]
+                diff = abs(((lon2 - lon1 + 180) % 360) - 180)
+                for asp_name, target in _ASPECT_ANGLES.items():
+                    orb = abs(diff - target)
+                    if orb <= _ASPECT_ORBS.get(asp_name, 5.0):
+                        mutual_aspects.append({
+                            "planet1": keys[i],
+                            "planet2": keys[j],
+                            "aspect":  asp_name,
+                            "orb":     round(orb, 2),
+                            "applying": False,  # simplified — would need speed check
+                        })
+        mutual_aspects.sort(key=lambda a: a["orb"])
+
+        # Moon info
+        moon_lon = planets.get("moon", 0)
+        sun_lon  = planets.get("sun",  0)
+        phase_angle = (moon_lon - sun_lon) % 360
+        phases = ["new_moon","waxing_crescent","first_quarter","waxing_gibbous",
+                  "full_moon","waning_gibbous","last_quarter","waning_crescent"]
+        phase_name = phases[int(phase_angle / 45) % 8]
+        voc  = void_of_course_moon(jd_val, look_ahead_days=3.0)
+        mans = lunar_mansion_full(moon_lon)
+
+        # Next 3 eclipses
+        upcoming_eclipses: list = []
+        try:
+            upcoming_eclipses = find_eclipses(date, count=3)
+        except Exception:
+            pass
+
+        # Active ingresses today (Sun in first 3 degrees of sign = fresh ingress)
+        sun_deg_in_sign = round(sun_lon % 30, 2)
+        fresh_ingress = sun_deg_in_sign < 3.0
+
+        return _present({
+            "date":            date,
+            "time":            time,
+            "utc_offset":      utc,
+            "planets":         planet_list,
+            "mutual_aspects":  mutual_aspects[:10],
+            "moon": {
+                "sign":          sign_name(moon_lon),
+                "degree":        round(moon_lon % 30, 2),
+                "phase":         phase_name,
+                "phase_angle":   round(phase_angle, 1),
+                "is_void":       voc.get("is_void", False),
+                "void_end_sign": voc.get("void_end_sign"),
+                "void_end_jd":   voc.get("void_end_jd"),
+                "mansion":       mans,
+            },
+            "sun": {
+                "sign":          sign_name(sun_lon),
+                "degree":        round(sun_deg_in_sign, 2),
+                "fresh_ingress": fresh_ingress,
+            },
+            "upcoming_eclipses": upcoming_eclipses,
+            "interpretation": (
+                f"Глобальный астрофон {date}: Солнце в {sign_name(sun_lon)}, "
+                f"Луна в {sign_name(moon_lon)} ({phase_name.replace('_',' ')}). "
+                f"Активных аспектов между транзитными планетами: {len(mutual_aspects)}."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── SYNASTRY / PROGRESSED ────────────────────────────────────────────────────
+
+class ProgressedSynastryRequest(BaseModel):
+    # Person 1
+    date1:  str;  time1:  str = "12:00"
+    lat1:   float; lon1:  float; utc1: float = 0.0
+    name1:  Optional[str] = None
+    # Person 2
+    date2:  str;  time2:  str = "12:00"
+    lat2:   float; lon2:  float; utc2: float = 0.0
+    name2:  Optional[str] = None
+    # Target date for progressions
+    target_date: Optional[str] = None
+    houses: str = "placidus"
+
+
+@app.post("/synastry/progressed")
+def synastry_progressed(req: ProgressedSynastryRequest):
+    """
+    Progressed synastry (Wastran / moving-chart method):
+    Computes secondary progressions for both people on the target date,
+    then calculates cross-aspects between the two progressed charts.
+    Also includes progressed-to-natal cross-aspects for completeness.
+    """
+    try:
+        target_date = req.target_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        jd_natal1 = _to_jd(req.date1, req.time1, req.utc1)
+        jd_natal2 = _to_jd(req.date2, req.time2, req.utc2)
+
+        # Secondary progressions for both people
+        prog1_raw = secondary_progressions(jd_natal1, req.lat1, req.lon1, target_date)
+        prog2_raw = secondary_progressions(jd_natal2, req.lat2, req.lon2, target_date)
+
+        # Build synthetic progressed charts for aspect calculation
+        # secondary_progressions returns a dict with 'planets' and 'houses'
+        prog1_planets = prog1_raw.get("planets", {})
+        prog2_planets = prog2_raw.get("planets", {})
+
+        # Cross-aspects: progressed1 ↔ progressed2
+        def _cross_aspects(p1: dict, p2: dict, label: str) -> list:
+            _ORB = 2.0
+            _ANGLES = {"conjunction": 0, "opposition": 180, "trine": 120,
+                       "square": 90, "sextile": 60}
+            result = []
+            for n1, d1 in p1.items():
+                lon1 = d1.get("lon", d1) if isinstance(d1, dict) else d1
+                for n2, d2 in p2.items():
+                    lon2 = d2.get("lon", d2) if isinstance(d2, dict) else d2
+                    diff = abs(((float(lon2) - float(lon1) + 180) % 360) - 180)
+                    for asp, target in _ANGLES.items():
+                        orb = abs(diff - target)
+                        if orb <= _ORB:
+                            result.append({
+                                "planet1": n1, "planet2": n2,
+                                "aspect": asp, "orb": round(orb, 3),
+                                "type": label,
+                            })
+            result.sort(key=lambda x: x["orb"])
+            return result
+
+        prog_x_prog = _cross_aspects(prog1_planets, prog2_planets,
+                                     "progressed1_x_progressed2")
+
+        # Natal charts for natal↔progressed aspects
+        yr1, mo1, dy1 = _parse_date(req.date1); h1, mi1, sc1 = _parse_time(req.time1)
+        yr2, mo2, dy2 = _parse_date(req.date2); h2, mi2, sc2 = _parse_time(req.time2)
+        n1_chart = calc_chart(yr1, mo1, dy1, h1, mi1, sc1, req.lat1, req.lon1, req.utc1,
+                              houses_system=req.houses, include_aspects=False,
+                              include_dignities=False, include_arabic=False)
+        n2_chart = calc_chart(yr2, mo2, dy2, h2, mi2, sc2, req.lat2, req.lon2, req.utc2,
+                              houses_system=req.houses, include_aspects=False,
+                              include_dignities=False, include_arabic=False)
+        nat1_planets = {p: d.get("lon", d) if isinstance(d, dict) else d
+                        for p, d in n1_chart.get("planets", {}).items()}
+        nat2_planets = {p: d.get("lon", d) if isinstance(d, dict) else d
+                        for p, d in n2_chart.get("planets", {}).items()}
+
+        prog1_x_nat2 = _cross_aspects(prog1_planets, nat2_planets, "progressed1_x_natal2")
+        prog2_x_nat1 = _cross_aspects(prog2_planets, nat1_planets, "progressed2_x_natal1")
+
+        all_aspects = prog_x_prog + prog1_x_nat2 + prog2_x_nat1
+        all_aspects.sort(key=lambda x: x["orb"])
+
+        return _present({
+            "target_date":         target_date,
+            "name1":               req.name1 or "Person 1",
+            "name2":               req.name2 or "Person 2",
+            "progressed1":         prog1_raw,
+            "progressed2":         prog2_raw,
+            "aspects": {
+                "prog_x_prog":    prog_x_prog[:10],
+                "prog1_x_natal2": prog1_x_nat2[:10],
+                "prog2_x_natal1": prog2_x_nat1[:10],
+                "all_sorted":     all_aspects[:20],
+            },
+            "interpretation": (
+                f"Прогрессированная синастрия на {target_date}. "
+                f"Прогр.×Прогр.: {len(prog_x_prog)} аспектов, "
+                f"Прогр.1×Нат.2: {len(prog1_x_nat2)}, "
+                f"Прогр.2×Нат.1: {len(prog2_x_nat1)}. "
+                "Аспекты с орбом ≤1° особенно значимы — они действуют в течение ~1 года."
+            ),
+        })
     except HTTPException:
         raise
     except Exception as e:
