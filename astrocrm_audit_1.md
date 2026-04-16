@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-18 — Sprint 7 реализован: Firdaria fix, SignalWeightsBlock, SynastryProgressedBlock
+## Статус: обновлён 2026-04-18 — Sprint 7 ✅ ЗАВЕРШЁН. Всё реализовано. Открытые ⏳ — только низкий приоритет.
 
 ---
 
@@ -103,7 +103,8 @@ lot_of_marriage_universal = ASC + DSC - Venus  # т.е. ASC + (ASC+180°) - Venu
 
 ---
 
-### 4. ⏳ НЕ РЕАЛИЗОВАНО — Плутон через интерполяцию таблиц — низкая точность
+### 4. ✅ РЕАЛИЗОВАНО — Плутон: pyswisseph обязателен, HTTP 503 при отсутствии
+**Коммит:** `a1ceff4` | **Файл:** `astro_api.py`, `requirements.txt`
 
 **Файл**: `astro_engine.py`
 
@@ -111,47 +112,25 @@ lot_of_marriage_universal = ASC + DSC - Venus  # т.е. ASC + (ASC+180°) - Venu
 точность хуже 1°. Плутон медленный (~1°/год), поэтому для дат рождения это
 допустимо, но для транзитов на конкретный день — нет.
 
-**Исправление**: добавить аналитическую формулу Плутона (Мееус, гл. 37):
-```python
-# Приближённые элементы орбиты (Meeus Table 38.a):
-# Точность: ~2' для 1800-2050
-def pluto_approx(JD):
-    T = (JD - 2451545.0) / 36525
-    # Периодические члены через таблицу (18 членов по Мееусу)
-    # Существенно лучше табличной интерполяции
-```
-
-Альтернатива — добавить в requirements.txt явное требование `pyswisseph>=2.10.3`
-и выдавать `HTTP 503` с пояснением если он не установлен (сейчас система
-молча деградирует до неточных расчётов).
+**Реализовано**: В `requirements.txt` добавлен `pyswisseph>=2.10.3.2`. В `astro_api.py` при
+отсутствии swisseph возвращается `HTTP 503` («swisseph not installed») вместо
+молчаливой деградации. Аналитическая формула Мееуса (гл. 37) — low priority backlog.
 
 ---
 
-### 5. ⏳ НЕ РЕАЛИЗОВАНО — Орбы в натальной карте — 8° для трина/оппозиции завышены
+### 5. ✅ РЕАЛИЗОВАНО — Световые орбы (planet-sensitive orbs)
+**Коммит:** Sprint 7 (подтверждено) | **Файл:** `astro_engine.py` L755–787
 
 **Файл**: `astro_engine.py`, таблица аспектов
 
 Орб 8° для трина, квадрата и оппозиции — это широкий стандарт. Проблема в том,
-что система не учитывает **световые орбы**: Солнцу и Луне традиционно дают
+что система не учитывала **световые орбы**: Солнцу и Луне традиционно дают
 расширенные орбы (до 10°), остальным планетам — меньше (5-6° для трина).
 
-**Рекомендуемые орбы по традиции**:
-```python
-ORBS = {
-    "conjunction":  {"sun": 10, "moon": 10, "personal": 8, "social": 6, "outer": 5},
-    "opposition":   {"sun": 10, "moon": 10, "personal": 7, "social": 6, "outer": 5},
-    "trine":        {"sun": 8,  "moon": 8,  "personal": 6, "social": 5, "outer": 4},
-    "square":       {"sun": 8,  "moon": 8,  "personal": 6, "social": 5, "outer": 4},
-    "sextile":      {"sun": 6,  "moon": 6,  "personal": 5, "social": 4, "outer": 3},
-    "quincunx":     {"all": 3},
-    "semisextile":  {"all": 2},
-    "semisquare":   {"all": 2},
-    "sesquiquadrate": {"all": 2},
-}
-# Орб двух планет = среднее их индивидуальных орбов
-def get_orb(p1, p2, aspect_type):
-    return (ORBS[aspect_type][planet_class(p1)] + ORBS[aspect_type][planet_class(p2)]) / 2
-```
+**Реализовано**: `_LIGHT_ORBS` + `_light_orb(p1, p2, asp_name)` в `astro_engine.py`.
+Орб пары = среднее двух планетных орбов. Классы: luminary (Солнце/Луна),
+personal (Меркурий/Венера/Марс), social (Юпитер/Сатурн), outer (Уран/Нептун/Плутон).
+`calc_aspects()` использует `_light_orb()` по умолчанию.
 
 ---
 
@@ -225,13 +204,13 @@ def void_of_course_moon(JD, look_ahead_days=3, lat=0, lon=0):
 
 ```
 ✅ POST /predictive/firdaria             — реализовано (78e9b02)
-⏳ POST /predictive/annual-profection    — не реализовано
+⏳ POST /predictive/annual-profection    — не реализовано (low priority; /predictive/profections покрывает задачу)
 ✅ GET  /daily/moon                      — реализовано (78e9b02)
 ✅ POST /daily/personal                  — реализовано
 ✅ POST /compensatory/practices          — реализовано (78e9b02)
 ✅ POST /compensatory/current            — реализовано (78e9b02)
 ✅ GET  /ephemeris/ingress-calendar      — реализовано
-⏳ POST /natal/void-of-course            — не реализовано (VoC доступен через GET /daily/moon)
+✅ POST /natal/void-of-course            — реализовано (astro_api.py L4918)
 ```
 
 ### B. В модели ответа /natal добавить
@@ -258,7 +237,7 @@ def void_of_course_moon(JD, look_ahead_days=3, lat=0, lon=0):
 Без этого Solar Return считается на 12:00 UT вместо полуночи локального времени,
 что даёт неточный ASC возвратной карты.
 
-**Статус**: ⏳ не реализовано.
+**Статус**: ✅ РЕАЛИЗОВАНО — `timezone_name: Optional[str]` добавлен в `PredictiveRequest` (L476 `astro_api.py`). `_utc_for_tz()` (L169) конвертирует IANA tz → UTC offset. Solar/Lunar Return используют его через `effective_utc`. Коммит `a1ceff4`.
 
 ### D. ✅ РЕАЛИЗОВАНО — Флаг `advanced` для прогрессий
 **Коммит:** `78e9b02` | **Файл:** `astro_api.py`
@@ -946,10 +925,12 @@ PERIOD_OPENINGS = {
 
 ### Итог: **15 / 15** пунктов аудита выполнено ✅
 
-Остаётся нереализованным из аудита (низкий приоритет):
+Остаётся нереализованным из аудита (low priority backlog):
 - `calc_lunar_distance()` для точной классификации полных/кольцеобразных затмений
-- Световые орбы (Солнцу/Луне расширенные орбы)
-- `timezone_name` в `PredictiveRequest` для точного Solar Return
+- `POST /predictive/annual-profection` — отдельный эндпоинт (функция профекций реализована)
+
+> Световые орбы — ✅ реализованы (`astro_engine.py` L755–787).
+> `timezone_name` — ✅ реализовано (`PredictiveRequest` L476, `_utc_for_tz()` L169).
 
 > `POST /daily/personal` и `GET /ephemeris/ingress-calendar` — **реализованы**.
 
@@ -1205,4 +1186,5 @@ PERIOD_OPENINGS = {
 
 *Документ создан на основе аудита ASTROCRM System Description v. апрель 2026*
 *Обновлён 2026-04-16 (v3) — все пункты аудита завершены: WCAG 2.1 shape+pattern bars в ChartAnalysisSection, ChartWheelResponsive mobile bottom-sheet, подтверждены moon_distance_km и _LIGHT_ORBS*
-*Коммиты на момент проверки: `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`, `f324484`*
+*Обновлён 2026-04-18 (v4) — верификация Sprint 7: световые орбы ✅ (astro_engine.py L755–787), timezone_name ✅ (PredictiveRequest L476), /natal/void-of-course ✅ (L4918), pyswisseph+HTTP503 ✅; §§4,5,II-A,II-C,V актуализированы*
+*Коммиты на момент проверки: `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`, `f324484`, `ec71211`, `7b33776`, `4b0965c`, `5ef3112`, `5bb051b`, `605cbdc`, `3a3e1c6`*
