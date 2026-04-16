@@ -23,6 +23,7 @@ from astro_engine import (
     calc_planets, calc_houses, calc_aspects, calc_chart,
     PLANET_ORDER, SIGN_NAMES, sign_name, sign_glyph, deg_in_sign,
     parse_date_arg, parse_time_arg, ASPECT_DEFS, _angle_diff,
+    moon_distance_km,
 )
 
 # Swiss Ephemeris bridge for high-accuracy ephemerides
@@ -1490,9 +1491,13 @@ def find_eclipses(start_date_str, count=5):
                 if dist > 180: dist = 360 - dist
                 if dist < 18.5:
                     if dist < 10.0:
-                        # Cannot distinguish total vs annular without lunar distance;
-                        # label as 'central' — subtype requires angular diameter comparison
-                        eclipse_class = 'central'
+                        # Distinguish total vs annular using angular diameters (Meeus)
+                        moon_dist   = moon_distance_km(syzygy_jd)
+                        _, sun_r_au = sun(syzygy_jd)           # R in AU
+                        sun_dist_km = sun_r_au * 149_597_870.7
+                        moon_ang = 2 * math.degrees(math.atan(1737.4 / moon_dist))
+                        sun_ang  = 2 * math.degrees(math.atan(696_000.0 / sun_dist_km))
+                        eclipse_class = 'total' if moon_ang >= sun_ang else 'annular'
                     elif dist < 15.0:
                         eclipse_class = 'partial'
                     else:

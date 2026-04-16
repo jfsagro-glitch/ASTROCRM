@@ -1176,6 +1176,251 @@ class DashboardRequest(BaseModel):
     julian: bool = False
 
 
+# ── DAILY PERSONAL (personalised daily summary) ───────────────────────────────
+
+class DailyPersonalRequest(BaseModel):
+    date:        str
+    time:        str
+    lat:         float
+    lon:         float
+    utc:         float
+    name:        Optional[str] = None
+    target_date: Optional[str] = None   # defaults to today UTC
+
+
+@app.post("/daily/personal")
+def daily_personal(req: DailyPersonalRequest):
+    """Personalised daily summary: Moon, top-3 transits, profection, firdaria, advice.
+
+    Aggregates the most useful data for a daily client brief without
+    running a full compensatory engine calculation.
+    """
+    try:
+        if not req.target_date:
+            target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        else:
+            target_date = req.target_date
+
+        natal_jd  = _to_jd(req.date, req.time, req.utc)
+        target_jd = _to_jd(target_date, "12:00", 0)
+
+        # ── Moon info ─────────────────────────────────────────────────────────
+        t_planets = calc_planets(target_jd)
+        moon_lon  = t_planets.get("moon", 0)
+        sun_lon   = t_planets.get("sun",  0)
+        phase_angle = (moon_lon - sun_lon) % 360
+        phase_names = ["new_moon","waxing_crescent","first_quarter","waxing_gibbous",
+                       "full_moon","waning_gibbous","last_quarter","waning_crescent"]
+        phase_name  = phase_names[int(phase_angle / 45)]
+        voc = void_of_course_moon(target_jd, look_ahead_days=3.0, lat=req.lat, lon=req.lon)
+        moon_info = {
+            "sign":        sign_name(moon_lon),
+            "degree":      round(moon_lon % 30, 2),
+            "phase":       phase_name,
+            "phase_angle": round(phase_angle, 2),
+            "void_of_course": voc,
+        }
+
+        # ── Top transits (aspects transit planets → natal planets, orb ≤ 2°) ──
+        natal_chart  = calc_chart(*_parse_birth(req.date, req.time, req.lat, req.lon, req.utc),
+                                  include_aspects=False)
+        natal_lons   = {k: v["lon"] for k, v in natal_chart.get("planets", {}).items()
+                        if isinstance(v, dict) and "lon" in v}
+        transit_lons = {k: v for k, v in t_planets.items()}
+        raw_aspects  = []
+        for tp, tlon in transit_lons.items():
+            for np, nlon in natal_lons.items():
+                if tp == np:
+                    continue
+                from astro_engine import _angle_diff as _ad, ASPECT_DEFS as _ADEFS
+                diff = _ad(tlon, nlon)
+                for asp_name, (asp_angle, asp_orb, _glyph) in _ADEFS.items():
+                    orb_val = min(asp_orb, 2.5)   # tight orb for daily relevance
+                    dev = abs(diff - asp_angle)
+                    if dev <= orb_val:
+                        raw_aspects.append({
+                            "transiting_planet": tp,
+                            "natal_planet":      np,
+                            "aspect":            asp_name,
+                            "orb":               round(dev, 2),
+                            "applying":          (tlon - nlon) % 360 < 180,
+                        })
+        raw_aspects.sort(key=lambda x: x["orb"])
+        top_transits = raw_aspects[:5]
+
+        # ── Profection ────────────────────────────────────────────────────────
+        prof_data: dict = {}
+        try:
+            prof_data = profections(natal_jd, target_date,
+                                    lat=req.lat, lon=req.lon)
+        except Exception:
+            pass
+
+        # ── Firdaria ─────────────────────────────────────────────────────────
+        fird_data: dict = {}
+        try:
+            fird_raw = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+            fird_data = {
+                "current_period": fird_raw.get("current_period"),
+                "current_sub":    fird_raw.get("current_sub"),
+            }
+        except Exception:
+            pass
+
+        # ── Advice (simple rule-based, no full compensatory engine) ───────────
+        advice = []
+        if voc.get("is_void"):
+            advice.append({
+                "category": "moon",
+                "text": "Луна без курса — не начинайте новых дел, завершайте текущие.",
+                "depth": "light",
+            })
+        moon_sign_str = sign_name(moon_lon)
+        if moon_sign_str in ("scorpio", "capricorn", "aries"):
+            advice.append({
+                "category": "energy",
+                "text": f"Луна в {moon_sign_str.capitalize()} — повышенная интенсивность, контролируйте реакции.",
+                "depth": "medium",
+            })
+        if top_transits:
+            t = top_transits[0]
+            advice.append({
+                "category": "transit",
+                "text": f"Ключевой транзит дня: {t['transiting_planet']} {t['aspect']} натальный {t['natal_planet']} (орб {t['orb']}°).",
+                "depth": "medium",
+            })
+
+        return _present({
+            "name":        req.name,
+            "birth_date":  req.date,
+            "target_date": target_date,
+            "moon":        moon_info,
+            "top_transits": top_transits,
+            "profection":   {
+                "age":            prof_data.get("age"),
+                "profected_house": prof_data.get("profected_house"),
+                "lord_of_year":   prof_data.get("lord_of_year"),
+            },
+            "firdaria": fird_data,
+            "advice":   advice,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+def _parse_birth(date, time, lat, lon, utc):
+    """Return args for calc_chart positional signature."""
+    yr, mo, dy = _parse_date(date)
+    h,  mi, sc = _parse_time(time)
+    return yr, mo, dy, h, mi, sc, lat, lon, utc
+
+
+# ── INGRESS CALENDAR ──────────────────────────────────────────────────────────
+
+@app.get("/ephemeris/ingress-calendar")
+def ingress_calendar(
+    year:         int = Query(..., ge=1900, le=2100),
+    planets:      str = Query("sun,mercury,venus,mars,jupiter,saturn"),
+    include_moon: bool = Query(False),
+):
+    """Sign ingresses for selected planets within a given year.
+
+    Returns all moments when a planet enters a new zodiac sign.
+    - **year**: Gregorian year (1900–2100)
+    - **planets**: comma-separated planet names
+    - **include_moon**: also include ~26 lunar ingresses (slow, adds ~0.5 s)
+    """
+    try:
+        from astro_engine import calc_planets as _cp, SIGN_NAMES as _SN
+        import math as _math
+
+        planet_list = [p.strip().lower() for p in planets.split(",") if p.strip()]
+        if include_moon and "moon" not in planet_list:
+            planet_list.append("moon")
+
+        # Validate
+        valid = {"sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"}
+        planet_list = [p for p in planet_list if p in valid]
+
+        start_jd = _to_jd(f"{year}-01-01", "00:00", 0)
+        end_jd   = _to_jd(f"{year}-12-31", "23:59", 0)
+
+        def get_sign_idx(jd_val: float, planet: str) -> int:
+            pl = _cp(jd_val)
+            lon = pl.get(planet, 0)
+            return int(lon // 30) % 12
+
+        def _jd_to_iso_date(jd_val: float) -> str:
+            """Convert JD to YYYY-MM-DD string."""
+            from astro_engine import jd as _jdf
+            z = int(jd_val + 0.5)
+            a = z if z < 2299161 else (
+                lambda al: z + 1 + al - al // 4
+            )((z - 1867216.25) // 36524.25)
+            b = a + 1524
+            c = int((b - 122.1) / 365.25)
+            d = int(365.25 * c)
+            e = int((b - d) / 30.6001)
+            day   = b - d - int(30.6001 * e)
+            month = e - 1 if e < 14 else e - 13
+            year  = c - 4716 if month > 2 else c - 4715
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+        # Step size per planet (days between scans)
+        _STEPS = {"moon": 0.5, "mercury": 2.0, "venus": 3.0, "sun": 5.0,
+                  "mars": 5.0, "jupiter": 15.0, "saturn": 20.0,
+                  "uranus": 30.0, "neptune": 30.0, "pluto": 30.0}
+
+        ingresses = []
+        for planet in planet_list:
+            step    = _STEPS.get(planet, 5.0)
+            jd_cur  = start_jd
+            prev_si = get_sign_idx(jd_cur, planet)
+
+            while jd_cur <= end_jd:
+                jd_next = jd_cur + step
+                next_si = get_sign_idx(jd_next, planet)
+                if next_si != prev_si:
+                    # Binary-search exact ingress moment
+                    lo, hi = jd_cur, jd_next
+                    for _ in range(40):
+                        mid    = (lo + hi) / 2
+                        mid_si = get_sign_idx(mid, planet)
+                        if mid_si == prev_si:
+                            lo = mid
+                        else:
+                            hi = mid
+                    ingress_jd  = (lo + hi) / 2
+                    ingress_si  = get_sign_idx(ingress_jd, planet)
+                    ingress_lon = _cp(ingress_jd).get(planet, 0)
+                    _frac_h = int(((ingress_jd + 0.5) % 1) * 24)
+                    ingresses.append({
+                        "planet":       planet,
+                        "sign":         _SN[ingress_si],
+                        "sign_idx":     ingress_si,
+                        "jd":           round(ingress_jd, 4),
+                        "datetime_utc": _jd_to_iso_date(ingress_jd) + f"T{_frac_h:02d}:00:00Z",
+                    })
+                    prev_si = next_si
+                jd_cur  = jd_next
+                prev_si = get_sign_idx(jd_cur, planet)
+
+        ingresses.sort(key=lambda x: x["jd"])
+
+        return _present({
+            "year":     year,
+            "planets":  planet_list,
+            "count":    len(ingresses),
+            "ingresses": ingresses,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/dashboard")
 def dashboard(req: DashboardRequest):
     """Aggregated daily dashboard: moon status, top transits + compensatory,
@@ -1344,6 +1589,14 @@ def natal(req: BirthData):
             include_fixed_stars=True, include_sect=True,
             include_dispositors=True,
         )
+        # Enrich with chart analysis (shape, elements, modalities, unaspected)
+        try:
+            from astro_engine import calc_chart_analysis as _cca
+            pl_lons = {k: v["lon"] for k, v in chart.get("planets", {}).items()
+                       if isinstance(v, dict) and "lon" in v}
+            chart["chart_analysis"] = _cca(pl_lons, chart.get("aspects", []))
+        except Exception:
+            pass
         return _present(chart)
     except HTTPException:
         raise
@@ -1372,6 +1625,60 @@ def heliocentric_chart(req: BirthData):
         raise
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ── PLANETARY NODES ───────────────────────────────────────────────────────────
+
+@app.post("/natal/planetary-nodes")
+def natal_planetary_nodes(req: BirthData):
+    """Heliocentric ascending nodes (Ω) of planetary orbits for a natal chart.
+
+    Returns ecliptic longitudes of the ascending nodes of Mercury–Pluto orbits
+    at the birth epoch, with aspects to natal planets.
+    Computed via Meeus J2000 reference + linear precession rate (~0.5° accuracy).
+    """
+    try:
+        from astro_engine import calc_planetary_nodes, calc_chart as _cc
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        natal_jd   = _to_jd(req.date, req.time, req.utc)
+        nodes      = calc_planetary_nodes(natal_jd)
+
+        # Compute aspects between each node and natal planets
+        natal = _cc(yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+                    include_aspects=False)
+        natal_lons = {k: v["lon"] for k, v in natal.get("planets", {}).items()
+                      if isinstance(v, dict) and "lon" in v}
+
+        from astro_engine import _angle_diff as _ad, ASPECT_DEFS as _ADEFS
+        for planet, node_data in nodes.items():
+            node_lon  = node_data["north_node_lon"]
+            aspects_to_natal = []
+            for np, nlon in natal_lons.items():
+                diff = _ad(node_lon, nlon)
+                for asp_name, (asp_angle, asp_orb, glyph) in _ADEFS.items():
+                    orb_val = min(asp_orb, 2.0)
+                    dev = abs(diff - asp_angle)
+                    if dev <= orb_val:
+                        aspects_to_natal.append({
+                            "natal_planet": np,
+                            "aspect": asp_name,
+                            "glyph": glyph,
+                            "orb": round(dev, 2),
+                        })
+            node_data["aspects_to_natal"] = sorted(aspects_to_natal, key=lambda x: x["orb"])
+
+        return _present({
+            "date":  req.date,
+            "time":  req.time,
+            "nodes": nodes,
+            "note":  "Heliocentric ascending nodes of planetary orbits (Meeus J2000, ~0.5° accuracy).",
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 
 
 def human_design(
@@ -1896,7 +2203,8 @@ def calc_ingress(req: IngressRequest):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-
+
+
 
 # ── SATURN CYCLE ──────────────────────────────────────────────────────────────
 
@@ -3053,8 +3361,88 @@ def kabbalah_tree_mapping(req: BirthData):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# PLANETARY HOURS
+@app.post("/kabbalah/72-angels")
+def kabbalah_72_angels(req: BirthData):
+    """
+    Full 72 Angels of the Shemhamphorash for a natal chart.
+
+    Maps each natal planet to its governing Shem angel (every 5° = one angel).
+    Returns angel name (Hebrew + transliteration), ruling decan planet,
+    corresponding Tarot pip card, and soul theme.
+    Also returns Tikkun angel (from birth date digit sum).
+    """
+    if not _NUMEROLOGY_OK:
+        raise HTTPException(status_code=503, detail="Numerology module unavailable")
+    try:
+        from astro_numerology import calc_natal_angels as _cna, tikkun_number as _tik
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        chart = calc_chart(
+            yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+            include_aspects=False, include_patterns=False,
+            include_dignities=False, include_arabic=False,
+            include_fixed_stars=False, include_sect=False,
+        )
+        planets_wrapped = {}
+        for pname, pdata in chart.get("planets", {}).items():
+            lon = pdata["lon"] if isinstance(pdata, dict) else pdata
+            planets_wrapped[pname] = {"lon": lon, "sign": sign_name(lon)}
+
+        natal_angels = _cna({"planets": planets_wrapped})
+        tikkun       = _tik(req.date)
+
+        return _present({
+            "date":          req.date,
+            "natal_angels":  natal_angels,
+            "tikkun_angel":  tikkun,
+            "note": (
+                "Каждые 5° эклиптики управляются одним из 72 Ангелов Шем (Шемхамфораш). "
+                "Натальный ангел планеты указывает архетипический канал её выражения. "
+                "Ангел Тиккуна (из даты рождения) — душевная миссия коррекции."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/kabbalah/four-worlds")
+def kabbalah_four_worlds(req: BirthData):
+    """
+    Four Worlds of Kabbalah (Arba Olamot) analysis of a natal chart.
+
+    Maps planets → Sephiroth → World (Atziluth / Briah / Yetzirah / Assiah).
+    Returns: world balance, dominant world, planets-by-world,
+    world descriptions (element, soul level, key questions, practice),
+    and interpretive narrative.
+    """
+    if not _NUMEROLOGY_OK:
+        raise HTTPException(status_code=503, detail="Numerology module unavailable")
+    try:
+        from astro_numerology import four_worlds_profile as _fwp
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+        chart = calc_chart(
+            yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+            include_aspects=False, include_patterns=False,
+            include_dignities=False, include_arabic=False,
+            include_fixed_stars=False, include_sect=False,
+        )
+        planets_wrapped = {}
+        for pname, pdata in chart.get("planets", {}).items():
+            lon = pdata["lon"] if isinstance(pdata, dict) else pdata
+            planets_wrapped[pname] = {"lon": lon, "sign": sign_name(lon)}
+
+        result = _fwp({"planets": planets_wrapped})
+        result["date"]     = req.date
+        result["metadata"] = chart.get("metadata", {})
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ═════════════════════════════════════════════════════════════════════════════
 
 class PlanetaryHoursRequest(BaseModel):

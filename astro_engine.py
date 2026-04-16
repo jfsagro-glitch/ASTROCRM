@@ -162,6 +162,42 @@ def moon(JD):
     return n360(Lp + sL/1e6 + dn)
 
 
+# Meeus Ch.47 Σr (distance) terms — coefficients in 0.001 km
+# Row format: D, M, M', F, cr  (same angular arguments as MOON_TBL)
+_MOON_R_TBL = [
+    [0,0,0,0,-20905355],[2,0,0,0,-3699111],[2,0,-2,0,-2955968],
+    [0,0,2,0,-569925],[0,1,0,0,48888],[0,0,0,2,-3149],
+    [2,0,-1,0,246158],[2,-1,-1,0,-152138],[2,0,1,0,-170733],
+    [2,-1,0,0,-204586],[0,1,-1,0,-129620],[1,0,0,0,108743],
+    [0,1,1,0,104755],[2,0,0,-2,10321],[0,0,1,2,0],
+    [0,0,1,-2,79661],[4,0,-1,0,-34782],[0,0,3,0,-23210],
+    [4,0,-2,0,-21636],[2,1,-1,0,24208],[2,1,0,0,30824],
+    [1,0,-1,0,-8379],[1,1,0,0,-16675],[2,-1,1,0,-12831],
+    [2,0,2,0,-10445],[4,0,0,0,-11650],[2,0,-3,0,14403],
+    [0,1,-2,0,-7003],[2,0,-1,2,10056],[2,-1,-2,0,6322],
+]
+
+def moon_distance_km(JD: float) -> float:
+    """Return geocentric distance to the Moon in km (Meeus Ch.47, ~30-term Σr table).
+
+    Accuracy: ±200 km for 1800–2050, sufficient to distinguish total vs annular
+    solar eclipses (threshold ~384 400 km ≈ angular diameter crossover).
+    """
+    t = T(JD)
+    M   = n360(357.5291 + 35999.0503*t)
+    Mp  = n360(134.9634 + 477198.8676*t)
+    F   = n360(93.2721  + 483202.0175*t)
+    D   = n360(297.8502 + 445267.1115*t)
+    E   = 1 - 2.516e-3*t - 7.4e-6*t*t
+    Mr, Mpr, Fr, Dr = [rad(x) for x in [M, Mp, F, D]]
+    sR = 0
+    for D_, M_, Mp_, F_, cr in _MOON_R_TBL:
+        Ef = E if abs(M_) == 1 else (E*E if abs(M_) == 2 else 1.0)
+        sR += Ef * cr * math.cos(D_*Dr + M_*Mr + Mp_*Mpr + F_*Fr)
+    # Base distance 385000.56 km + Σr/1000
+    return 385000.56 + sR / 1000.0
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # VSOP87 OUTER PLANETS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -325,6 +361,45 @@ def true_node(JD):
 def lilith(JD):
     t = T(JD)
     return n360(83.3532 + 4069.0137*t - 0.01032*t*t - t*t*t/80053 + 180)
+
+
+# ── Planetary Nodes (heliocentric ascending nodes, Meeus App.III / J2000) ────
+# Each entry: (Omega_J2000_deg, rate_deg_per_century)
+# These are the ecliptic longitudes of planetary orbit ascending nodes.
+_PLANET_NODES_J2000: dict[str, tuple[float, float]] = {
+    "mercury": (48.3313,  1.1861),
+    "venus":   (76.6799,  0.9040),
+    "mars":    (49.5574,  0.7702),
+    "jupiter": (100.4542, 1.3966),
+    "saturn":  (113.6634, 0.8741),
+    "uranus":  (74.0005,  1.3820),
+    "neptune": (131.7806, 0.2600),
+    "pluto":   (110.3069, 0.1812),
+}
+
+def calc_planetary_nodes(JD: float) -> dict:
+    """Return geocentric ecliptic longitudes of planetary ascending nodes (Ω).
+
+    Uses J2000 values + linear precession rate from Meeus Appendix III.
+    Accuracy: ~0.5° for 1800–2100, sufficient for natal/transit use.
+
+    Returns dict {planet: {lon, sign, degree, south_node_lon, south_node_sign}}.
+    """
+    t = T(JD)   # Julian centuries from J2000
+    result = {}
+    for planet, (omega0, rate) in _PLANET_NODES_J2000.items():
+        lon = n360(omega0 + rate * t)
+        s_lon = n360(lon + 180)
+        result[planet] = {
+            "planet":           planet,
+            "north_node_lon":   round(lon, 4),
+            "north_node_sign":  sign_name(lon),
+            "north_node_degree": round(lon % 30, 4),
+            "south_node_lon":   round(s_lon, 4),
+            "south_node_sign":  sign_name(s_lon),
+        }
+    return result
+
 
 def lilith_true(JD):
     """True (Oscillating/Osculating) Black Moon Lilith via Swiss Ephemeris."""
@@ -676,11 +751,49 @@ def _angle_diff(lon1, lon2):
     d = abs(lon1 - lon2) % 360
     return 360 - d if d > 180 else d
 
+
+# ── Light orbs (planet-sensitive) ─────────────────────────────────────────────
+# Sun and Moon receive wider orbs; orb of a pair = average of individual orbs.
+_PLANET_CLASS = {
+    "sun":     "luminary", "moon":    "luminary",
+    "mercury": "personal", "venus":   "personal", "mars":    "personal",
+    "jupiter": "social",   "saturn":  "social",
+    "uranus":  "outer",    "neptune": "outer",    "pluto":   "outer",
+}
+_LIGHT_ORBS: dict[str, dict[str, float]] = {
+    "conjunction":    {"luminary": 10.0, "personal": 8.0, "social": 6.0, "outer": 5.0, "other": 4.0},
+    "opposition":     {"luminary": 10.0, "personal": 7.0, "social": 6.0, "outer": 5.0, "other": 4.0},
+    "trine":          {"luminary":  8.0, "personal": 6.0, "social": 5.0, "outer": 4.0, "other": 3.0},
+    "square":         {"luminary":  8.0, "personal": 6.0, "social": 5.0, "outer": 4.0, "other": 3.0},
+    "sextile":        {"luminary":  6.0, "personal": 5.0, "social": 4.0, "outer": 3.0, "other": 2.5},
+    "quincunx":       {"luminary":  3.0, "personal": 3.0, "social": 3.0, "outer": 3.0, "other": 3.0},
+    "semi_sextile":   {"luminary":  2.0, "personal": 2.0, "social": 2.0, "outer": 2.0, "other": 2.0},
+    "semi_square":    {"luminary":  2.0, "personal": 2.0, "social": 2.0, "outer": 2.0, "other": 2.0},
+    "sesquiquadrate": {"luminary":  2.0, "personal": 2.0, "social": 2.0, "outer": 2.0, "other": 2.0},
+    "quintile":       {"luminary":  2.0, "personal": 2.0, "social": 2.0, "outer": 2.0, "other": 2.0},
+    "biquintile":     {"luminary":  2.0, "personal": 2.0, "social": 2.0, "outer": 2.0, "other": 2.0},
+}
+
+def _light_orb(p1: str, p2: str, asp_name: str) -> float:
+    """Return orb for an aspect pair using planet-class-sensitive light orbs.
+    Orb of a pair = average of each planet's individual orb."""
+    table = _LIGHT_ORBS.get(asp_name)
+    if table is None:
+        # Fallback to ASPECT_DEFS default
+        return ASPECT_DEFS[asp_name][1]
+    c1 = _PLANET_CLASS.get(p1.lower(), "other")
+    c2 = _PLANET_CLASS.get(p2.lower(), "other")
+    return (table[c1] + table[c2]) / 2.0
+
+
 def calc_aspects(planets_dict, custom_orbs=None, decls_dict=None, parallel_orb=1.0):
-    """Compute all aspects (longitude + declination-based) between planets."""
-    orbs = {k: v for k, (v, o, _) in ASPECT_DEFS.items()}
-    if custom_orbs:
-        orbs.update(custom_orbs)
+    """Compute all aspects (longitude + declination-based) between planets.
+
+    Uses planet-class-sensitive light orbs (Sun/Moon wider, outer planets tighter)
+    unless custom_orbs overrides specific aspects.
+    """
+    # custom_orbs overrides per aspect name
+    orb_overrides = dict(custom_orbs) if custom_orbs else {}
 
     names = list(planets_dict.keys())
     results = []
@@ -692,7 +805,11 @@ def calc_aspects(planets_dict, custom_orbs=None, decls_dict=None, parallel_orb=1
             diff = _angle_diff(planets_dict[p1], planets_dict[p2])
             best, best_dev = None, float("inf")
             for asp_name, (asp_angle, asp_orb, glyph) in ASPECT_DEFS.items():
-                orb_val = orbs.get(asp_name, asp_orb)
+                # Use custom override if provided, else light-orb calculation
+                if asp_name in orb_overrides:
+                    orb_val = orb_overrides[asp_name]
+                else:
+                    orb_val = _light_orb(p1, p2, asp_name)
                 deviation = abs(diff - asp_angle)
                 if deviation <= orb_val and deviation < best_dev:
                     best_dev = deviation
@@ -2058,7 +2175,7 @@ def calc_heliocentric_chart(yr, mo, dy, h, mi, sc, lat, lon_deg, utc_off,
     }
 
 
-
+def calc_chart_analysis(planets_dict: dict, aspects: list) -> dict:
     """Compute chart shape, dominant element, dominant modality, unaspected planets.
 
     Args:

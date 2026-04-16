@@ -921,6 +921,110 @@ export async function getCompensatoryPractices(
   });
 }
 
+// ── 72 Angels of the Shemhamphorash ──────────────────────────────────────────
+
+export interface ShemAngel {
+  planet: string;
+  lon: number;
+  sign: string;
+  angel_number: number;
+  angel_name: string;
+  hebrew: string;
+  decan_planet: string;
+  tarot_card: string;
+  theme: string;
+}
+
+export interface Angels72Result {
+  date: string;
+  natal_angels: Record<string, ShemAngel>;
+  tikkun_angel: {
+    tikkun_number: number;
+    angel: string;
+    zodiac_lon: number;
+    sign: string;
+    degree_in_sign: number;
+    description: string;
+  };
+  note: string;
+}
+
+export async function getAngels72(b: BirthInput): Promise<Angels72Result> {
+  return post('/kabbalah/72-angels', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+  });
+}
+
+// ── Four Worlds of Kabbalah ───────────────────────────────────────────────────
+
+export interface FourWorldInfo {
+  name_ru: string;
+  name_en: string;
+  element: string;
+  element_ru: string;
+  hebrew_letter: string;
+  soul_level: string;
+  sephiroth: string[];
+  planets: string[];
+  theme: string;
+  questions: string[];
+  practice: string;
+}
+
+export interface FourWorldsResult {
+  date: string;
+  worlds_balance: Record<string, number>;
+  worlds_percent: Record<string, number>;
+  dominant_world: string;
+  dominant_world_data: FourWorldInfo;
+  planets_by_world: Record<string, Array<{ planet: string; sephirah: string; lon: number; sign: string }>>;
+  world_descriptions: Record<string, FourWorldInfo>;
+  interpretation: string;
+}
+
+export async function getFourWorlds(b: BirthInput): Promise<FourWorldsResult> {
+  return post('/kabbalah/four-worlds', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+  });
+}
+
+// ── Planetary Nodes ───────────────────────────────────────────────────────────
+
+export interface PlanetaryNode {
+  planet: string;
+  north_node_lon: number;
+  north_node_sign: string;
+  north_node_degree: number;
+  south_node_lon: number;
+  south_node_sign: string;
+  aspects_to_natal: Array<{ natal_planet: string; aspect: string; glyph: string; orb: number }>;
+}
+
+export interface PlanetaryNodesResult {
+  date: string;
+  time: string;
+  nodes: Record<string, PlanetaryNode>;
+  note: string;
+}
+
+export async function getPlanetaryNodes(b: BirthInput): Promise<PlanetaryNodesResult> {
+  return post('/natal/planetary-nodes', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+  });
+}
+
 // ── Report Generation ─────────────────────────────────────────────────────────
 
 export async function generateReportHtml(

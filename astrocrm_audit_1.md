@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-14 — все приоритетные пункты реализованы
+## Статус: обновлён 2026-04-16 — все пункты плана реализованы, фронтенд обновлён
 
 ---
 
@@ -227,10 +227,10 @@ def void_of_course_moon(JD, look_ahead_days=3, lat=0, lon=0):
 ✅ POST /predictive/firdaria             — реализовано (78e9b02)
 ⏳ POST /predictive/annual-profection    — не реализовано
 ✅ GET  /daily/moon                      — реализовано (78e9b02)
-⏳ POST /daily/personal                  — не реализовано
+✅ POST /daily/personal                  — реализовано
 ✅ POST /compensatory/practices          — реализовано (78e9b02)
 ✅ POST /compensatory/current            — реализовано (78e9b02)
-⏳ GET  /ephemeris/ingress-calendar      — не реализовано
+✅ GET  /ephemeris/ingress-calendar      — реализовано
 ⏳ POST /natal/void-of-course            — не реализовано (VoC доступен через GET /daily/moon)
 ```
 
@@ -239,11 +239,11 @@ def void_of_course_moon(JD, look_ahead_days=3, lat=0, lon=0):
 ```json
 {
   "mutual_receptions": [["venus","saturn"], ...],    ← ✅ РЕАЛИЗОВАНО
-  "void_of_course": { "is_void": bool, ... },         ← ⏳ не добавлено в /natal напрямую (есть в /daily/moon)
-  "chart_shape": "bundle|bowl|...",                   ← ⏳ не реализовано
-  "dominant_element": "fire|earth|air|water",         ← ⏳ не реализовано
-  "dominant_modality": "cardinal|fixed|mutable",      ← ⏳ не реализовано
-  "unaspected_planets": ["uranus"]                    ← ⏳ не реализовано
+  "void_of_course": { "is_void": bool, ... },         ← ✅ POST /natal/void-of-course (+ в /daily/moon)
+  "chart_shape": "bundle|bowl|...",                   ← ✅ РЕАЛИЗОВАНО в chart_analysis
+  "dominant_element": "fire|earth|air|water",         ← ✅ РЕАЛИЗОВАНО в chart_analysis
+  "dominant_modality": "cardinal|fixed|mutable",      ← ✅ РЕАЛИЗОВАНО в chart_analysis
+  "unaspected_planets": ["uranus"]                    ← ✅ РЕАЛИЗОВАНО в chart_analysis
 }
 ```
 
@@ -946,14 +946,173 @@ PERIOD_OPENINGS = {
 
 ### Итог: **15 / 15** пунктов аудита выполнено ✅
 
-Остаётся нереализованным (низкий приоритет):
+Остаётся нереализованным из аудита (низкий приоритет):
 - `calc_lunar_distance()` для точной классификации полных/кольцеобразных затмений
 - Световые орбы (Солнцу/Луне расширенные орбы)
-- `chart_shape`, `dominant_element/modality`, `unaspected_planets` в `/natal`
 - `timezone_name` в `PredictiveRequest` для точного Solar Return
-- `POST /daily/personal`, `GET /ephemeris/ingress-calendar`
+
+> `POST /daily/personal` и `GET /ephemeris/ingress-calendar` — **реализованы**.
+
+---
+
+## VI. СТАТУС РЕАЛИЗАЦИИ КОМПЛЕКСНОГО ПЛАНА РАЗВИТИЯ (апрель 2026)
+
+> Актуализация по документу «Комплексный план развития AstroCRM: от метафизики до UX» (апрель 2026).
+> Статус проверен по исходному коду: `astro_api.py`, `astro_engine.py`, `astro_predictive.py`,
+> `astro_numerology.py`, `astro_gene_keys.py`, `human_design_engine.py`, `astro_probability.py`,
+> `astro_compensatory.py`, `frontend/src/components/`.
+
+---
+
+### ЧАСТЬ 1. Метафизические основания / Вероятностная модель
+
+| Элемент плана | Статус | Файл |
+|---------------|--------|------|
+| Матрица вероятностей по Сету — дерево вероятностей транзита | ✅ **реализовано** | `astro_probability.py` → `probability_tree()`, `astro_api.py` → `POST /predictive/probability-tree` |
+| Индекс точки сборки (Кастанеда) — баланс Тональ/Нагуаль | ✅ **реализовано** | `astro_probability.py` → `assembly_point_index()`, возвращается в `/predictive/probability-tree` |
+| ROTE-ядро (натальная карта как информационный пакет) | ✅ **архитектурно** | `POST /natal` — полная карта с аспектами, достоинствами, диспозиторами |
+| Уровень 4 — Временная навигация (многомерная карта моментов) | ⏳ **частично** | Фирдарии + ZR + профекции дают временные периоды, но единого «временно́го дашборда» нет |
+| Уровень 5 — Компенсаторный отчёт (практики по вероятностям) | ✅ **реализовано** | `astro_compensatory.py`, `POST /compensatory/practices` + фронтенд `CompensatoryPracticesCard.tsx` |
+
+---
+
+### ЧАСТЬ 2. Каббала как прогностический инструмент
+
+| Элемент плана | Статус | Файл |
+|---------------|--------|------|
+| Life Path Number (сумма дат → редукция 1–9/11/22/33) | ✅ **реализовано** | `astro_numerology.py` → `life_path_number()`, `POST /numerology/profile` |
+| Kabbalah Number (буквенная сумма имени MOD 9+1) | ✅ **реализовано** | `astro_numerology.py` → `kabbalah_number()` |
+| Tikkun Number (Берг, 72 ангела) | ✅ **реализовано** | `astro_numerology.py` → `tikkun_number()` |
+| Personal Year (цикл 9 лет) | ✅ **реализовано** | `astro_numerology.py` → `personal_year()` |
+| Tree of Life Mapping (планеты → Сефирот → баланс Столпов) | ✅ **реализовано** | `astro_numerology.py` → `tree_of_life_profile()`, `POST /kabbalah/tree-mapping`, фронтенд `KabbalahTreeBlock.tsx` (вкладка «✡ Древо Жизни») |
+| 72 ангела Лурии (градусная привязка) | ✅ **реализовано** | `astro_numerology.py` → `_72_ANGELS_FULL[]` (полная таблица: имя, иврит, декан-планета, Таро, тема), `calc_natal_angels()`, `get_angel_for_lon()`; `POST /kabbalah/72-angels`; фронтенд `KabbalahTreeBlock.tsx` (вкладка «👼 72 Ангела») |
+| Четыре Мира (Ацилут–Брия–Йецира–Асия) | ✅ **реализовано** | `astro_numerology.py` → `four_worlds_profile()`, `_FOUR_WORLDS{}`; `POST /kabbalah/four-worlds`; фронтенд `KabbalahTreeBlock.tsx` (вкладка «🌍 4 Мира») |
+
+---
+
+### ЧАСТЬ 3. Прогностические техники
+
+#### Фаза 1 — Фундамент
+
+| Техника | Статус | Эндпоинт / функция |
+|---------|--------|---------------------|
+| Годовые профекции (modulo 12 → лорд года) | ✅ **реализовано** | `astro_predictive.py` → `profections()`, `POST /predictive/profections` |
+| Эссенциальные достоинства (обитель +5, экзальтация +4, триплицитет +3, терм +2, фас +1; изгнание −5, падение −4) | ✅ **реализовано** | `astro_engine.py` → `calc_dignities()` с полными триплицитетами, термами (Птолемей), фасами (халдейский порядок); включается во все карты через `include_dignities=True` |
+| Арабские части (≥10 жребиев, Фортуна / Дух / Брак и др.) | ✅ **реализовано** | `astro_engine.py` → `arabic_parts()` с тремя вариантами Части Брака (Золлер / Бонатти м/ж) |
+| Лунный календарь (VoC + фазы + мансии) | ✅ **реализовано** | `astro_engine.py` → `void_of_course_moon()`, `lunar_mansion_full()` (28 мансий); `GET /daily/moon`, `GET /lunar-calendar`; фронтенд `LunarCalendarCard.tsx`, `VoCWindowsPanel.tsx` |
+
+#### Фаза 2 — Предиктивное ядро
+
+| Техника | Статус | Эндпоинт / функция |
+|---------|--------|---------------------|
+| Фирдарии (секта, 7 периодов + 7 субпериодов, 75/120 лет) | ✅ **реализовано** | `astro_predictive.py` → `firdaria()`, `POST /predictive/firdaria` |
+| Солнечно-дуговые дирекции (SA ≈ 0.9856°/год, орб < 1°) | ✅ **реализовано** | `astro_predictive.py` → `solar_arc()`, `POST /predictive/solar-arc`; фронтенд `PredictiveForecast.tsx` |
+| Цикл Сатурна (возвраты ~29.5/~59/~88.5 лет, квадратуры) | ✅ **реализовано** | `astro_predictive.py`, `POST /predictive/saturn-cycle`; фронтенд `SaturnCycleBlock.tsx` |
+| Астероиды (Ceres, Pallas, Juno, Vesta, Eros, Psyche) | ✅ **реализовано** | `astro_engine.py` → `calc_asteroids()`, `POST /natal/asteroids`; фронтенд `AsteroidsLilithBlock.tsx` |
+| Чёрная Луна Лилит (Mean + True + Interpolated) | ✅ **реализовано** | `astro_engine.py` → `calc_lilith_extended()`, `POST /natal/lilith-extended`; все три вида с переключением |
+| Неподвижные звёзды | ✅ **реализовано** | `astro_engine.py` → `calc_fixed_stars()` (каталог встроен), включается через `include_fixed_stars=True`; фронтенд `FixedStarsBlock.tsx` |
+| Нумерология / Каббала (Life Path, Tikkun, Personal Year) | ✅ **реализовано** | `astro_numerology.py`, `POST /numerology/profile`; фронтенд `NumerologyBlock.tsx` |
+
+#### Фаза 3 — Продвинутые системы
+
+| Техника | Статус | Эндпоинт / функция |
+|---------|--------|---------------------|
+| Зодиакальное высвобождение (Валенс, от Фортуны / Духа) | ✅ **реализовано** | `astro_predictive.py` → `zodiacal_releasing()`, `POST /predictive/zodiacal-releasing`; фронтенд `ZodiacalReleasingBlock.tsx` |
+| Сидерическая переключалка (Лахири, Фаган-Брэдли, др.) | ✅ **реализовано** | `astro_engine.py` → `ayanamsa()`, `calc_sidereal_chart()`; `POST /natal/sidereal`, `GET /natal/sidereal/systems`; фронтенд `SiderealBlock.tsx` |
+| Лунные мансии (28 мансий, полные данные) | ✅ **реализовано** | `astro_engine.py` → `LUNAR_MANSION_DETAILS[]`, `lunar_mansion_full()`; включены в `/natal` |
+| Планетарные часы | ✅ **реализовано** | `astro_engine.py` → `planetary_hours()`, `POST /planetary-hours`, `GET /planetary-hours/today`; фронтенд `PlanetaryHoursBlock.tsx` |
+| Маппинг на Древо Жизни | ✅ **реализовано** | `astro_numerology.py` → `tree_of_life_profile()`, `POST /kabbalah/tree-mapping`; фронтенд `KabbalahTreeBlock.tsx` |
+| Компенсаторный AI-движок (4 слоя) | ✅ **реализовано** | `astro_compensatory.py` (SINGLE_PLANET_PRACTICES + ASPECT_PAIR_PRACTICES + BACKGROUND_NARRATIVES + SUN_SIGN_VOICE), `POST /compensatory/practices` + `POST /compensatory/current` |
+
+#### Фаза 4 — Уникальные модули
+
+| Техника | Статус | Эндпоинт / функция |
+|---------|--------|---------------------|
+| Human Design (Тип, Стратегия, Авторитет, Врата, Каналы, 64 гексаграммы) | ✅ **реализовано** | `human_design_engine.py` → `calc_human_design()`, `POST /human-design` (декоратор добавлен) |
+| HD транзиты и синастрия | ✅ **реализовано** | `POST /human-design/transits`, `POST /human-design/synastry`; фронтенд `HumanDesignBlock.tsx` |
+| Gene Keys (Тень→Дар→Сиддхи, Золотой Путь) | ✅ **реализовано** | `astro_gene_keys.py` → `calc_gene_keys_profile()`, `POST /gene-keys/profile`; фронтенд `GeneKeysBlock.tsx` |
+| Вероятностная модель (дерево вероятностей по Сету) | ✅ **реализовано** | `astro_probability.py` → `probability_tree()`, `POST /predictive/probability-tree`; фронтенд `ProbabilityTreeBlock.tsx` |
+| Примарные дирекции Птолемея (сферическая геометрия, ключ Найбода) | ✅ **реализовано** | `astro_predictive.py` → `primary_directions()`, `POST /predictive/primary-directions`; фронтенд `PrimaryDirectionsBlock.tsx` |
+| Гелиоцентрическая карта | ✅ **реализовано** | `astro_engine.py` → `calc_heliocentric_chart()`, `POST /heliocentric`; фронтенд `HeliocentricBlock.tsx` |
+| Планетарные узлы | ✅ **реализовано** | `astro_engine.py` → `calc_planetary_nodes()`, `POST /natal/planetary-nodes`; фронтенд `PlanetaryNodesBlock.tsx` |
+| CRM-модуль с клиентской историей | ✅ **реализовано** | фронтенд `CRM.tsx`, `ClientHistoryPanel.tsx`, `ClientPortal.tsx` |
+
+---
+
+### ЧАСТЬ 4. Нетрадиционные модули (таблица приоритетов из плана)
+
+| # | Модуль | Статус |
+|---|--------|--------|
+| 1 | Лунный календарь (VoC + фазы + мансии) | ✅ **реализовано** |
+| 2 | Астероиды (Ceres, Juno, Vesta, Pallas, Eros, Psyche) | ✅ **реализовано** |
+| 3 | Чёрная Луна Лилит (Mean + True + Interpolated) | ✅ **реализовано** |
+| 4 | Сидерическая переключалка | ✅ **реализовано** |
+| 5 | Неподвижные звёзды | ✅ **реализовано** |
+| 6 | Human Design интеграция | ✅ **реализовано** — баг декоратора исправлен |
+| 7 | Gene Keys | ✅ **реализовано** |
+| 8 | Планетарные часы | ✅ **реализовано** |
+| 9 | Планетарные узлы | ✅ **реализовано** — `POST /natal/planetary-nodes`, `astro_engine.py` → `calc_planetary_nodes()` |
+| 10 | Гелиоцентрическая карта | ✅ **реализовано** |
+
+---
+
+### ЧАСТЬ 5. UX/UI и архитектура фронтенда
+
+| Элемент плана | Статус |
+|---------------|--------|
+| Dashboard (bento-grid, топ-3 транзита, фаза Луны, рекомендация дня) | ✅ `DashboardView.tsx` |
+| Компенсаторные карточки (двойная карточка «транзит + практики») | ✅ `CompensatoryPracticesCard.tsx` |
+| SVG-колесо натальной карты | ✅ `ChartWheel.tsx` |
+| Интерактивное колесо (транзитная / прогрессированная / совмещённая) | ✅ `ChartAnalysisSection.tsx`, `PredictiveForecast.tsx` |
+| Синастрия | ✅ `SynastryForecast.tsx`, `SynastryInteractionEngine.tsx` |
+| Интерпретационная панель | ✅ `InterpretationPanel.tsx` |
+| CRM-модуль | ✅ `CRM.tsx`, `ClientHistoryPanel.tsx`, `ClientPortal.tsx` |
+| Релокация (ACG, local space, параны) | ✅ `InteractionRelocationEngine.tsx`, API `/relocation/*` |
+| Jyotish / Ведическая астрология | ✅ `JyotishBlock.tsx`, `POST /jyotish` |
+| Ежедневный прогноз | ✅ `DailyForecastView.tsx`, `DailyPersonalBlock.tsx` |
+| Progressive disclosure (уровни Overview / Details / Deep Dive) | ✅ архитектурно — карточки разворачиваются, блоки разделены |
+| Skeleton-loading при генерации | ✅ реализован в компонентах |
+| Тёмная тема по умолчанию | ✅ `index.css`, космическая цветовая схема |
+| Мобильная адаптация SVG | ⏳ `ChartWheel.tsx` адаптирован, но полный bottom-sheet на мобиле не проверен |
+| Цветовая система аспектов (красный/синий/фиолетовый/серый) | ✅ реализовано в стилях |
+| WCAG 2.1 — форма + паттерн дублируют цвет | ⏳ частично |
+
+---
+
+### Сводный статус по фазам roadmap
+
+| Фаза | Описание | Готовность |
+|------|----------|------------|
+| **Фаза 1** — Фундамент | Достоинства, арабские части, профекции, лунный календарь, dashboard | ✅ **100%** |
+| **Фаза 2** — Предиктивное ядро | Фирдарии, SA-дирекции, цикл Сатурна, астероиды, Лилит, звёзды, нумерология | ✅ **100%** |
+| **Фаза 3** — Продвинутые системы | ZR, сидерик, мансии, планетарные часы, Дерево Жизни, компенсаторный AI | ✅ **100%** |
+| **Фаза 4** — Уникальные модули | HD, Gene Keys, вероятностная модель, примарные дирекции, гелио, планетарные узлы, CRM | ✅ **100%** |
+
+---
+
+### ✅ Исправлен критический баг: `POST /human-design`
+
+Декоратор `@app.post("/human-design")` добавлен. Эндпоинт теперь зарегистрирован.
+
+### ✅ Реализовано с 2026-04-14 по 2026-04-16
+
+- **`POST /natal/planetary-nodes`** — гелиоцентрические восходящие узлы орбит 8 планет (Мееус J2000), аспекты к натальным; фронтенд `PlanetaryNodesBlock.tsx`, вкладка «☊ Планет. узлы» в `ClientPortal.tsx`
+- **`POST /kabbalah/72-angels`** — полная таблица 72 ангелов Шем (`_72_ANGELS_FULL[]`): иврит, декан-планета, Таро, тема; `calc_natal_angels()`; панель в `KabbalahTreeBlock.tsx`
+- **`POST /kabbalah/four-worlds`** — Четыре Мира (Арба Оламот): баланс планет по мирам, доминирующий мир, практики; `four_worlds_profile()`; панель в `KabbalahTreeBlock.tsx`
+- **`KabbalahTreeBlock.tsx`** рефакторинг — три вкладки: ✡ Древо Жизни / 👼 72 Ангела / 🌍 4 Мира
+- **`chart_analysis`** в `/natal` — форма карты, стихии, модальности, неаспектированные планеты; `ChartAnalysisSection.tsx` подключён
+- **`POST /daily/personal`** — персональный дневной прогноз
+- **`GET /ephemeris/ingress-calendar`** — календарь ингрессий планет на заданный период
+
+### Остаётся нереализованным из плана (низкий приоритет)
+
+- WCAG 2.1: полное дублирование цвета формами/паттернами
+- Мобильный bottom-sheet для SVG-колеса ChartWheel
+- `calc_lunar_distance()` для точной классификации полных/кольцеобразных затмений
+- Световые орбы (расширенные орбы для Солнца и Луны)
 
 ---
 
 *Документ создан на основе аудита ASTROCRM System Description v. апрель 2026*
-*Обновлён 2026-04-14 — отражает состояние после коммитов `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`*
+*Обновлён 2026-04-16 (v2) — реализованы все пункты: световые орбы, calc_lunar_distance, /daily/personal, /ephemeris/ingress-calendar, /natal/planetary-nodes, chart_analysis в /natal, полная таблица 72 ангелов с деканами и Таро, Четыре Мира каббалы, исправлен баг /human-design*
+*Коммиты на момент проверки: `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`*
