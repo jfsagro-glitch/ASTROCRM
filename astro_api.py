@@ -3696,67 +3696,140 @@ class ReportRequest(BaseModel):
 def generate_report(req: ReportRequest):
     """
     Generate a comprehensive astrological report.
-    Aggregates: natal chart, transits, firdaria, profections, numerology, probability tree.
+    Aggregates ALL available engines: natal, aspects, chart-analysis, transits,
+    firdaria, profections, solar-arc, numerology, kabbalah, jyotish, human-design,
+    probability tree.
     Returns HTML (printable as PDF via browser) or JSON.
     """
     try:
+        import datetime as _dt
         natal_jd = _to_jd(req.date, req.time, req.utc)
         yr, mo, dy = [int(x) for x in req.date.split("-")]
         h, mi = [int(x) for x in req.time.split(":")[:2]]
-        target = req.target_date or __import__('datetime').date.today().isoformat()
+        target = req.target_date or _dt.date.today().isoformat()
 
         report_data: dict = {
             "name": req.name or "Без имени",
             "birth_date": req.date,
             "birth_time": req.time,
+            "lat": req.lat,
+            "lon": req.lon,
             "target_date": target,
             "depth": req.depth,
         }
 
-        # Sections based on depth
+        # Sections based on depth (always include everything unless caller restricts)
+        _all = ["natal", "transits", "firdaria", "profections",
+                "numerology", "jyotish", "human-design",
+                "solar-arc", "probability"]
         sections = req.include or (
-            ["natal", "transits"]                      if req.depth == "brief" else
-            ["natal", "transits", "firdaria", "profections", "numerology"]  if req.depth == "full" else
-            ["natal", "transits", "firdaria", "profections", "numerology", "solar-arc", "probability"]
+            ["natal", "transits", "profections", "numerology"]  if req.depth == "brief" else
+            _all  # full + professional both include everything
         )
 
-        # Natal chart
+        # ── Natal chart ───────────────────────────────────────────────────────
         if "natal" in sections:
-            chart = calc_chart(yr, mo, dy, h, mi, 0, req.lat, req.lon, req.utc,
-                               include_aspects=True, include_patterns=True,
-                               include_dignities=True, include_arabic=True)
+            chart = calc_chart(
+                yr, mo, dy, h, mi, 0, req.lat, req.lon, req.utc,
+                include_aspects=True, include_patterns=True,
+                include_dignities=True, include_arabic=True,
+                include_fixed_stars=True, include_sect=True,
+            )
+            # Chart analysis: shape, elements, modalities, unaspected
+            try:
+                from astro_engine import calc_chart_analysis as _cca
+                pl_lons = {k: v["lon"] for k, v in chart.get("planets", {}).items()
+                           if isinstance(v, dict) and "lon" in v}
+                chart["chart_analysis"] = _cca(pl_lons, chart.get("aspects", []))
+            except Exception:
+                pass
             report_data["natal"] = chart
 
-        # Transits
+        # ── Transits ─────────────────────────────────────────────────────────
         if "transits" in sections:
-            report_data["transits"] = transits(
-                natal_jd, target, lat=req.lat, lon=req.lon,
-                transit_orb_major=2.0, transit_orb_minor=1.0,
-            )
+            try:
+                report_data["transits"] = transits(
+                    natal_jd, target, lat=req.lat, lon=req.lon,
+                    transit_orb_major=2.0, transit_orb_minor=1.0,
+                )
+            except Exception:
+                report_data["transits"] = {}
 
-        # Firdaria
+        # ── Firdaria ─────────────────────────────────────────────────────────
         if "firdaria" in sections:
-            report_data["firdaria"] = firdaria(natal_jd, target)
+            try:
+                report_data["firdaria"] = firdaria(natal_jd, target)
+            except Exception:
+                report_data["firdaria"] = {}
 
-        # Profections
+        # ── Profections ──────────────────────────────────────────────────────
         if "profections" in sections:
-            report_data["profections"] = profections(natal_jd, target, lat=req.lat, lon=req.lon)
+            try:
+                report_data["profections"] = profections(natal_jd, target, lat=req.lat, lon=req.lon)
+            except Exception:
+                report_data["profections"] = {}
 
-        # Solar arc
+        # ── Solar arc ────────────────────────────────────────────────────────
         if "solar-arc" in sections:
-            report_data["solar_arc"] = solar_arc(natal_jd, req.lat, req.lon, target)
+            try:
+                report_data["solar_arc"] = solar_arc(natal_jd, req.lat, req.lon, target)
+            except Exception:
+                report_data["solar_arc"] = {}
 
-        # Numerology
+        # ── Solar Return ─────────────────────────────────────────────────────
+        if req.depth in ("full", "professional") and "natal" in sections:
+            try:
+                report_data["solar_return"] = solar_return(natal_jd, req.lat, req.lon, target)
+            except Exception:
+                report_data["solar_return"] = {}
+
+        # ── Numerology + Kabbalah ─────────────────────────────────────────────
         if "numerology" in sections and _NUMEROLOGY_OK:
-            from astro_numerology import numerology_profile as _np
-            report_data["numerology"] = _np(req.date, req.name, int(target[:4]),
-                                            report_data.get("natal"))
+            try:
+                from astro_numerology import (
+                    numerology_profile as _np,
+                    four_worlds_profile as _fwp,
+                    calc_natal_angels as _cna,
+                    tikkun_number as _tkn,
+                )
+                natal_for_num = report_data.get("natal") or {}
+                report_data["numerology"] = _np(req.date, req.name, int(target[:4]), natal_for_num)
+                if natal_for_num:
+                    try:
+                        report_data["four_worlds"] = _fwp(natal_for_num)
+                    except Exception:
+                        pass
+                    try:
+                        report_data["natal_angels"] = _cna(natal_for_num)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
-        # Probability tree
+        # ── Jyotish ──────────────────────────────────────────────────────────
+        if "jyotish" in sections and _JYOTISH_OK and _calc_jyotish is not None:
+            try:
+                report_data["jyotish"] = _calc_jyotish(req.date, req.time, req.lat, req.lon, req.utc)
+            except Exception:
+                report_data["jyotish"] = {}
+
+        # ── Human Design ─────────────────────────────────────────────────────
+        if "human-design" in sections and _HUMAN_DESIGN_OK and calc_human_design is not None:
+            try:
+                report_data["human_design"] = calc_human_design(
+                    req.date, req.time, req.lat, req.lon, req.utc, mode="analyst"
+                )
+            except Exception:
+                report_data["human_design"] = {}
+
+        # ── Probability tree ─────────────────────────────────────────────────
         if "probability" in sections and _PROBABILITY_OK:
-            natal_for_prob = report_data.get("natal") or {}
-            transit_aspects = report_data.get("transits", {}).get("transit_aspects", [])
-            report_data["probability"] = _probability_tree(natal_for_prob, transit_aspects, target)
+            try:
+                natal_for_prob = report_data.get("natal") or {}
+                transit_aspects = report_data.get("transits", {}).get("transit_aspects", [])
+                report_data["probability"] = _probability_tree(natal_for_prob, transit_aspects, target)
+            except Exception:
+                report_data["probability"] = {}
 
         if req.format == "json":
             return _present(report_data)
@@ -3770,17 +3843,26 @@ def generate_report(req: ReportRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _build_html_report(data: dict, depth: str) -> str:
-    """Build a printable HTML report from aggregated report data."""
-    name         = data.get("name", "")
-    birth_date   = data.get("birth_date", "")
-    target_date  = data.get("target_date", "")
-    natal        = data.get("natal", {})
-    transits_d   = data.get("transits", {})
-    firdaria_d   = data.get("firdaria", {})
-    profections_d= data.get("profections", {})
-    numerology   = data.get("numerology", {})
-    probability  = data.get("probability", {})
+def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
+    """Build a printable HTML report from aggregated report data — all engines."""
+    name          = data.get("name", "")
+    birth_date    = data.get("birth_date", "")
+    birth_time    = data.get("birth_time", "")
+    lat           = data.get("lat", 0)
+    lon           = data.get("lon", 0)
+    target_date   = data.get("target_date", "")
+    natal         = data.get("natal", {})
+    transits_d    = data.get("transits", {})
+    firdaria_d    = data.get("firdaria", {})
+    profections_d = data.get("profections", {})
+    solar_arc_d   = data.get("solar_arc", {})
+    solar_return_d= data.get("solar_return", {})
+    numerology    = data.get("numerology", {})
+    four_worlds   = data.get("four_worlds", {})
+    natal_angels  = data.get("natal_angels", {})
+    jyotish       = data.get("jyotish", {})
+    human_design  = data.get("human_design", {})
+    probability   = data.get("probability", {})
 
     _SIGN_GLYPHS = {'aries':'♈','taurus':'♉','gemini':'♊','cancer':'♋','leo':'♌','virgo':'♍',
                     'libra':'♎','scorpio':'♏','sagittarius':'♐','capricorn':'♑','aquarius':'♒','pisces':'♓'}
@@ -3794,114 +3876,335 @@ def _build_html_report(data: dict, depth: str) -> str:
     _SIGN_RU = {'aries':'Овен','taurus':'Телец','gemini':'Близнецы','cancer':'Рак',
                 'leo':'Лев','virgo':'Дева','libra':'Весы','scorpio':'Скорпион',
                 'sagittarius':'Стрелец','capricorn':'Козерог','aquarius':'Водолей','pisces':'Рыбы'}
+    _ASP_GLYPHS = {'conjunction':'☌','opposition':'☍','trine':'△','square':'□',
+                   'sextile':'⚹','quincunx':'⚻','semisquare':'∠','sesquiquadrate':'⊼',
+                   'semisextile':'⌖','quintile':'Q'}
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+    def _esc(s): return str(s).replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
 
     def _planet_row(pname, pdata):
-        sign = pdata.get('sign','')
-        dm   = pdata.get('deg_min','')
-        ret  = '℞' if pdata.get('retrograde') else ''
-        g    = _PLANET_GLYPHS.get(pname,'●')
-        sg   = _SIGN_GLYPHS.get(sign,'')
-        pru  = _PLANET_RU.get(pname, pname)
-        sru  = _SIGN_RU.get(sign, sign)
-        return f"<tr><td>{g} {pru}</td><td>{sg} {sru} {dm} {ret}</td></tr>"
+        sign  = pdata.get('sign','')
+        dm    = pdata.get('deg_min','')
+        ret   = ' ℞' if pdata.get('retrograde') else ''
+        house = pdata.get('house', '')
+        dig   = pdata.get('dignity', '')
+        g     = _PLANET_GLYPHS.get(pname,'●')
+        sg    = _SIGN_GLYPHS.get(sign,'')
+        pru   = _PLANET_RU.get(pname, pname)
+        sru   = _SIGN_RU.get(sign, sign)
+        h_str = f" · дом {house}" if house else ''
+        d_str = f" · <em>{_esc(dig)}</em>" if dig else ''
+        return f"<tr><td>{g} {_esc(pru)}</td><td>{sg} {_esc(sru)} {_esc(dm)}{ret}</td><td>{h_str}{d_str}</td></tr>"
 
-    # Planets table
+    # ── SECTION 1: Натальная карта ───────────────────────────────────────────
     planets_html = ""
     for pname, pdata in natal.get("planets", {}).items():
-        planets_html += _planet_row(pname, pdata)
+        if isinstance(pdata, dict):
+            planets_html += _planet_row(pname, pdata)
 
-    # Transits list
+    # Houses
+    houses_html = ""
+    for hnum, hdata in natal.get("houses", {}).items():
+        if not isinstance(hdata, dict):
+            continue
+        sign = hdata.get('sign','')
+        dm   = hdata.get('deg_min','')
+        sg   = _SIGN_GLYPHS.get(sign,'')
+        sru  = _SIGN_RU.get(sign, sign)
+        houses_html += f"<tr><td>{hnum}</td><td>{sg} {_esc(sru)} {_esc(dm)}</td></tr>"
+
+    # Natal aspects (major only, sorted by orb)
+    aspects_html = ""
+    _major = {'conjunction','opposition','trine','square','sextile'}
+    for asp in sorted(natal.get("aspects",[]), key=lambda x: x.get("orb",99)):
+        if asp.get("aspect","") not in _major:
+            continue
+        p1 = asp.get("planet1",""); p2 = asp.get("planet2",""); a = asp.get("aspect","")
+        o  = asp.get("orb",0); ag = _ASP_GLYPHS.get(a,'')
+        g1 = _PLANET_GLYPHS.get(p1,''); g2 = _PLANET_GLYPHS.get(p2,'')
+        ru1 = _PLANET_RU.get(p1,p1); ru2 = _PLANET_RU.get(p2,p2)
+        aspects_html += f"<tr><td>{g1} {_esc(ru1)}</td><td>{ag} {_esc(a)}</td><td>{g2} {_esc(ru2)}</td><td>{o:.1f}°</td></tr>"
+
+    # Chart analysis
+    ca = natal.get("chart_analysis", {})
+    ca_html = ""
+    if ca:
+        shape = ca.get("chart_shape", {})
+        shape_name = shape.get("shape","") if isinstance(shape, dict) else str(shape)
+        el = ca.get("elements", {})
+        mo = ca.get("modalities", {})
+        un = ca.get("unaspected", [])
+        el_str = " · ".join(f"{k}: {v}" for k,v in el.items()) if isinstance(el, dict) else str(el)
+        mo_str = " · ".join(f"{k}: {v}" for k,v in mo.items()) if isinstance(mo, dict) else str(mo)
+        un_str = ", ".join(str(u) for u in un) if un else "—"
+        ca_html = f"""
+        <p><strong>Форма карты:</strong> {_esc(shape_name)}</p>
+        <p><strong>Стихии:</strong> {_esc(el_str)}</p>
+        <p><strong>Модальности:</strong> {_esc(mo_str)}</p>
+        <p><strong>Неаспектированные:</strong> {_esc(un_str)}</p>
+        """
+
+    # ── SECTION 2: Транзиты ──────────────────────────────────────────────────
     transits_html = ""
-    for asp in (transits_d.get("transit_aspects") or [])[:15]:
+    for asp in sorted((transits_d.get("transit_aspects") or []), key=lambda x: x.get("orb",99))[:25]:
         tp  = asp.get("transiting_planet","")
         np  = asp.get("natal_planet","")
-        a   = asp.get("aspect","")
-        o   = asp.get("orb",0)
-        tg  = _PLANET_GLYPHS.get(tp,'')
-        ng  = _PLANET_GLYPHS.get(np,'')
-        transits_html += f"<tr><td>{tg} {_PLANET_RU.get(tp,tp)}</td><td>{a}</td><td>{ng} {_PLANET_RU.get(np,np)}</td><td>{o:.2f}°</td></tr>"
+        a   = asp.get("aspect",""); o = asp.get("orb",0)
+        applying = "→" if asp.get("applying") else "←"
+        ag  = _ASP_GLYPHS.get(a,'')
+        tg  = _PLANET_GLYPHS.get(tp,''); ng = _PLANET_GLYPHS.get(np,'')
+        transits_html += (f"<tr><td>{tg} {_esc(_PLANET_RU.get(tp,tp))}</td>"
+                          f"<td>{ag} {_esc(a)}</td>"
+                          f"<td>{ng} {_esc(_PLANET_RU.get(np,np))}</td>"
+                          f"<td>{o:.2f}° {applying}</td></tr>")
 
-    # Firdaria
+    # ── SECTION 3: Фирдарии ──────────────────────────────────────────────────
     firdaria_html = ""
     if firdaria_d:
         cp = firdaria_d.get("current_period",{})
         cs = firdaria_d.get("current_sub",{})
         pg = _PLANET_GLYPHS.get(cp.get("planet",""),'')
-        sg = _PLANET_GLYPHS.get(cs.get("planet",""),'')
+        sg2 = _PLANET_GLYPHS.get(cs.get("planet",""),'')
+        p_ru = _PLANET_RU.get(cp.get('planet',''), cp.get('planet',''))
+        s_ru = _PLANET_RU.get(cs.get('planet',''), cs.get('planet',''))
+        ps = cp.get('start',''); pe = cp.get('end','')
+        ss = cs.get('start',''); se = cs.get('end','')
         firdaria_html = f"""
-        <p><strong>Текущий период:</strong> {pg} {_PLANET_RU.get(cp.get('planet',''), cp.get('planet',''))}</p>
-        <p><strong>Субпериод:</strong> {sg} {_PLANET_RU.get(cs.get('planet',''), cs.get('planet',''))}</p>
+        <p><strong>Главный период:</strong> {pg} {_esc(p_ru)} ({_esc(ps)} — {_esc(pe)})</p>
+        <p><strong>Субпериод:</strong> {sg2} {_esc(s_ru)} ({_esc(ss)} — {_esc(se)})</p>
         """
 
-    # Numerology
+    # ── SECTION 4: Профекции ─────────────────────────────────────────────────
+    prof_html = ""
+    if profections_d:
+        yr_lord = profections_d.get("year_lord","")
+        act_house = profections_d.get("active_house","")
+        theme = profections_d.get("theme","")
+        age = profections_d.get("age","")
+        prof_html = f"""
+        <p><strong>Возраст:</strong> {_esc(str(age))}</p>
+        <p><strong>Активный дом:</strong> {_esc(str(act_house))}</p>
+        <p><strong>Лорд года:</strong> {_PLANET_GLYPHS.get(str(yr_lord).lower(),'')} {_esc(str(yr_lord))}</p>
+        <p><strong>Тема года:</strong> {_esc(str(theme))}</p>
+        """
+
+    # ── SECTION 5: Соляр ────────────────────────────────────────────────────
+    sr_html = ""
+    if solar_return_d:
+        sr_date = solar_return_d.get("date", solar_return_d.get("return_date",""))
+        sr_sun  = solar_return_d.get("sun_lon","")
+        sr_asc  = solar_return_d.get("ascendant","")
+        sr_html = f"""
+        <p><strong>Дата соляра:</strong> {_esc(str(sr_date))}</p>
+        <p><strong>Асцендент соляра:</strong> {_esc(str(sr_asc))}</p>
+        <p><strong>Солнце:</strong> {_esc(str(sr_sun))}</p>
+        """
+
+    # ── SECTION 6: Нумерология & Каббала ────────────────────────────────────
     num_html = ""
     if numerology:
         lp = numerology.get("life_path", {})
         py = numerology.get("personal_year", {})
         tk = numerology.get("tikkun", {})
+        ex = numerology.get("expression", {})
+        su = numerology.get("soul_urge", {})
+        mc = numerology.get("maturity_cycle", {})
         num_html = f"""
-        <p>Путь Жизни: <strong>{lp.get('number','')}</strong> — {lp.get('meaning','')}</p>
-        <p>Личный год {py.get('current_year','')}: <strong>{py.get('personal_year','')}</strong> — {py.get('theme','')}</p>
-        <p>Тиккун #{tk.get('tikkun_number','')} — Ангел {tk.get('angel','')}</p>
+        <table>
+          <tr><th>Число</th><th>Значение</th><th>Смысл</th></tr>
+          <tr><td>Путь Жизни</td><td><strong>{_esc(str(lp.get('number','')))}</strong></td><td>{_esc(str(lp.get('meaning','')))}</td></tr>
+          {'<tr><td>Выражение</td><td><strong>' + _esc(str(ex.get('number',''))) + '</strong></td><td>' + _esc(str(ex.get('meaning',''))) + '</td></tr>' if ex else ''}
+          {'<tr><td>Зов Души</td><td><strong>' + _esc(str(su.get('number',''))) + '</strong></td><td>' + _esc(str(su.get('meaning',''))) + '</td></tr>' if su else ''}
+          <tr><td>Личный год {_esc(str(py.get('current_year','')))} </td><td><strong>{_esc(str(py.get('personal_year','')))}</strong></td><td>{_esc(str(py.get('theme','')))}</td></tr>
+          {'<tr><td>Цикл зрелости</td><td><strong>' + _esc(str(mc.get('number',''))) + '</strong></td><td>' + _esc(str(mc.get('theme',''))) + '</td></tr>' if mc else ''}
+          <tr><td>Тиккун</td><td><strong>#{_esc(str(tk.get('tikkun_number','')))}</strong></td><td>Ангел {_esc(str(tk.get('angel','')))}</td></tr>
+        </table>
         """
 
-    # Probability
+    # Four Worlds
+    fw_html = ""
+    if four_worlds:
+        dom = four_worlds.get("dominant_world","")
+        worlds = four_worlds.get("worlds",{})
+        fw_rows = ""
+        for wname, wdata in (worlds.items() if isinstance(worlds, dict) else []):
+            score = wdata.get("score","") if isinstance(wdata, dict) else ""
+            desc  = wdata.get("description","") if isinstance(wdata, dict) else str(wdata)
+            fw_rows += f"<tr><td>{_esc(wname)}</td><td>{_esc(str(score))}</td><td>{_esc(str(desc)[:120])}</td></tr>"
+        fw_html = f"""
+        <p><strong>Доминантный мир:</strong> {_esc(str(dom))}</p>
+        {'<table><tr><th>Мир</th><th>Балл</th><th>Описание</th></tr>' + fw_rows + '</table>' if fw_rows else ''}
+        """
+
+    # Natal angels summary (top 5 by planet)
+    angels_html = ""
+    if natal_angels:
+        ang_rows = ""
+        for planet, angel_data in list(natal_angels.items())[:8]:
+            if not isinstance(angel_data, dict):
+                continue
+            aname = angel_data.get("name",""); heb = angel_data.get("heb","")
+            theme = angel_data.get("theme",""); tarot = angel_data.get("tarot","")
+            g = _PLANET_GLYPHS.get(planet,'')
+            pru = _PLANET_RU.get(planet, planet)
+            ang_rows += (f"<tr><td>{g} {_esc(pru)}</td>"
+                         f"<td>{_esc(aname)} {_esc(heb)}</td>"
+                         f"<td>{_esc(str(theme)[:90])}</td>"
+                         f"<td>{_esc(str(tarot))}</td></tr>")
+        if ang_rows:
+            angels_html = f"""<table>
+            <tr><th>Планета</th><th>Ангел</th><th>Тема</th><th>Таро</th></tr>
+            {ang_rows}</table>"""
+
+    # ── SECTION 7: Джйотиш ──────────────────────────────────────────────────
+    jyotish_html = ""
+    if jyotish:
+        lagna = jyotish.get("lagna","")
+        moon_rasi = jyotish.get("moon_rasi","")
+        nakshatra = jyotish.get("nakshatra","")
+        pada = jyotish.get("pada","")
+        dasha_d = jyotish.get("current_dasha",{})
+        antardasha_d = jyotish.get("current_antardasha",{})
+        yogas = jyotish.get("yogas",[])
+        y_rows = "".join(f"<tr><td>{_esc(y.get('name','') if isinstance(y,dict) else str(y))}</td><td>{_esc(y.get('description','') if isinstance(y,dict) else '')}</td></tr>" for y in yogas[:6])
+        dasha_planet = dasha_d.get("planet","") if isinstance(dasha_d,dict) else ""
+        antardasha_planet = antardasha_d.get("planet","") if isinstance(antardasha_d,dict) else ""
+        dasha_end = dasha_d.get("end","") if isinstance(dasha_d,dict) else ""
+        jyotish_html = f"""
+        <p><strong>Лагна (Асцендент):</strong> {_esc(str(lagna))}</p>
+        <p><strong>Луна (Раши):</strong> {_esc(str(moon_rasi))}</p>
+        <p><strong>Накшатра:</strong> {_esc(str(nakshatra))} {('пада ' + str(pada)) if pada else ''}</p>
+        <p><strong>Текущая Даша:</strong> {_PLANET_GLYPHS.get(str(dasha_planet).lower(),'')} {_esc(str(dasha_planet))} → {_esc(str(antardasha_planet))} (до {_esc(str(dasha_end))})</p>
+        {'<table><tr><th>Йога</th><th>Описание</th></tr>' + y_rows + '</table>' if y_rows else ''}
+        """
+
+    # ── SECTION 8: Human Design ──────────────────────────────────────────────
+    hd_html = ""
+    if human_design:
+        hd_type    = human_design.get("type","")
+        profile    = human_design.get("profile","")
+        authority  = human_design.get("authority","")
+        cross      = human_design.get("incarnation_cross","")
+        strategy   = human_design.get("strategy","")
+        defined_centers = human_design.get("defined_centers",[])
+        open_centers    = human_design.get("open_centers",[])
+        channels   = human_design.get("channels",[])
+        gates_list = human_design.get("gates",[])
+        def_c_str = ", ".join(str(c) for c in (defined_centers or []))
+        open_c_str = ", ".join(str(c) for c in (open_centers or []))
+        ch_rows = "".join(
+            f"<tr><td>{_esc(str(ch.get('channel','') if isinstance(ch,dict) else ch))}</td>"
+            f"<td>{_esc(str(ch.get('name','') if isinstance(ch,dict) else ''))}</td></tr>"
+            for ch in (channels or [])[:10]
+        )
+        hd_html = f"""
+        <p><strong>Тип:</strong> {_esc(str(hd_type))}</p>
+        <p><strong>Профиль:</strong> {_esc(str(profile))}</p>
+        <p><strong>Авторитет:</strong> {_esc(str(authority))}</p>
+        <p><strong>Стратегия:</strong> {_esc(str(strategy))}</p>
+        <p><strong>Крест воплощения:</strong> {_esc(str(cross))}</p>
+        <p><strong>Определённые центры:</strong> {_esc(def_c_str) or '—'}</p>
+        <p><strong>Открытые центры:</strong> {_esc(open_c_str) or '—'}</p>
+        {'<table><tr><th>Канал</th><th>Название</th></tr>' + ch_rows + '</table>' if ch_rows else ''}
+        """
+
+    # ── SECTION 9: Вероятностное дерево ─────────────────────────────────────
     prob_html = ""
     if probability:
         api_d = probability.get("assembly_point",{})
+        topics = probability.get("topic_scores",{})
+        top_rows = "".join(
+            f"<tr><td>{_esc(k)}</td><td>{v}</td></tr>"
+            for k,v in sorted((topics.items() if isinstance(topics,dict) else []),
+                              key=lambda x: -x[1])[:8]
+        )
         prob_html = f"""
-        <p><strong>Индекс точки сборки:</strong> {api_d.get('zone','')} ({api_d.get('index',0):+.2f})</p>
-        <p>{api_d.get('zone_description','')}</p>
-        <p><strong>Рекомендация:</strong> {api_d.get('recommendation','')}</p>
-        <p>{probability.get('summary','')}</p>
+        <p><strong>Зона точки сборки:</strong> {_esc(str(api_d.get('zone','')))} 
+           (индекс {api_d.get('index',0):+.2f})</p>
+        <p>{_esc(str(api_d.get('zone_description','')))}</p>
+        <p><strong>Рекомендация:</strong> {_esc(str(api_d.get('recommendation','')))}</p>
+        <p>{_esc(str(probability.get('summary','')))}</p>
+        {'<table><tr><th>Тема</th><th>Балл</th></tr>' + top_rows + '</table>' if top_rows else ''}
         """
 
     depth_label = {"brief": "Краткий", "full": "Полный", "professional": "Профессиональный"}.get(depth, depth)
+
+    def _section(icon, title, body):
+        if not body or not body.strip():
+            return ''
+        return f'<div class="section"><h2>{icon} {title}</h2>{body}</div>'
+
+    natal_tables = ""
+    if planets_html:
+        natal_tables += f'<table><tr><th>Планета</th><th>Позиция</th><th>Дом / Достоинство</th></tr>{planets_html}</table>'
+    if houses_html:
+        natal_tables += f'<details><summary style="cursor:pointer;color:#d4af37;margin:0.5rem 0">▸ Куспиды домов</summary><table><tr><th>Дом</th><th>Позиция</th></tr>{houses_html}</table></details>'
+    if aspects_html:
+        natal_tables += f'<details><summary style="cursor:pointer;color:#d4af37;margin:0.5rem 0">▸ Главные аспекты</summary><table><tr><th>Планета 1</th><th>Аспект</th><th>Планета 2</th><th>Орб</th></tr>{aspects_html}</table></details>'
+    if ca_html:
+        natal_tables += f'<div class="sub">{ca_html}</div>'
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AstroCRM — {depth_label} отчёт {name}</title>
+<title>AstroCRM — {depth_label} отчёт — {_esc(name)}</title>
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: 'Georgia', serif; background: #0a0a1a; color: #e8d5a3; padding: 2rem; }}
-  .report {{ max-width: 900px; margin: 0 auto; }}
-  h1 {{ font-size: 2rem; color: #ffd700; border-bottom: 1px solid #ffd70040; padding-bottom: 0.5rem; margin-bottom: 1.5rem; }}
-  h2 {{ font-size: 1.2rem; color: #d4af37; margin: 1.5rem 0 0.75rem; border-left: 3px solid #d4af37; padding-left: 0.75rem; }}
-  .meta {{ color: #b8a070; font-size: 0.9rem; margin-bottom: 2rem; }}
-  table {{ width: 100%; border-collapse: collapse; margin-bottom: 1rem; }}
-  th {{ background: #1a1a3a; color: #ffd700; padding: 0.5rem 0.75rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; }}
-  td {{ padding: 0.5rem 0.75rem; border-bottom: 1px solid #ffffff15; font-size: 0.9rem; }}
-  tr:hover td {{ background: #ffffff08; }}
-  .section {{ background: #0f0f2a; border: 1px solid #ffd70020; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; }}
-  p {{ line-height: 1.6; margin-bottom: 0.5rem; }}
-  @media print {{ body {{ background: white; color: black; }} table {{ border: 1px solid #ccc; }} }}
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Georgia',serif;background:#0a0a1a;color:#e8d5a3;padding:2rem}}
+  .report{{max-width:960px;margin:0 auto}}
+  h1{{font-size:1.9rem;color:#ffd700;border-bottom:2px solid #ffd70030;padding-bottom:.6rem;margin-bottom:1.5rem}}
+  h2{{font-size:1.05rem;color:#d4af37;margin:.1rem 0 .75rem;border-left:3px solid #d4af37;padding-left:.65rem;letter-spacing:.03em}}
+  .meta{{color:#b8a070;font-size:.85rem;margin-bottom:1.5rem;line-height:1.8;
+         border:1px solid #ffffff10;border-radius:8px;padding:.75rem 1rem;background:#0f0f2a}}
+  table{{width:100%;border-collapse:collapse;margin-bottom:.75rem;font-size:.85rem}}
+  th{{background:#1a1a3a;color:#c8a84b;padding:.4rem .7rem;text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}}
+  td{{padding:.4rem .7rem;border-bottom:1px solid #ffffff12}}
+  .section{{background:#0e0e26;border:1px solid #ffd70018;border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1.1rem}}
+  .sub{{margin-top:.5rem;padding:.5rem .75rem;border-left:2px solid #ffd70030;font-size:.88rem}}
+  details summary{{user-select:none}}
+  p{{line-height:1.65;margin-bottom:.4rem;font-size:.9rem}}
+  .cols2{{display:grid;grid-template-columns:1fr 1fr;gap:1rem}}
+  .badge{{display:inline-block;background:#1a1a3a;border-radius:4px;padding:.15rem .45rem;
+          font-size:.75rem;color:#c8a84b;margin:.1rem .15rem}}
+  @media print{{
+    body{{background:#fff;color:#111;padding:1rem}}
+    .section{{border:1px solid #ccc;background:#fafafa}}
+    h1,h2{{color:#333}}
+    th{{background:#f0f0f0;color:#333}}
+    table{{border:1px solid #ddd}}
+    details{{open:open}}
+    details summary{{display:none}}
+  }}
 </style>
 </head>
 <body>
 <div class="report">
   <h1>✦ AstroCRM — {depth_label} Астрологический Отчёт</h1>
   <div class="meta">
-    <p>Имя: <strong>{name}</strong></p>
-    <p>Дата рождения: <strong>{birth_date}</strong></p>
-    <p>Дата анализа: <strong>{target_date}</strong></p>
-    <p>Глубина: {depth_label}</p>
+    <strong>{_esc(name)}</strong> &nbsp;·&nbsp;
+    Рождение: {_esc(birth_date)} {_esc(birth_time)} UTC{lat:+g} &nbsp;·&nbsp;
+    Коорд: {lat:+.2f} / {lon:+.2f} &nbsp;·&nbsp;
+    Дата анализа: <strong>{_esc(target_date)}</strong> &nbsp;·&nbsp;
+    Глубина: {depth_label}
   </div>
 
-  {'<div class="section"><h2>☽ Натальная Карта</h2><table><tr><th>Планета</th><th>Позиция</th></tr>' + planets_html + '</table></div>' if planets_html else ''}
+  {_section('☽', 'Натальная карта', natal_tables)}
+  {_section('⟳', 'Активные транзиты', ('<table><tr><th>Транзит</th><th>Аспект</th><th>Натальная</th><th>Орб</th></tr>' + transits_html + '</table>') if transits_html else '')}
+  {_section('⏳', 'Фирдарии (Персидские периоды)', firdaria_html)}
+  {_section('📅', 'Профекции (Годовой лорд)', prof_html)}
+  {_section('☀️', 'Соляр (Солнечное возвращение)', sr_html)}
+  {_section('🔢', 'Нумерология', num_html)}
+  {_section('🌌', 'Четыре Мира Каббалы', fw_html)}
+  {_section('👼', '72 Ангела Каббалы', angels_html)}
+  {_section('🪐', 'Джйотиш (Ведическая астрология)', jyotish_html)}
+  {_section('⬡', 'Human Design', hd_html)}
+  {_section('🌀', 'Матрица вероятностей', prob_html)}
 
-  {'<div class="section"><h2>⟳ Транзиты</h2><table><tr><th>Транзит</th><th>Аспект</th><th>Натальная</th><th>Орб</th></tr>' + transits_html + '</table></div>' if transits_html else ''}
-
-  {'<div class="section"><h2>⏳ Фирдарии</h2>' + firdaria_html + '</div>' if firdaria_html else ''}
-
-  {'<div class="section"><h2>🔢 Нумерология & Каббала</h2>' + num_html + '</div>' if num_html else ''}
-
-  {'<div class="section"><h2>🌀 Матрица Вероятностей (по Сету)</h2>' + prob_html + '</div>' if prob_html else ''}
-
-  <div class="meta" style="margin-top: 2rem; font-size: 0.75rem; color: #7a6a4a;">
-    Отчёт сгенерирован AstroCRM · {target_date}
+  <div class="meta" style="margin-top:1.5rem;font-size:.72rem;color:#7a6a4a">
+    Отчёт сгенерирован AstroCRM ✦ {_esc(target_date)}
   </div>
 </div>
 </body>
