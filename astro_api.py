@@ -1319,106 +1319,7 @@ def _parse_birth(date, time, lat, lon, utc):
 
 # ── INGRESS CALENDAR ──────────────────────────────────────────────────────────
 
-@app.get("/ephemeris/ingress-calendar")
-def ingress_calendar(
-    year:         int = Query(..., ge=1900, le=2100),
-    planets:      str = Query("sun,mercury,venus,mars,jupiter,saturn"),
-    include_moon: bool = Query(False),
-):
-    """Sign ingresses for selected planets within a given year.
-
-    Returns all moments when a planet enters a new zodiac sign.
-    - **year**: Gregorian year (1900–2100)
-    - **planets**: comma-separated planet names
-    - **include_moon**: also include ~26 lunar ingresses (slow, adds ~0.5 s)
-    """
-    try:
-        from astro_engine import calc_planets as _cp, SIGN_NAMES as _SN
-        import math as _math
-
-        planet_list = [p.strip().lower() for p in planets.split(",") if p.strip()]
-        if include_moon and "moon" not in planet_list:
-            planet_list.append("moon")
-
-        # Validate
-        valid = {"sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"}
-        planet_list = [p for p in planet_list if p in valid]
-
-        start_jd = _to_jd(f"{year}-01-01", "00:00", 0)
-        end_jd   = _to_jd(f"{year}-12-31", "23:59", 0)
-
-        def get_sign_idx(jd_val: float, planet: str) -> int:
-            pl = _cp(jd_val)
-            lon = pl.get(planet, 0)
-            return int(lon // 30) % 12
-
-        def _jd_to_iso_date(jd_val: float) -> str:
-            """Convert JD to YYYY-MM-DD string."""
-            from astro_engine import jd as _jdf
-            z = int(jd_val + 0.5)
-            a = z if z < 2299161 else (
-                lambda al: z + 1 + al - al // 4
-            )((z - 1867216.25) // 36524.25)
-            b = a + 1524
-            c = int((b - 122.1) / 365.25)
-            d = int(365.25 * c)
-            e = int((b - d) / 30.6001)
-            day   = b - d - int(30.6001 * e)
-            month = e - 1 if e < 14 else e - 13
-            year  = c - 4716 if month > 2 else c - 4715
-            return f"{year:04d}-{month:02d}-{day:02d}"
-
-        # Step size per planet (days between scans)
-        _STEPS = {"moon": 0.5, "mercury": 2.0, "venus": 3.0, "sun": 5.0,
-                  "mars": 5.0, "jupiter": 15.0, "saturn": 20.0,
-                  "uranus": 30.0, "neptune": 30.0, "pluto": 30.0}
-
-        ingresses = []
-        for planet in planet_list:
-            step    = _STEPS.get(planet, 5.0)
-            jd_cur  = start_jd
-            prev_si = get_sign_idx(jd_cur, planet)
-
-            while jd_cur <= end_jd:
-                jd_next = jd_cur + step
-                next_si = get_sign_idx(jd_next, planet)
-                if next_si != prev_si:
-                    # Binary-search exact ingress moment
-                    lo, hi = jd_cur, jd_next
-                    for _ in range(40):
-                        mid    = (lo + hi) / 2
-                        mid_si = get_sign_idx(mid, planet)
-                        if mid_si == prev_si:
-                            lo = mid
-                        else:
-                            hi = mid
-                    ingress_jd  = (lo + hi) / 2
-                    ingress_si  = get_sign_idx(ingress_jd, planet)
-                    ingress_lon = _cp(ingress_jd).get(planet, 0)
-                    _frac_h = int(((ingress_jd + 0.5) % 1) * 24)
-                    ingresses.append({
-                        "planet":       planet,
-                        "sign":         _SN[ingress_si],
-                        "sign_idx":     ingress_si,
-                        "jd":           round(ingress_jd, 4),
-                        "datetime_utc": _jd_to_iso_date(ingress_jd) + f"T{_frac_h:02d}:00:00Z",
-                    })
-                    prev_si = next_si
-                jd_cur  = jd_next
-                prev_si = get_sign_idx(jd_cur, planet)
-
-        ingresses.sort(key=lambda x: x["jd"])
-
-        return _present({
-            "year":     year,
-            "planets":  planet_list,
-            "count":    len(ingresses),
-            "ingresses": ingresses,
-        })
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, str(e))
+# NOTE: /ephemeris/ingress-calendar is defined further below (single authoritative version)
 
 
 @app.post("/dashboard")
@@ -2145,8 +2046,15 @@ def calc_prenatal(req: PrenatalRequest):
         raise HTTPException(500, str(e))
 
 
-@app.post("/predictive/perfections")
+@app.post("/predictive/exact-aspects")
+@app.post("/predictive/perfections")  # deprecated alias
 def calc_perfections(req: PerfectionsRequest):
+    """Exact dates when transit planets form aspects to natal points.
+
+    Previously mis-named /predictive/perfections — renamed to /predictive/exact-aspects.
+    The old path is kept as a deprecated alias for backwards compatibility.
+    Uses transit_exact_dates() under the hood.
+    """
     try:
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = transit_exact_dates(natal_jd, req.from_date, req.to_date,
@@ -3831,6 +3739,21 @@ def generate_report(req: ReportRequest):
             except Exception:
                 report_data["probability"] = {}
 
+        # ── Compensatory practices ────────────────────────────────────────────
+        if _COMPENSATORY_OK and build_compensatory_report is not None:
+            try:
+                natal_for_comp = report_data.get("natal") or {}
+                transit_asps   = report_data.get("transits", {}).get("transit_aspects", [])
+                if natal_for_comp and transit_asps:
+                    comp = build_compensatory_report(  # type: ignore[misc]
+                        natal_chart=natal_for_comp,
+                        transit_aspects=transit_asps[:10],
+                        depth="full" if req.depth == "professional" else "light",
+                    )
+                    report_data["compensatory"] = comp
+            except Exception:
+                pass
+
         if req.format == "json":
             return _present(report_data)
 
@@ -3841,6 +3764,243 @@ def generate_report(req: ReportRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html, status_code=200)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── FULL PROFILE ──────────────────────────────────────────────────────────────
+
+class FullProfileRequest(BaseModel):
+    """Single-request aggregator for the main dashboard full profile."""
+    date:              str
+    time:              str          = "12:00"
+    lat:               float        = 55.75
+    lon:               float        = 37.62
+    utc:               float        = 0.0
+    timezone_name:     Optional[str] = None
+    name:              Optional[str] = None
+    target_date:       Optional[str] = None
+    target_time:       str          = "12:00"
+    depth:             str          = "full"          # brief | full | professional
+    include_compensatory: bool      = True
+    include_human_design: bool      = False
+    include_jyotish:      bool      = False
+    include_relocation:   bool      = False
+    houses:            str          = "P"
+
+
+@app.post("/full-profile")
+async def full_profile(req: FullProfileRequest):  # noqa: C901
+    """Single-request aggregator used by the main dashboard.
+
+    Returns natal + chart analysis + moon + top active transits (with compensatory
+    per transit) + period background + profections + firdaria + solar-arc hits
+    (top 3) + saturn cycle + optional HD / jyotish / relocation.
+    """
+    try:
+        target_date = req.target_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        natal_jd    = _to_jd(req.date, req.time, req.utc)
+        target_jd   = _to_jd(target_date, req.target_time, req.utc)
+
+        yr, mo, dy = _parse_date(req.date)
+        h,  mi, sc = _parse_time(req.time)
+
+        # ── Natal chart ───────────────────────────────────────────────────────
+        natal = calc_chart(
+            yr, mo, dy, h, mi, sc,
+            req.lat, req.lon, req.utc,
+            houses_system=req.houses,
+            include_aspects=True, include_patterns=True,
+            include_dignities=True, include_arabic=True,
+            include_sect=True, include_dispositors=False,
+        )
+
+        # ── Chart analysis ────────────────────────────────────────────────────
+        chart_analysis: dict = {}
+        try:
+            planets_raw = {p: d["lon"] if isinstance(d, dict) else d
+                           for p, d in natal.get("planets", {}).items()}
+            chart_analysis = calc_chart_analysis(planets_raw, natal.get("aspects", []))
+        except Exception:
+            pass
+
+        # ── Active transits ───────────────────────────────────────────────────
+        transit_result: dict = {}
+        try:
+            transit_result = transits(
+                natal_jd, target_date, req.target_time,
+                lat=req.lat, lon=req.lon,
+                transit_orb_major=2.5, transit_orb_minor=1.5,
+            )
+        except Exception:
+            pass
+
+        transit_aspects = transit_result.get("aspects", [])
+        transit_aspects.sort(key=lambda a: a.get("orb", 99))
+        top_aspects = transit_aspects[:6]
+
+        # ── Compensatory per transit ──────────────────────────────────────────
+        comp_per_transit: list = []
+        if req.include_compensatory and _COMPENSATORY_OK and build_compensatory_report is not None and natal:
+            try:
+                for ta in top_aspects:
+                    comp = build_compensatory_report(  # type: ignore[misc]
+                        natal_chart=natal,
+                        transit_aspects=[ta],
+                        depth="light",
+                    )
+                    comp_per_transit.append({
+                        "transit": ta,
+                        "practices": comp.get("practices", [])[:3],
+                    })
+            except Exception:
+                pass
+
+        # ── Moon today ────────────────────────────────────────────────────────
+        moon_today_data: dict = {}
+        try:
+            t_pl = transit_result.get("transit_planets", {})
+            moon_lon = (t_pl.get("moon") or {}).get("lon", 0) if isinstance(t_pl.get("moon"), dict) else t_pl.get("moon", 0)
+            sun_lon  = (t_pl.get("sun")  or {}).get("lon", 0) if isinstance(t_pl.get("sun"),  dict) else t_pl.get("sun",  0)
+            phase_angle = (moon_lon - sun_lon) % 360
+            phases = ["new_moon","waxing_crescent","first_quarter","waxing_gibbous",
+                      "full_moon","waning_gibbous","last_quarter","waning_crescent"]
+            voc = void_of_course_moon(target_jd, look_ahead_days=2.0)
+            moon_today_data = {
+                "sign":        sign_name(moon_lon),
+                "degree":      round(moon_lon % 30, 2),
+                "phase":       phases[int(phase_angle / 45) % 8],
+                "phase_angle": round(phase_angle, 1),
+                "void_of_course": voc,
+            }
+        except Exception:
+            pass
+
+        # ── Period background ──────────────────────────────────────────────────
+        period_bg: dict = {}
+        try:
+            period_bg = {
+                "year_theme": transit_result.get("year_theme", ""),
+                "season":     transit_result.get("season", ""),
+            }
+        except Exception:
+            pass
+
+        # ── Profections ────────────────────────────────────────────────────────
+        prof: dict = {}
+        try:
+            prof = profections(natal_jd, target_date, lat=req.lat, lon=req.lon)
+        except Exception:
+            pass
+
+        # ── Firdaria ──────────────────────────────────────────────────────────
+        fird: dict = {}
+        try:
+            fird = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+        except Exception:
+            pass
+
+        # ── Solar-arc hits (top 3) ─────────────────────────────────────────────
+        sa_hits: list = []
+        try:
+            sa_result = solar_arc(natal_jd, req.lat, req.lon, target_date)
+            raw_hits  = sa_result.get("hits", sa_result.get("aspects", []))
+            raw_hits  = sorted(raw_hits, key=lambda x: abs(x.get("orb", 99)))
+            sa_hits   = raw_hits[:3]
+        except Exception:
+            pass
+
+        # ── Saturn cycle ──────────────────────────────────────────────────────
+        saturn_cyc: dict = {}
+        try:
+            from astro_predictive import saturn_cycle as _saturn_cycle_fn
+            saturn_cyc = _saturn_cycle_fn(
+                req.date, req.time, req.lat, req.lon, req.utc
+            )
+        except Exception:
+            pass
+
+        # ── Optional Human Design ──────────────────────────────────────────────
+        hd: dict = {}
+        if req.include_human_design and _HUMAN_DESIGN_OK:
+            try:
+                hd = calc_human_design(yr, mo, dy, h, mi, sc)
+            except Exception:
+                pass
+
+        # ── Optional Jyotish ──────────────────────────────────────────────────
+        jyotish_data: dict = {}
+        if req.include_jyotish and _JYOTISH_OK:
+            try:
+                jyotish_data = _calc_jyotish(yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc)
+            except Exception:
+                pass
+
+        # ── Optional relocation ───────────────────────────────────────────────
+        reloc: dict = {}
+        if req.include_relocation:
+            try:
+                from astro_relocation import calc_relocation_chart as _cr
+                reloc = _cr(yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+                             new_lat=req.lat, new_lon=req.lon)
+            except Exception:
+                pass
+
+        result: dict = {
+            "name":              req.name,
+            "birth_date":        req.date,
+            "birth_time":        req.time,
+            "target_date":       target_date,
+            "depth":             req.depth,
+            "natal":             natal,
+            "chart_analysis":    chart_analysis,
+            "moon_today":        moon_today_data,
+            "active_transits":   top_aspects,
+            "compensatory_per_transit": comp_per_transit,
+            "period_background": period_bg,
+            "profections":       prof,
+            "firdaria":          fird,
+            "solar_arc_hits":    sa_hits,
+            "saturn_cycle":      saturn_cyc,
+        }
+        if req.include_human_design:
+            result["human_design"] = hd
+        if req.include_jyotish:
+            result["jyotish"] = jyotish_data
+        if req.include_relocation:
+            result["relocation"] = reloc
+
+        return _present(result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── COUPLE/* aliases for /interaction/* ──────────────────────────────────────
+
+@app.post("/couple/forecast")
+async def couple_forecast(req: PersonalInteractionRequest):
+    """Alias for /interaction/personal-forecast — used by couple dashboard."""
+    return interaction_personal_forecast(req)
+
+
+@app.post("/couple/timeline")
+async def couple_timeline(req: PersonalInteractionRequest):
+    """Alias for /interaction/timeline — synastry timeline."""
+    return interaction_timeline(req)
+
+
+@app.post("/couple/compare")
+async def couple_compare(req: ScenarioCompareRequest):
+    """Alias for /interaction/compare-scenarios — compare relationship scenarios."""
+    return compare_scenarios(req)
 
 
 def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
@@ -3863,6 +4023,7 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
     jyotish       = data.get("jyotish", {})
     human_design  = data.get("human_design", {})
     probability   = data.get("probability", {})
+    compensatory  = data.get("compensatory", {})
 
     _SIGN_GLYPHS = {'aries':'♈','taurus':'♉','gemini':'♊','cancer':'♋','leo':'♌','virgo':'♍',
                     'libra':'♎','scorpio':'♏','sagittarius':'♐','capricorn':'♑','aquarius':'♒','pisces':'♓'}
@@ -4130,6 +4291,26 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
 
     depth_label = {"brief": "Краткий", "full": "Полный", "professional": "Профессиональный"}.get(depth, depth)
 
+    # ── Compensatory practices HTML ───────────────────────────────────────────
+    comp_html = ""
+    if compensatory:
+        practices = compensatory.get("practices", [])
+        comp_rows = ""
+        for p in practices[:12]:
+            pname = _esc(str(p.get("name", "")))
+            desc  = _esc(str(p.get("description", p.get("desc", ""))))
+            cat   = _esc(str(p.get("category", "")))
+            comp_rows += f"<tr><td>{cat}</td><td><strong>{pname}</strong></td><td>{desc}</td></tr>"
+        summary = _esc(str(compensatory.get("summary", "")))
+        comp_html = ""
+        if summary:
+            comp_html += f"<p>{summary}</p>"
+        if comp_rows:
+            comp_html += (
+                "<table><tr><th>Категория</th><th>Практика</th><th>Описание</th></tr>"
+                + comp_rows + "</table>"
+            )
+
     def _section(icon, title, body):
         if not body or not body.strip():
             return ''
@@ -4202,6 +4383,7 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
   {_section('🪐', 'Джйотиш (Ведическая астрология)', jyotish_html)}
   {_section('⬡', 'Human Design', hd_html)}
   {_section('🌀', 'Матрица вероятностей', prob_html)}
+  {_section('🛠️', 'Компенсаторные практики', comp_html)}
 
   <div class="meta" style="margin-top:1.5rem;font-size:.72rem;color:#7a6a4a">
     Отчёт сгенерирован AstroCRM ✦ {_esc(target_date)}
