@@ -2107,6 +2107,112 @@ def calc_profections(req: PredictiveRequest):
         raise HTTPException(500, str(e))
 
 
+@app.post("/predictive/annual-profection")
+def annual_profection(req: PredictiveRequest):
+    """Annual profection — full 12-year cycle table + activated natal planets.
+
+    Extends /predictive/profections with:
+    - cycle_12: list of all 12 years ahead (house, sign, lord, age)
+    - activated_natal_planets: natal planets inside the current profected house
+    - house_theme: Russian theme text for the active house
+    - interpretation: narrative text
+    """
+    try:
+        from astro_engine import calc_planets as _cp, calc_houses as _ch
+        from astro_predictive import TRADITIONAL_LORD as _TL
+
+        natal_jd = _to_jd(req.date, req.time, req.utc)
+        base = profections(natal_jd, req.target_date,
+                           houses_system=req.houses, lat=req.lat, lon=req.lon)
+
+        natal_planets = _cp(natal_jd)
+        natal_houses  = _ch(natal_jd, req.lat, req.lon, req.houses)
+
+        current_house = base["annual_house"]
+        age           = base["age"]
+
+        # Full 12-year cycle starting from current year
+        cycle = []
+        for offset in range(12):
+            h      = ((current_house - 1 + offset) % 12) + 1
+            h_lon  = natal_houses.get(f"h{h}", 0)
+            h_sign = sign_name(h_lon)
+            cycle.append({
+                "year_offset": offset,
+                "age":         age + offset,
+                "house":       h,
+                "house_lon":   round(h_lon, 4),
+                "sign":        h_sign,
+                "lord":        _TL.get(h_sign, "sun"),
+                "is_current":  offset == 0,
+            })
+
+        # Natal planets activated inside the profected house
+        ann_h_lon  = natal_houses.get(f"h{current_house}", 0)
+        next_h     = (current_house % 12) + 1
+        next_h_lon = natal_houses.get(f"h{next_h}", 0)
+        house_span = (next_h_lon - ann_h_lon) % 360
+
+        activated = []
+        for pname_k, plon in natal_planets.items():
+            if plon is None:
+                continue
+            diff = (plon - ann_h_lon) % 360
+            if diff < house_span:
+                activated.append({
+                    "planet": pname_k,
+                    "lon":    round(plon, 4),
+                    "sign":   sign_name(plon),
+                })
+
+        # House themes (Russian)
+        _HOUSE_THEMES_RU = {
+            1:  "идентичность, тело, новые начинания",
+            2:  "деньги, ресурсы, ценности",
+            3:  "коммуникации, братья/сёстры, обучение",
+            4:  "дом, семья, корни",
+            5:  "творчество, дети, романтика, риск",
+            6:  "работа, здоровье, рутина",
+            7:  "партнёрство, отношения, договоры",
+            8:  "трансформация, наследство, кризис",
+            9:  "путешествия, философия, высшее образование",
+            10: "карьера, статус, публичность",
+            11: "друзья, цели, социальные связи",
+            12: "уединение, тайны, духовная работа",
+        }
+        theme      = _HOUSE_THEMES_RU.get(current_house, "")
+        lord_name  = base["annual_lord"]
+
+        interp = (
+            f"Год профекций: дом {current_house} — «{theme}». "
+            f"Лорд года: {lord_name.capitalize()}. "
+            "Состояние лорда в натальной карте определяет качество года. "
+        )
+        if activated:
+            planets_str = ", ".join(p["planet"].capitalize() for p in activated)
+            interp += (
+                f"В активированном доме натально стоят: {planets_str} — "
+                "эти планеты усиленно задействованы в текущем году."
+            )
+        else:
+            interp += (
+                "В активированном доме натально нет планет — "
+                "тема дома раскрывается прежде всего через лорда года."
+            )
+
+        base["cycle_12"]                = cycle
+        base["activated_natal_planets"] = activated
+        base["house_theme"]             = theme
+        base["interpretation"]          = interp
+        base["type"]                    = "annual_profection"
+
+        return _present(base)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/predictive/firdaria")
 def calc_firdaria(req: PredictiveRequest):
     """Firdaria (Firdariyyat) — Hellenistic unequal planetary periods.

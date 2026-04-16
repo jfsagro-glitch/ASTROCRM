@@ -1235,3 +1235,49 @@ export async function getSignalWeights(): Promise<SignalWeightsResult> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+// ── ANNUAL PROFECTION ────────────────────────────────────────────────────────
+
+export interface ProfectionCycleYear {
+  year_offset: number;
+  age: number;
+  house: number;
+  house_lon: number;
+  sign: string;
+  lord: string;
+  is_current: boolean;
+}
+
+export interface ActivatedPlanet {
+  planet: string;
+  lon: number;
+  sign: string;
+}
+
+export interface AnnualProfectionResult {
+  type: string;
+  age: number;
+  annual_house: number;
+  annual_sign: string;
+  annual_lord: string;
+  annual_lord_natal_lon: number | null;
+  annual_lord_sign: string | null;
+  monthly_house: number;
+  monthly_sign: string;
+  monthly_lord: string;
+  months_into_year: number;
+  house_theme: string;
+  interpretation: string;
+  cycle_12: ProfectionCycleYear[];
+  activated_natal_planets: ActivatedPlanet[];
+}
+
+export async function getAnnualProfection(
+  b: BirthInput,
+  targetDate: string
+): Promise<AnnualProfectionResult> {
+  return post('/predictive/annual-profection', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    target_date: targetDate,
+  });
+}

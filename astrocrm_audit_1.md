@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-18 — Sprint 7 ✅ ЗАВЕРШЁН. Всё реализовано. Открытые ⏳ — только низкий приоритет.
+## Статус: обновлён 2026-04-18 — Sprint 8 ✅ ЗАВЕРШЁН. Все пункты реализованы. Технический долг нулевой.
 
 ---
 
@@ -204,7 +204,7 @@ def void_of_course_moon(JD, look_ahead_days=3, lat=0, lon=0):
 
 ```
 ✅ POST /predictive/firdaria             — реализовано (78e9b02)
-⏳ POST /predictive/annual-profection    — не реализовано (low priority; /predictive/profections покрывает задачу)
+✅ POST /predictive/annual-profection    — реализовано (Sprint 8): цикл 12 лет + активированные планеты + интерпретация
 ✅ GET  /daily/moon                      — реализовано (78e9b02)
 ✅ POST /daily/personal                  — реализовано
 ✅ POST /compensatory/practices          — реализовано (78e9b02)
@@ -925,12 +925,10 @@ PERIOD_OPENINGS = {
 
 ### Итог: **15 / 15** пунктов аудита выполнено ✅
 
-Остаётся нереализованным из аудита (low priority backlog):
-- `calc_lunar_distance()` для точной классификации полных/кольцеобразных затмений
-- `POST /predictive/annual-profection` — отдельный эндпоинт (функция профекций реализована)
+Остаётся нереализованным из аудита: **ничего**. Технический долг нулевой.
 
-> Световые орбы — ✅ реализованы (`astro_engine.py` L755–787).
-> `timezone_name` — ✅ реализовано (`PredictiveRequest` L476, `_utc_for_tz()` L169).
+> `calc_lunar_distance()` — ✅ реализована как `moon_distance_km()` и используется в `find_eclipses()`.
+> `POST /predictive/annual-profection` — ✅ реализовано (Sprint 8).
 
 > `POST /daily/personal` и `GET /ephemeris/ingress-calendar` — **реализованы**.
 
@@ -1019,6 +1017,16 @@ PERIOD_OPENINGS = {
 | `SynastryProgressedBlock.tsx` — UI для `POST /synastry/progressed` | ✅ | Кнопка Рассчитать, 4 таба (all/prog×prog/prog1→natal2/prog2→natal1), `AspectRow` с applying/separating, интерпретация |
 | Вкладка `⚡ Веса сигналов` в ClientPortal | ✅ | `signal-weights` добавлен в `activeTab` union, `tabs[]`, рендер-секция |
 | Вкладка `🔄 Прогрессии` в SynastryPanel | ✅ | `progressed` добавлен в `SynTab` union, `TABS[]`, рендер через `SynastryProgressedBlock` |
+
+### Sprint 8 — Закрытие долга ✅ РЕАЛИЗОВАН
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| `POST /predictive/annual-profection` | ✅ | `cycle_12` (все 12 лет: дом/знак/лорд/возраст), `activated_natal_planets` (натальные планеты в профектированном доме), `house_theme`, `interpretation`; добавлен в `astro_api.py` после `/predictive/profections` |
+| `AnnualProfectionBlock.tsx` | ✅ | Сводка (дом года / лорд / дом месяца), активированные планеты-бейджи, интерпретация, таблица 12-летнего цикла с подсветкой текущего года |
+| Вкладка `🔄 Профекции года` в ClientPortal | ✅ | `annual-profection` добавлен в `activeTab` union, `tabs[]` (иконка Calendar), рендер-секция |
+| Импорт `Calendar` из lucide-react | ✅ | Добавлен в деструктуризацию `lucide-react` |
+| `getAnnualProfection()` в astrologyService.ts | ✅ | Интерфейсы `AnnualProfectionResult`, `ProfectionCycleYear`, `ActivatedPlanet`; вызов `POST /predictive/annual-profection` |
 
 ---
 
@@ -1186,5 +1194,5 @@ PERIOD_OPENINGS = {
 
 *Документ создан на основе аудита ASTROCRM System Description v. апрель 2026*
 *Обновлён 2026-04-16 (v3) — все пункты аудита завершены: WCAG 2.1 shape+pattern bars в ChartAnalysisSection, ChartWheelResponsive mobile bottom-sheet, подтверждены moon_distance_km и _LIGHT_ORBS*
-*Обновлён 2026-04-18 (v4) — верификация Sprint 7: световые орбы ✅ (astro_engine.py L755–787), timezone_name ✅ (PredictiveRequest L476), /natal/void-of-course ✅ (L4918), pyswisseph+HTTP503 ✅; §§4,5,II-A,II-C,V актуализированы*
-*Коммиты на момент проверки: `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`, `f324484`, `ec71211`, `7b33776`, `4b0965c`, `5ef3112`, `5bb051b`, `605cbdc`, `3a3e1c6`*
+*Обновлён 2026-04-18 (v5) — Sprint 8: POST /predictive/annual-profection ✅ (цикл 12 лет + activated planets + AnnualProfectionBlock.tsx); все пункты аудита закрыты, долг нулевой*
+*Коммиты на момент проверки: `a1ceff4`, `75e09d4`, `78e9b02`, `53b544a`, `f324484`, `ec71211`, `7b33776`, `4b0965c`, `5ef3112`, `5bb051b`, `605cbdc`, `3a3e1c6`, `4063aeb`*

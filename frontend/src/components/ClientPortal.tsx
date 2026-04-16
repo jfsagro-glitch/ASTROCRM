@@ -3,7 +3,7 @@ import {
   Moon, Sun, Star, Map, Heart, Sparkles, ArrowRight, Palette,
   Download, Layers, Clock, Zap, Globe, RefreshCw, ChevronDown,
   AlertCircle, Loader2, Search, BookOpen, ChevronRight, Lightbulb,
-  LogOut, UserCircle, Trash2,
+  LogOut, UserCircle, Trash2, Calendar,
 } from 'lucide-react';
 import {
   scoreSpheres, getPairInterp, getAspectCategory, getAspectInterpText,
@@ -52,6 +52,7 @@ import EclipsePersonalBlock from './EclipsePersonalBlock';
 import IngressPersonalBlock from './IngressPersonalBlock';
 import SignalWeightsBlock from './SignalWeightsBlock';
 import SynastryProgressedBlock from './SynastryProgressedBlock';
+import AnnualProfectionBlock from './AnnualProfectionBlock';
 import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -2145,7 +2146,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'|'signal-weights'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'|'signal-weights'|'annual-profection'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2275,6 +2276,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'eclipse-personal',     icon: Star,      label: '🌑 Затмения' },
     { key: 'ingress-personal',     icon: Globe,     label: '🌠 Ингрессии·домов' },
     { key: 'signal-weights',       icon: Zap,       label: '⚡ Веса сигналов' },
+    { key: 'annual-profection',    icon: Calendar,  label: '🔄 Профекции года' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2602,6 +2604,19 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           {activeTab === 'signal-weights' && (
             <div id="pdf-section-signal-weights">
               <SignalWeightsBlock theme={theme} />
+            </div>
+          )}
+
+          {activeTab === 'annual-profection' && (
+            <div id="pdf-section-annual-profection">
+              {birth.date && birth.time ? (
+                <AnnualProfectionBlock birth={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Calendar className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для расчёта профекций</p>
+                </div>
+              )}
             </div>
           )}
 
