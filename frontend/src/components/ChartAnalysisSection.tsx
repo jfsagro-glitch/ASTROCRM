@@ -17,17 +17,19 @@ const SHAPE_INFO: Record<string, { emoji: string; name_ru: string; desc: string 
   splash:     { emoji: '💫', name_ru: 'Всплеск',    desc: 'Планеты равномерно по кругу. Широкий охват интересов, универсальность.' },
 };
 
-const ELEMENT_INFO: Record<string, { ru: string; color: string; bg: string }> = {
-  fire:  { ru: 'Огонь 🔥', color: 'text-orange-400', bg: 'bg-orange-400' },
-  earth: { ru: 'Земля 🌍', color: 'text-emerald-400', bg: 'bg-emerald-400' },
-  air:   { ru: 'Воздух 💨', color: 'text-sky-400', bg: 'bg-sky-400' },
-  water: { ru: 'Вода 💧', color: 'text-blue-500', bg: 'bg-blue-500' },
+// WCAG 2.1 SC 1.4.1: each element has a distinct shape marker (not just color)
+const ELEMENT_INFO: Record<string, { ru: string; color: string; bg: string; shape: string; pattern: string }> = {
+  fire:  { ru: 'Огонь',  color: 'text-orange-400',  bg: 'bg-orange-400',  shape: '▲', pattern: 'repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.18) 3px,rgba(255,255,255,.18) 4px)' },
+  earth: { ru: 'Земля',  color: 'text-emerald-400', bg: 'bg-emerald-400', shape: '■', pattern: 'repeating-linear-gradient(90deg,transparent,transparent 5px,rgba(255,255,255,.18) 5px,rgba(255,255,255,.18) 6px)' },
+  air:   { ru: 'Воздух', color: 'text-sky-400',     bg: 'bg-sky-400',     shape: '●', pattern: 'repeating-linear-gradient(0deg,transparent,transparent 5px,rgba(255,255,255,.18) 5px,rgba(255,255,255,.18) 6px)' },
+  water: { ru: 'Вода',   color: 'text-blue-500',    bg: 'bg-blue-500',    shape: '▼', pattern: 'repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(255,255,255,.18) 3px,rgba(255,255,255,.18) 4px)' },
 };
 
-const MODALITY_INFO: Record<string, { ru: string; color: string; bg: string }> = {
-  cardinal: { ru: 'Кардинальные ♈♋♎♑', color: 'text-red-400',    bg: 'bg-red-400' },
-  fixed:    { ru: 'Фиксированные ♉♌♏♒', color: 'text-amber-400',  bg: 'bg-amber-400' },
-  mutable:  { ru: 'Мутабельные ♊♍♐♓',   color: 'text-purple-400', bg: 'bg-purple-400' },
+// WCAG 2.1 SC 1.4.1: each modality has a distinct shape/pattern in addition to color
+const MODALITY_INFO: Record<string, { ru: string; color: string; bg: string; shape: string; pattern: string }> = {
+  cardinal: { ru: 'Кардинальные', color: 'text-red-400',    bg: 'bg-red-400',    shape: '→', pattern: 'repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.18) 4px,rgba(255,255,255,.18) 5px)' },
+  fixed:    { ru: 'Фиксированные', color: 'text-amber-400', bg: 'bg-amber-400',  shape: '◆', pattern: 'repeating-linear-gradient(90deg,transparent,transparent 4px,rgba(255,255,255,.18) 4px,rgba(255,255,255,.18) 5px)' },
+  mutable:  { ru: 'Мутабельные',   color: 'text-purple-400',bg: 'bg-purple-400', shape: '~', pattern: 'repeating-linear-gradient(-45deg,transparent,transparent 4px,rgba(255,255,255,.18) 4px,rgba(255,255,255,.18) 5px)' },
 };
 
 const PLANET_RU: Record<string, string> = {
@@ -43,28 +45,47 @@ const PLANET_GLYPH: Record<string, string> = {
 
 interface ScoreBarProps {
   label: string;
+  shape: string;       // WCAG 2.1: distinct shape marker (not just color)
+  pattern: string;     // WCAG 2.1: repeating-gradient pattern for colorblind users
   score: number;
   maxScore: number;
   color: string;
   bg: string;
   isDominant: boolean;
+  ariaLabel: string;
 }
 
-function ScoreBar({ label, score, maxScore, color, bg, isDominant }: ScoreBarProps) {
+function ScoreBar({ label, shape, pattern, score, maxScore, color, bg, isDominant, ariaLabel }: ScoreBarProps) {
   const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
   return (
-    <div className="flex items-center gap-2">
-      <span className={`text-xs w-28 flex-shrink-0 ${isDominant ? color + ' font-semibold' : 'text-white/60'}`}>
+    <div
+      className="flex items-center gap-2"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      {/* Shape marker — primary non-color visual differentiator */}
+      <span
+        className={`text-[11px] w-4 text-center flex-shrink-0 ${isDominant ? color : 'text-white/30'}`}
+        aria-hidden="true"
+      >{shape}</span>
+      <span className={`text-xs w-24 flex-shrink-0 ${isDominant ? color + ' font-semibold' : 'text-white/60'}`}>
         {label}
         {isDominant && <span className="ml-1 text-[10px] opacity-70">★</span>}
       </span>
-      <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">
+      {/* Bar with pattern overlay for colorblindness support */}
+      <div
+        className="flex-1 bg-white/10 rounded-full h-2 overflow-hidden"
+        role="presentation"
+      >
         <div
-          className={`h-full rounded-full transition-all duration-500 ${isDominant ? bg : 'bg-white/30'}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full transition-all duration-500 ${isDominant ? bg : 'bg-white/25'}`}
+          style={{
+            width: `${pct}%`,
+            backgroundImage: isDominant ? pattern : undefined,
+          }}
         />
       </div>
-      <span className="text-xs text-white/40 w-6 text-right">{score.toFixed(1)}</span>
+      <span className="text-xs text-white/40 w-8 text-right tabular-nums">{score.toFixed(1)}</span>
     </div>
   );
 }
@@ -113,11 +134,14 @@ export function ChartAnalysisSection({ analysis }: Props) {
               <ScoreBar
                 key={key}
                 label={info.ru}
+                shape={info.shape}
+                pattern={info.pattern}
                 score={analysis.element_scores[key] ?? 0}
                 maxScore={maxElem}
                 color={info.color}
                 bg={info.bg}
                 isDominant={analysis.dominant_element === key}
+                ariaLabel={`${info.ru}: ${(analysis.element_scores[key] ?? 0).toFixed(1)} баллов${analysis.dominant_element === key ? ', доминирующая стихия' : ''}`}
               />
             ))}
           </div>
@@ -131,11 +155,14 @@ export function ChartAnalysisSection({ analysis }: Props) {
               <ScoreBar
                 key={key}
                 label={info.ru}
+                shape={info.shape}
+                pattern={info.pattern}
                 score={analysis.modality_scores[key] ?? 0}
                 maxScore={maxMod}
                 color={info.color}
                 bg={info.bg}
                 isDominant={analysis.dominant_modality === key}
+                ariaLabel={`${info.ru}: ${(analysis.modality_scores[key] ?? 0).toFixed(1)} баллов${analysis.dominant_modality === key ? ', доминирующая модальность' : ''}`}
               />
             ))}
           </div>

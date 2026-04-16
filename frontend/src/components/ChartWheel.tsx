@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import type { NatalChart } from '../types/astro';
 import { PLANET_SYMBOLS, SIGN_COLORS } from '../types/astro';
 
@@ -6,6 +6,88 @@ interface ChartWheelProps {
   chart: NatalChart;
   size?: number;
   theme?: 'dark' | 'light';
+}
+
+/** Mobile bottom-sheet wrapper for ChartWheel.
+ *  On viewports < 768 px the wheel is shown behind an "open" button;
+ *  tapping it slides up a full-viewport bottom-sheet with the wheel at
+ *  full width minus padding (max 420 px).
+ *  On desktop the wheel renders inline as normal.
+ */
+export function ChartWheelResponsive(props: ChartWheelProps) {
+  const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Desktop: render inline
+  if (!isMobile) return <ChartWheel {...props} />;
+
+  // Mobile: compact preview + expand button
+  const mobileSize = Math.min(window.innerWidth - 32, 340);
+
+  return (
+    <>
+      {/* Compact placeholder with open button */}
+      <div
+        className="relative flex items-center justify-center rounded-2xl border border-white/10 bg-white/3 overflow-hidden"
+        style={{ width: '100%', height: 200 }}
+      >
+        {/* Mini wheel preview at reduced size */}
+        <div
+          className="pointer-events-none select-none opacity-40"
+          style={{ transform: 'scale(0.38)', transformOrigin: 'center' }}
+        >
+          <ChartWheel {...props} size={480} />
+        </div>
+        {/* Overlay button */}
+        <button
+          onClick={() => setOpen(true)}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40 backdrop-blur-sm"
+          aria-label="Открыть колесо натальной карты"
+        >
+          <span className="text-3xl">☿</span>
+          <span className="text-sm font-semibold text-white/80">Открыть колесо</span>
+          <span className="text-xs text-white/40">нажмите для просмотра</span>
+        </button>
+      </div>
+
+      {/* Bottom-sheet overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={() => setOpen(false)}
+        >
+          {/* Sheet panel */}
+          <div
+            className="relative rounded-t-3xl bg-[#0c0c1e] border-t border-white/10 flex flex-col items-center pb-8 pt-4 px-4"
+            style={{ maxHeight: '92dvh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="w-10 h-1 rounded-full bg-white/20 mb-4" />
+            {/* Close button */}
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white/70 text-xl"
+              aria-label="Закрыть"
+            >✕</button>
+            <p className="text-xs text-white/30 uppercase tracking-widest mb-3">Натальная карта</p>
+            <div className="flex justify-center">
+              <ChartWheel {...props} size={mobileSize} />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 const SIGN_GLYPHS = ['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];

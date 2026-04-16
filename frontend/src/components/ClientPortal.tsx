@@ -18,7 +18,7 @@ import {
 import type { RelationshipForecast } from '../data/forecastData';
 import { Link } from 'react-router-dom';
 
-import ChartWheel from './ChartWheel';
+import ChartWheel, { ChartWheelResponsive } from './ChartWheel';
 import HumanDesignBlock from './HumanDesignBlock';
 import JyotishBlock from './JyotishBlock';
 import HolosBlock from './HolosBlock';
@@ -2391,7 +2391,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   </div>
                   <div className="flex flex-col lg:flex-row gap-4">
                     <div className="flex justify-center lg:justify-start shrink-0">
-                      <ChartWheel chart={natalChart} size={480} theme={theme.wheelTheme} />
+                      <ChartWheelResponsive chart={natalChart} size={480} theme={theme.wheelTheme} />
                     </div>
                     <div className="flex-1 space-y-3">
                       <PlanetTable chart={natalChart} theme={theme} />
