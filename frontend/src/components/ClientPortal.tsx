@@ -50,6 +50,8 @@ import { PlanetaryNodesBlock } from './PlanetaryNodesBlock';
 import { CompensatoryPracticesCard } from './CompensatoryPracticesCard';
 import EclipsePersonalBlock from './EclipsePersonalBlock';
 import IngressPersonalBlock from './IngressPersonalBlock';
+import SignalWeightsBlock from './SignalWeightsBlock';
+import SynastryProgressedBlock from './SynastryProgressedBlock';
 import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -999,7 +1001,7 @@ function PredictivePanel({ birth, theme }: { birth: BirthInput; theme: typeof ch
 }
 
 // ─── Synastry Panel ───────────────────────────────────────────────────────────
-type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'advanced'|'interaction-engine'|'composite'|'davison';
+type SynTab = 'compat'|'aspects'|'spheres'|'compensation'|'forecast'|'advanced'|'interaction-engine'|'composite'|'davison'|'progressed';
 
 function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typeof chartThemes[ThemeKey]; people?: SavedPerson[] }) {
   const { tr } = useLang();
@@ -1183,6 +1185,7 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
     ['interaction-engine', '🧩 Движок взаимодействия'],
     ['composite',    '🔵 Композит'],
     ['davison',      '🟡 Дэвисон'],
+    ['progressed',   '🔄 Прогрессии'],
   ];
 
   return (
@@ -2067,6 +2070,10 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
             </div>
           )}
 
+          {tab === 'progressed' && (
+            <SynastryProgressedBlock birth1={birth} birth2={partner} theme={theme} />
+          )}
+
           {/* Loading state for charts */}
           {(tab === 'composite' && !compositeChart) || (tab === 'davison' && !davisonChart) ? (
             <div className={`rounded-xl border ${theme.card} p-8 text-center`}>
@@ -2138,7 +2145,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'|'signal-weights'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2267,6 +2274,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'compensatory',        icon: Sparkles,  label: '🌿 Компенсация' },
     { key: 'eclipse-personal',     icon: Star,      label: '🌑 Затмения' },
     { key: 'ingress-personal',     icon: Globe,     label: '🌠 Ингрессии·домов' },
+    { key: 'signal-weights',       icon: Zap,       label: '⚡ Веса сигналов' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2588,6 +2596,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <p className={`${theme.text} text-sm`}>Введите дату и время рождения для анализа ингрессий</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'signal-weights' && (
+            <div id="pdf-section-signal-weights">
+              <SignalWeightsBlock theme={theme} />
             </div>
           )}
 

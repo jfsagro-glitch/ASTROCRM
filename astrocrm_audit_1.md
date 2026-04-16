@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-18 — Sprint 6 реализован: фронтенд для Sprint 4+5 эндпоинтов
+## Статус: обновлён 2026-04-18 — Sprint 7 реализован: Firdaria fix, SignalWeightsBlock, SynastryProgressedBlock
 
 ---
 
@@ -1024,6 +1024,20 @@ PERIOD_OPENINGS = {
 | `IngressPersonalBlock.tsx` — ингрессии Солнца | ✅ | Таблица 12 солнечных ингрессий через натальные дома, выбор года |
 | Вкладки `eclipse-personal`, `ingress-personal` в ClientPortal | ✅ | Добавлены в `activeTab` union, `tabs[]` и секции рендера |
 | Секция GlobalAstroPanel в DashboardView | ✅ | Коллапсируемая панель «🌍 Глобальный астрофон», позиции планет + транзитные аспекты, без natal-данных |
+
+---
+
+### Sprint 7 — Исправления + новые UI блоки ✅ РЕАЛИЗОВАН
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| Исправлен «Фирдарий не определён» | ✅ | API `/dashboard` теперь нормализует `firdaria_data` → `{main_period: {planet, start, end}, sub_period: {planet}}` вместо сырого `active_major`/`active_sub` |
+| Световые орбы — верификация | ✅ | `_LIGHT_ORBS` и `_light_orb()` в `astro_engine.py` (L755–787) — уже реализованы ранее |
+| `timezone_name` в `PredictiveRequest` — верификация | ✅ | Уже реализовано: Solar/Lunar Return используют `_utc_for_tz(req.timezone_name, ...)` |
+| `SignalWeightsBlock.tsx` — UI для `GET /calibration/signal-weights` | ✅ | 3 вкладки: 🪐 Планеты (bars по reliability_weight + calibration_data), ⚹ Аспекты (calibrated_weight + correction), ◎ Орбы (grid min→max) |
+| `SynastryProgressedBlock.tsx` — UI для `POST /synastry/progressed` | ✅ | Кнопка Рассчитать, 4 таба (all/prog×prog/prog1→natal2/prog2→natal1), `AspectRow` с applying/separating, интерпретация |
+| Вкладка `⚡ Веса сигналов` в ClientPortal | ✅ | `signal-weights` добавлен в `activeTab` union, `tabs[]`, рендер-секция |
+| Вкладка `🔄 Прогрессии` в SynastryPanel | ✅ | `progressed` добавлен в `SynTab` union, `TABS[]`, рендер через `SynastryProgressedBlock` |
 
 ---
 

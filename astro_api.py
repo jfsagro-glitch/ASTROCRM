@@ -1416,7 +1416,20 @@ def dashboard(req: DashboardRequest):
         # ── Firdaria ─────────────────────────────────────────────────────────
         natal_jd = _to_jd(req.date, req.time, req.utc)
         try:
-            firdaria_data = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+            _fird_raw = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+            _am = _fird_raw.get("active_major") or {}
+            _as = _fird_raw.get("active_sub") or {}
+            firdaria_data = {
+                "main_period": {
+                    "planet": _am.get("major_lord"),
+                    "start":  str(int(_am["start_year"])) if _am.get("start_year") else None,
+                    "end":    str(int(_am["end_year"]))   if _am.get("end_year")   else None,
+                } if _am else None,
+                "sub_period": {
+                    "planet": _as.get("sub_lord"),
+                } if _as else None,
+                "sect": _fird_raw.get("sect", ""),
+            }
         except Exception:
             firdaria_data = {}
 
