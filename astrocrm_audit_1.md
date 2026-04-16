@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-17 — Sprint 5 реализован: ML-калибровка весов + GET /calibration/signal-weights
+## Статус: обновлён 2026-04-18 — Sprint 6 реализован: фронтенд для Sprint 4+5 эндпоинтов
 
 ---
 
@@ -1003,7 +1003,7 @@ PERIOD_OPENINGS = {
 
 ---
 
-### Sprint 5 — ML-калибровка весов ✅ РЕАЛИЗОВАН (коммит `sprint5`)
+### Sprint 5 — ML-калибровка весов ✅ РЕАЛИЗОВАН (коммит `5bb051b`)
 
 | Задача | Статус | Детали |
 |--------|--------|--------|
@@ -1012,6 +1012,18 @@ PERIOD_OPENINGS = {
 | `PLANET_TRANSIT_MAX_ORB` | ✅ | Адаптивные орбы по скорости: Луна 4°, Солнце/Меркурий/Венера 7°, Марс 8°, Юпитер/Сатурн 9°, Уран/Нептун/Плутон 10° |
 | Интеграция в `astro_probability.py` | ✅ | `_ASPECT_WEIGHTS` = калиброванные; `_transit_probability()` умножает на `rel_w` (надёжность натальной планеты) и использует адаптивный `max_orb` |
 | `GET /calibration/signal-weights` | ✅ | Новый эндпоинт — возвращает полный отчёт о весах (с источниками и методологией) |
+
+---
+
+### Sprint 6 — Фронтенд для Sprint 4+5 эндпоинтов ✅ РЕАЛИЗОВАН
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| `astrologyService.ts` — 5 новых функций | ✅ | `getEclipsePersonal`, `getIngressPersonal`, `getDailyGlobal`, `getSynastryProgressed`, `getSignalWeights` + типы |
+| `EclipsePersonalBlock.tsx` — затмения в натальных домах | ✅ | Карточки Solar/Lunar, отсчёт дней, компенсаторика, легенда домов |
+| `IngressPersonalBlock.tsx` — ингрессии Солнца | ✅ | Таблица 12 солнечных ингрессий через натальные дома, выбор года |
+| Вкладки `eclipse-personal`, `ingress-personal` в ClientPortal | ✅ | Добавлены в `activeTab` union, `tabs[]` и секции рендера |
+| Секция GlobalAstroPanel в DashboardView | ✅ | Коллапсируемая панель «🌍 Глобальный астрофон», позиции планет + транзитные аспекты, без natal-данных |
 
 ---
 

@@ -48,6 +48,8 @@ import { HeliocentricBlock } from './HeliocentricBlock';
 import { KabbalahTreeBlock } from './KabbalahTreeBlock';
 import { PlanetaryNodesBlock } from './PlanetaryNodesBlock';
 import { CompensatoryPracticesCard } from './CompensatoryPracticesCard';
+import EclipsePersonalBlock from './EclipsePersonalBlock';
+import IngressPersonalBlock from './IngressPersonalBlock';
 import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -2136,7 +2138,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2263,6 +2265,8 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'kabbalah-tree',       icon: Sparkles,  label: '✡ Каббала' },
     { key: 'planetary-nodes',     icon: Globe,     label: '☊ Планет. узлы' },
     { key: 'compensatory',        icon: Sparkles,  label: '🌿 Компенсация' },
+    { key: 'eclipse-personal',     icon: Star,      label: '🌑 Затмения' },
+    { key: 'ingress-personal',     icon: Globe,     label: '🌠 Ингрессии·домов' },
     { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
   ] as const;
 
@@ -2558,6 +2562,32 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 </div>
                 <CompensatoryPracticesCard birthData={birth} />
               </div>
+            </div>
+          )}
+
+          {activeTab === 'eclipse-personal' && (
+            <div id="pdf-section-eclipse-personal">
+              {birth.date && birth.time ? (
+                <EclipsePersonalBlock birth={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для анализа затмений в натальных домах</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'ingress-personal' && (
+            <div id="pdf-section-ingress-personal">
+              {birth.date && birth.time ? (
+                <IngressPersonalBlock birth={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для анализа ингрессий</p>
+                </div>
+              )}
             </div>
           )}
 

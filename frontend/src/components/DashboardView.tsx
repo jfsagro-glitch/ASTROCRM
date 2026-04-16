@@ -6,7 +6,7 @@ import {
   Moon, Star, Zap, Clock, TrendingUp, Sparkles,
   AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp,
 } from 'lucide-react';
-import { getDashboard } from '../services/astrologyService';
+import { getDashboard, getDailyGlobal, DailyGlobalResult } from '../services/astrologyService';
 import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
@@ -492,7 +492,149 @@ export default function DashboardView({ birthData, theme }: Props) {
           />
         </div>
 
+        {/* ── GLOBAL ASTRO BACKGROUND (Sprint 6) ──────────────────────────────── */}
+        <div className="md:col-span-2 xl:col-span-3">
+          <GlobalAstroPanel theme={theme} />
+        </div>
+
       </div>
+    </div>
+  );
+}
+
+// ─── GlobalAstroPanel ─────────────────────────────────────────────────────────
+// Sprint 6 — calls GET /daily/global, shows transit sky + mutual aspects
+const PLANET_GLYPH_G: Record<string, string> = {
+  sun: '☉', moon: '☽', mercury: '☿', venus: '♀', mars: '♂',
+  jupiter: '♃', saturn: '♄', uranus: '⛢', neptune: '♆', pluto: '♇',
+};
+const PLANET_RU_G: Record<string, string> = {
+  sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
+  mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн',
+  uranus: 'Уран', neptune: 'Нептун', pluto: 'Плутон',
+};
+const SIGN_RU_G: Record<string, string> = {
+  aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак',
+  leo: 'Лев', virgo: 'Дева', libra: 'Весы', scorpio: 'Скорпион',
+  sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
+};
+const ASP_COLOR_G: Record<string, string> = {
+  conjunction: 'text-violet-400', opposition: 'text-orange-400',
+  trine: 'text-blue-400', square: 'text-red-400', sextile: 'text-cyan-400',
+};
+const ASP_RU_G: Record<string, string> = {
+  conjunction: '☌', opposition: '☍', trine: '△', square: '□', sextile: '⚹',
+};
+
+function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
+  const [data, setData] = useState<DailyGlobalResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    if (loading || data) return;
+    setLoading(true);
+    try {
+      setData(await getDailyGlobal());
+    } catch {
+      // silently fail — panel stays collapsed
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, data]);
+
+  const handleToggle = useCallback(() => {
+    setOpen(v => {
+      if (!v) load();
+      return !v;
+    });
+  }, [load]);
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      {/* Collapsible header */}
+      <button
+        onClick={handleToggle}
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2">
+          <Info size={14} className={theme.accent} />
+          <span className={`text-sm font-medium ${theme.header}`}>🌍 Глобальный астрофон сегодня</span>
+          {data && (
+            <span className={`text-[10px] ${theme.text} opacity-40`}>
+              {data.planets?.length ?? 0} планет · {data.mutual_aspects?.length ?? 0} аспектов
+            </span>
+          )}
+        </div>
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-white/8">
+          {loading && (
+            <div className="py-4 text-center">
+              <RefreshCw size={16} className={`${theme.accent} animate-spin mx-auto`} />
+            </div>
+          )}
+          {data && (
+            <div className="space-y-3 pt-3">
+              {/* Planet positions */}
+              <div>
+                <div className="text-[10px] text-white/30 uppercase tracking-wider mb-2">
+                  Позиции планет
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(data.planets ?? []).map(p => (
+                    <div
+                      key={p.planet}
+                      className="flex items-center gap-1 text-[11px] border border-white/12 rounded-full px-2 py-0.5 bg-white/3"
+                    >
+                      <span className="text-white/50">{PLANET_GLYPH_G[p.planet] ?? ''}</span>
+                      <span className="text-white/70">{SIGN_RU_G[p.sign] ?? p.sign}</span>
+                      <span className="text-white/30">{p.degree.toFixed(1)}°</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mutual aspects */}
+              {(data.mutual_aspects ?? []).length > 0 && (
+                <div>
+                  <div className="text-[10px] text-white/30 uppercase tracking-wider mb-2">
+                    Транзитные аспекты (орб ≤ 5°)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {(data.mutual_aspects ?? []).slice(0, 8).map((a, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 text-[11px] border border-white/8 rounded-lg px-2.5 py-1.5 bg-white/3"
+                      >
+                        <span className={`font-bold ${ASP_COLOR_G[a.aspect] ?? 'text-white/50'}`}>
+                          {ASP_RU_G[a.aspect] ?? a.aspect}
+                        </span>
+                        <span className="text-white/60">
+                          {PLANET_RU_G[a.planet1] ?? a.planet1}
+                          {' – '}
+                          {PLANET_RU_G[a.planet2] ?? a.planet2}
+                        </span>
+                        <span className="text-white/25 ml-auto">{a.orb.toFixed(1)}°</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Interpretation */}
+              {data.interpretation && (
+                <p className={`text-[11px] ${theme.text} opacity-50 leading-relaxed border-t border-white/8 pt-3`}>
+                  {data.interpretation}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

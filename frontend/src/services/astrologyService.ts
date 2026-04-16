@@ -1055,3 +1055,183 @@ export async function generateReportHtml(
   }
   return res.text();
 }
+
+// ── Sprint 6 — Personal Eclipse / Ingress / Global / Synastry Progressed ─────
+
+export interface PersonalEclipse {
+  type: 'solar' | 'lunar';
+  eclipse_class: string;
+  date_str: string;
+  jd: number;
+  sun_lon?: number;
+  moon_lon?: number;
+  natal_house: number;
+  activated_theme: string;
+  sign: string;
+  compensatory?: unknown[];
+}
+
+export interface EclipsePersonalResult {
+  natal_date: string;
+  scan_from: string;
+  eclipses: PersonalEclipse[];
+  count: number;
+  interpretation: string;
+}
+
+export async function getEclipsePersonal(
+  b: BirthInput,
+  count = 6,
+  includeCompensatory = false,
+): Promise<EclipsePersonalResult> {
+  return post('/predictive/eclipse-personal', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+    count,
+    include_compensatory: includeCompensatory,
+  });
+}
+
+export interface PersonalIngress {
+  sign: string;
+  sign_ru: string;
+  ingress_date: string;
+  ingress_lon: number;
+  natal_house: number;
+  activated_theme: string;
+}
+
+export interface IngressPersonalResult {
+  natal_date: string;
+  year: number;
+  ingresses: PersonalIngress[];
+  interpretation: string;
+}
+
+export async function getIngressPersonal(
+  b: BirthInput,
+  year?: number,
+): Promise<IngressPersonalResult> {
+  return post('/predictive/ingress-personal', {
+    date: b.date,
+    time: b.time ?? '12:00',
+    lat: b.lat ?? 0,
+    lon: b.lon ?? 0,
+    utc: b.utc ?? 0,
+    year: year ?? null,
+  });
+}
+
+export interface GlobalPlanetPos {
+  planet: string;
+  lon: number;
+  sign: string;
+  degree: number;
+}
+
+export interface GlobalMutualAspect {
+  planet1: string;
+  planet2: string;
+  aspect: string;
+  orb: number;
+}
+
+export interface DailyGlobalResult {
+  date: string;
+  time: string;
+  utc_offset: number;
+  planets: GlobalPlanetPos[];
+  mutual_aspects: GlobalMutualAspect[];
+  moon: {
+    sign: string;
+    degree: number;
+    phase: string;
+    phase_angle: number;
+    is_void: boolean;
+    void_end_sign?: string;
+    mansion?: { number: number; name: string; nature: string };
+  };
+  sun: { sign: string; degree: number; fresh_ingress: boolean };
+  upcoming_eclipses: PersonalEclipse[];
+  interpretation: string;
+}
+
+export async function getDailyGlobal(date?: string): Promise<DailyGlobalResult> {
+  const params = new URLSearchParams();
+  if (date) params.set('date', date);
+  const res = await fetch(`${API_URL}/daily/global?${params}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface ProgressedAspect {
+  planet1: string;
+  planet2: string;
+  aspect: string;
+  orb: number;
+  type: string;
+}
+
+export interface SynastryProgressedResult {
+  target_date: string;
+  name1: string;
+  name2: string;
+  progressed1: Record<string, unknown>;
+  progressed2: Record<string, unknown>;
+  aspects: {
+    prog_x_prog: ProgressedAspect[];
+    prog1_x_natal2: ProgressedAspect[];
+    prog2_x_natal1: ProgressedAspect[];
+    all_sorted: ProgressedAspect[];
+  };
+  interpretation: string;
+}
+
+export async function getSynastryProgressed(
+  b1: BirthInput,
+  b2: BirthInput,
+): Promise<SynastryProgressedResult> {
+  return post('/synastry/progressed', {
+    date1: b1.date, time1: b1.time ?? '12:00',
+    lat1: b1.lat ?? 0, lon1: b1.lon ?? 0, utc1: b1.utc ?? 0,
+    name1: b1.name ?? '',
+    date2: b2.date, time2: b2.time ?? '12:00',
+    lat2: b2.lat ?? 0, lon2: b2.lon ?? 0, utc2: b2.utc ?? 0,
+    name2: b2.name ?? '',
+  });
+}
+
+export interface SignalWeightsPlanet {
+  planet: string;
+  reliability_weight: number;
+  orbital_speed_deg_day: number;
+  positional_uncertainty_5min_deg: number;
+  max_transit_orb_deg: number;
+  calibration_data: {
+    n: number;
+    mae_arcmin: number;
+    sign_accuracy_pct: number;
+    within1deg_pct: number;
+  } | null;
+}
+
+export interface SignalWeightsResult {
+  calibration_dataset: { total_charts: number; computed_charts: number; source: string };
+  planet_reliability_weights: SignalWeightsPlanet[];
+  aspect_weights: Array<{ aspect: string; base_weight: number; correction: number; calibrated_weight: number }>;
+  planet_transit_max_orbs: Record<string, number>;
+  methodology: string;
+  version: string;
+}
+
+export async function getSignalWeights(): Promise<SignalWeightsResult> {
+  const res = await fetch(`${API_URL}/calibration/signal-weights`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
