@@ -1,15 +1,16 @@
 // ─── DashboardView — Bento-grid daily dashboard ───────────────────────────────
 // Shows: Moon card, top 3 transits w/ compensatory, firdaria, profections,
 // fortune lot, 7-day lunar mini-calendar.
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Moon, Star, Zap, Clock, TrendingUp, Sparkles,
-  AlertTriangle, CheckCircle, RefreshCw, Info,
+  AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { getDashboard } from '../services/astrologyService';
 import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
+import { useAppMode } from '../hooks/useAppMode';
 
 // ─── Theme type ───────────────────────────────────────────────────────────────
 interface ThemeLike {
@@ -82,11 +83,127 @@ function Card({ title, icon: Icon, children, className = '', theme }: {
   );
 }
 
+// ─── VoC countdown hook ───────────────────────────────────────────────────────
+function useVocCountdown(vocEndJd: number | null): string | null {  const [label, setLabel] = useState<string | null>(null);
+  const rafRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!vocEndJd) { setLabel(null); return; }
+    // JD to unix ms: (JD - 2440587.5) * 86400000
+    const endMs = (vocEndJd - 2440587.5) * 86400000;
+
+    function tick() {
+      const diff = endMs - Date.now();
+      if (diff <= 0) { setLabel(null); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      setLabel(h > 0 ? `ВоК ещё ${h}ч ${m}м` : `ВоК ещё ${m}м`);
+      rafRef.current = window.setTimeout(tick, 30000);
+    }
+    tick();
+    return () => { if (rafRef.current) clearTimeout(rafRef.current); };
+  }, [vocEndJd]);
+
+  return label;
+}
+
+// ─── VocBadge sub-component ───────────────────────────────────────────────────
+function VocBadge({ isVoid, vocEndJd }: { isVoid: boolean; vocEndJd: number | null }) {
+  const countdown = useVocCountdown(isVoid ? vocEndJd : null);
+  if (!isVoid) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium whitespace-nowrap">
+      <AlertTriangle size={9} className="shrink-0" />
+      {countdown ?? 'ВоК активен'}
+    </span>
+  );
+}
+
+// ─── TransitRow — expandable transit with inline compensatory ────────────────
+function TransitRow({ transit, theme }: { transit: Record<string, unknown>; theme: ThemeLike }) {
+  const [expanded, setExpanded] = useState(false);
+  const t = transit;
+  const transitPlanet = String(t.transit_planet ?? '');
+  const natalPlanet   = String(t.natal_planet ?? '');
+  const aspect        = String(t.aspect ?? '');
+  const orb           = typeof t.orb === 'number' ? t.orb : 0;
+  const applying      = Boolean(t.applying);
+
+  // compensatory_summary injected by /predictive/transits?include_compensatory=true
+  // or compensatory[] array from /full-profile
+  const compSummary = t.compensatory_summary as Record<string, unknown> | undefined;
+  const compList    = Array.isArray(t.compensatory) ? (t.compensatory as unknown[]) : null;
+  const hasComp     = Boolean(compSummary || (compList && compList.length > 0));
+
+  return (
+    <div className="border-b border-white/5 last:border-0">
+      <button
+        onClick={() => hasComp && setExpanded(e => !e)}
+        className={`w-full flex items-start gap-2 py-2.5 text-left ${hasComp ? 'cursor-pointer' : 'cursor-default'}`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-xs font-medium ${theme.header}`}>
+              {PLANET_RU[transitPlanet] ?? transitPlanet}
+            </span>
+            <span className={`text-xs ${ASPECT_COLOR[aspect] ?? 'text-gray-400'}`}>
+              {ASPECT_RU[aspect] ?? aspect}
+            </span>
+            <span className={`text-xs ${theme.text} opacity-70`}>
+              {PLANET_RU[natalPlanet]?.replace(/^[☀☽☿♀♂♃♄⛢♆♇☊⚷]\s/, '') ?? natalPlanet}
+            </span>
+          </div>
+          <div className={`text-[10px] ${theme.text} opacity-50 mt-0.5`}>
+            орб {orb.toFixed(2)}° · {applying ? '↗ применяющийся' : '↘ разделяющийся'}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border
+            ${applying ? 'border-amber-400/40 text-amber-300' : 'border-slate-500/40 text-slate-400'}`}>
+            {applying ? '↗' : '↘'}
+          </span>
+          {hasComp && (
+            expanded
+              ? <ChevronUp size={12} className={`${theme.text} opacity-40`} />
+              : <ChevronDown size={12} className={`${theme.text} opacity-40`} />
+          )}
+        </div>
+      </button>
+
+      {/* Inline compensatory panel */}
+      {expanded && hasComp && (
+        <div className="mb-2 pl-2 border-l-2 border-amber-500/30 space-y-1.5">
+          {compSummary && (
+            <div className="rounded-lg bg-amber-500/8 px-2.5 py-2">
+              <div className={`text-[10px] font-medium text-amber-300 mb-1`}>
+                <Sparkles size={9} className="inline mr-1" />
+                {compSummary.count != null ? `${String(compSummary.count)} практик` : 'Компенсаторика'}
+              </div>
+              {Boolean(compSummary.top_practice) && (
+                <div className={`text-[10px] ${theme.text} opacity-80`}>
+                  {String((compSummary.top_practice as Record<string,unknown>).practice ?? compSummary.top_practice)}
+                </div>
+              )}
+            </div>
+          )}
+          {compList && (compList as Array<Record<string,unknown>>).slice(0, 3).map((c, j) => (
+            <div key={j} className="rounded-lg bg-white/5 px-2.5 py-2">
+              {Boolean(c.practice) && <div className={`text-[10px] font-medium ${theme.accent}`}>{String(c.practice)}</div>}
+              {Boolean(c.why)     && <div className={`text-[10px] ${theme.text} opacity-60 mt-0.5`}>{String(c.why)}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DashboardView({ birthData, theme }: Props) {
   const [data, setData]       = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+  const { mode, toggle: toggleMode, isPro } = useAppMode();
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -139,19 +256,43 @@ export default function DashboardView({ birthData, theme }: Props) {
 
   const today = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
 
+  // VoC countdown (uses JD if available from moon response)
+  const vocEndJd = moon.is_void ? ((moon as Record<string,unknown>).void_end_jd as number | null ?? null) : null;
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className={`text-base font-semibold ${theme.header}`}>
-          Дашборд · {today}
-        </h2>
-        <button
-          onClick={load}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${theme.btn}`}
-        >
-          <RefreshCw size={12} /> Обновить
-        </button>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className={`text-base font-semibold ${theme.header}`}>
+            Дашборд · {today}
+          </h2>
+          {/* VoC badge */}
+          <VocBadge isVoid={moon.is_void} vocEndJd={vocEndJd} />
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Простой / Профи switcher */}
+          <div className="flex rounded-lg overflow-hidden border border-white/10 text-xs">
+            <button
+              onClick={() => mode !== 'simple' && toggleMode()}
+              className={`px-2.5 py-1 transition-colors ${mode === 'simple' ? 'bg-white/15 text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
+            >
+              Простой
+            </button>
+            <button
+              onClick={() => mode !== 'pro' && toggleMode()}
+              className={`px-2.5 py-1 transition-colors ${mode === 'pro' ? 'bg-white/15 text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
+            >
+              Профи
+            </button>
+          </div>
+          <button
+            onClick={load}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${theme.btn}`}
+          >
+            <RefreshCw size={12} /> Обновить
+          </button>
+        </div>
       </div>
 
       {/* Bento grid */}
@@ -221,33 +362,9 @@ export default function DashboardView({ birthData, theme }: Props) {
           {top_transits.length === 0 ? (
             <p className={`text-xs ${theme.text} opacity-50`}>Нет активных транзитов</p>
           ) : (
-            <div className="space-y-2.5">
-              {top_transits.slice(0, 4).map((t, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-xs font-medium ${theme.header}`}>
-                        {PLANET_RU[t.transit_planet] ?? t.transit_planet}
-                      </span>
-                      <span className={`text-xs ${ASPECT_COLOR[t.aspect] ?? 'text-gray-400'}`}>
-                        {ASPECT_RU[t.aspect] ?? t.aspect}
-                      </span>
-                      <span className={`text-xs ${theme.text} opacity-70`}>
-                        {PLANET_RU[t.natal_planet]?.replace(/^[☀☽☿♀♂♃♄⛢♆♇☊⚷]\s/, '') ?? t.natal_planet}
-                      </span>
-                    </div>
-                    <div className={`text-[10px] ${theme.text} opacity-50 mt-0.5`}>
-                      орб {t.orb.toFixed(2)}° · {t.applying ? '↗ применяющийся' : '↘ разделяющийся'}
-                    </div>
-                  </div>
-                  <div className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border
-                    ${t.applying
-                      ? 'border-amber-400/40 text-amber-300'
-                      : 'border-slate-500/40 text-slate-400'}`}
-                  >
-                    {t.applying ? '↗' : '↘'}
-                  </div>
-                </div>
+            <div className="space-y-1">
+              {top_transits.slice(0, isPro ? 6 : 4).map((t, i) => (
+                <TransitRow key={i} transit={t as unknown as Record<string, unknown>} theme={theme} />
               ))}
             </div>
           )}

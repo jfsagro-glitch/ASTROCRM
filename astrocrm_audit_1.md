@@ -1,6 +1,6 @@
 # ASTROCRM — Аудит и улучшения
 ## Апрель 2026
-## Статус: обновлён 2026-04-16 — **все пункты плана реализованы, включая WCAG 2.1 и мобильный bottom-sheet**
+## Статус: обновлён 2026-04-16 — Sprint 3 UX реализован; Sprint 4 (новые эндпоинты) в плане
 
 ---
 
@@ -952,6 +952,54 @@ PERIOD_OPENINGS = {
 - `timezone_name` в `PredictiveRequest` для точного Solar Return
 
 > `POST /daily/personal` и `GET /ephemeris/ingress-calendar` — **реализованы**.
+
+---
+
+## V-A. СПРИНТЫ — ИСТОРИЯ ИЗМЕНЕНИЙ И ТЕКУЩИЙ СТАТУС
+
+### Sprint 1 — Исправления API (`ec71211`, 2026-04-16)
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| Удалить дубль `POST /daily/personal` (L1191 без compensatory) | ✅ | Осталась единственная версия с фирдари + профекции + компенсаторика |
+| Удалить дубль `GET /ephemeris/ingress-calendar` (L1322) | ✅ | Осталась одна версия |
+| Переименовать `/predictive/perfections` → `/predictive/exact-aspects` | ✅ | Старый путь оставлен как deprecated alias через стековый декоратор |
+| Добавить compensatory Section 10 в `/report/generate` | ✅ | HTML-секция «🛠 Компенсаторные практики» в `_build_html_report()` |
+| Добавить `POST /full-profile` | ✅ | Агрегирует natal + moon + transits + compensatory_per_transit + profections + firdaria + solar_arc + saturn_cycle |
+| Добавить `/couple/forecast\|timeline\|compare` алиасы | ✅ | Псевдонимы для `/interaction/personal-forecast\|timeline\|compare-scenarios` |
+
+### Sprint 2 — Связность и обогащение данных (`7b33776`, 2026-04-16)
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| `/couple/*` → PRIMARY декораторы (убрать Sprint-1 врапперы) | ✅ | Стековые декораторы на оригинальных функциях; `/interaction/*` как deprecated aliases |
+| `include_compensatory` в `PredictiveRequest` | ✅ | При `true` каждый транзит получает `compensatory_summary: {top_practice, count}` |
+| `/predictive/transits` inline compensatory | ✅ | Строит натальную карту + вызывает движок компенсаторики per aspect |
+| `depth` + `include_human_design` в `DashboardRequest` | ✅ | `depth=full` добавляет `hd_transit_gates`, `solar_arc_top`, `saturn_cycle` |
+| `/dashboard?depth=full` | ✅ | HD транзитные гейты + top SA хит + цикл Сатурна |
+
+### Sprint 3 — Frontend UX (`в работе`, 2026-04-16)
+
+| Задача | Статус | Детали |
+|--------|--------|--------|
+| Переключатель Простой/Профи (localStorage) | ✅ | `useAppMode` хук (`frontend/src/hooks/useAppMode.ts`); кнопки в хедере `DashboardView` |
+| Карточки транзитов с inline компенсаторикой | ✅ | `TransitRow` компонент с expand/collapse; показывает `compensatory_summary` или `compensatory[]` без лишнего API вызова |
+| VoC индикатор в хедере с обратным отсчётом | ✅ | `VocBadge` + `useVocCountdown` в `DashboardView`; таймер обновляется каждые 30с |
+| PDF-экспорт через `/report/generate` | ✅ | `usePdfExport.exportFullReport()` + кнопка «Полный отчёт PDF» в `ClientPortal` |
+| Мобильная адаптация bento-grid → single column | ✅ | `grid-cols-1 md:grid-cols-2 xl:grid-cols-3` в `DashboardView` |
+| Bottom-sheet для деталей на мобильном | ✅ | Реализовано в `ChartWheel.tsx` (мобильный drag-handle bottom-sheet) |
+| Кнопка «Полный отчёт» → PDF | ✅ | `handleFullReport()` в `ClientPortal.tsx` (L2189–L2193) |
+
+### Sprint 4 — Новые эндпоинты (запланировано)
+
+| Задача | Статус |
+|--------|--------|
+| `POST /predictive/eclipse-personal` — затмения в натальных домах + compensatory | ⏳ |
+| `POST /predictive/ingress-personal` — ингрессии через натальные дома | ⏳ |
+| `GET /daily/global` — глобальный астрофон без данных рождения | ⏳ |
+| `POST /synastry/progressed` — прогрессированная синастрия (метод Вэстрана) | ⏳ |
+| Лунные мансии D22ALS в `/daily/moon` | ⏳ |
+| ML-калибровка весов мультисигнального прогноза | ⏳ |
 
 ---
 
