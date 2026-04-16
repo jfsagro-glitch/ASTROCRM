@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,"system-ui");background:transparent;color:var(--color-text-primary);font-size:13px}
+h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:0.5px solid var(--color-border-tertiary);padding-bottom:0}
+.tab{padding:8px 14px;font-size:12px;border-radius:6px 6px 0 0;cursor:pointer;border:0.5px solid transparent;border-bottom:none;transition:all .15s;color:var(--color-text-secondary);position:relative;bottom:-1px}
+.tab.active{background:var(--color-background-primary);border-color:var(--color-border-tertiary);color:var(--color-text-primary);font-weight:500}
+.tab:hover:not(.active){color:var(--color-text-primary)}
+.pane{display:none}.pane.active{display:block}
+
+/* MOCKUP: Main dashboard */
+.phone-frame{background:var(--color-background-secondary);border-radius:12px;border:0.5px solid var(--color-border-tertiary);padding:14px;max-width:380px}
+.app-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.app-logo{font-size:14px;font-weight:500;letter-spacing:.03em}
+.app-mode{display:flex;gap:4px}
+.mode-btn{font-size:10px;padding:3px 8px;border-radius:12px;cursor:pointer;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);transition:all .12s}
+.mode-btn.active{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary)}
+
+/* bento grid */
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:11px 12px}
+.card.wide{grid-column:1/-1}
+.card.moon{background:linear-gradient(135deg,color-mix(in srgb,#4060b0 12%,var(--color-background-primary)) 0%,var(--color-background-primary) 100%)}
+.card.transit{border-color:color-mix(in srgb,var(--color-border-warning) 60%,transparent)}
+.card.comp{background:color-mix(in srgb,var(--color-background-warning) 15%,var(--color-background-primary))}
+
+.card-label{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;font-weight:500}
+.card-main{font-size:16px;font-weight:500;line-height:1.2;margin-bottom:3px}
+.card-sub{font-size:11px;color:var(--color-text-secondary);line-height:1.4}
+.card-hint{font-size:10px;color:var(--color-text-tertiary);margin-top:4px}
+.voc-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:var(--color-background-warning);color:var(--color-text-warning);font-weight:500;margin-left:4px}
+.phase-arc{width:32px;height:16px;position:relative;margin-bottom:4px}
+
+.transit-row{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.transit-row:last-child{border-bottom:none}
+.t-planet{font-size:14px;width:18px;flex-shrink:0;text-align:center}
+.t-asp{font-size:11px;color:var(--color-text-secondary);flex-shrink:0;width:14px;text-align:center}
+.t-natal{font-size:12px;font-weight:500;flex:1}
+.t-orb{font-size:10px;color:var(--color-text-tertiary);min-width:28px;text-align:right}
+.t-type{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.t-expand{font-size:10px;color:var(--color-text-info);cursor:pointer;margin-left:4px}
+
+.comp-row{padding:7px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.comp-row:last-child{border-bottom:none}
+.comp-title{font-size:11px;font-weight:500;margin-bottom:2px}
+.comp-text{font-size:10px;color:var(--color-text-secondary);line-height:1.4}
+.comp-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;margin-right:3px;background:var(--color-background-secondary);color:var(--color-text-secondary)}
+
+.timing-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.timing-cell{padding:7px;background:var(--color-background-secondary);border-radius:7px}
+.timing-label{font-size:9px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.timing-val{font-size:12px;font-weight:500}
+.timing-sub{font-size:10px;color:var(--color-text-secondary);margin-top:1px}
+
+.big-btn{width:100%;padding:10px;border-radius:8px;border:none;background:var(--color-text-primary);color:var(--color-background-primary);font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;transition:opacity .15s}
+.big-btn:hover{opacity:.85}
+.big-btn.secondary{background:transparent;border:0.5px solid var(--color-border-primary);color:var(--color-text-primary)}
+
+/* Tab content sections */
+.spec-section{margin-bottom:20px}
+.spec-title{font-size:13px;font-weight:500;margin-bottom:8px;padding-bottom:6px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.spec-row{display:flex;gap:12px;margin-bottom:8px;align-items:flex-start}
+.spec-label{font-size:11px;font-weight:500;min-width:120px;color:var(--color-text-secondary);flex-shrink:0;padding-top:1px}
+.spec-val{font-size:11px;color:var(--color-text-primary);line-height:1.5;flex:1}
+.code{font-family:var(--font-mono,"monospace");font-size:10px;background:var(--color-background-secondary);padding:2px 5px;border-radius:3px}
+.issue-row{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-radius:7px;margin-bottom:6px}
+.issue-ok{background:var(--color-background-success)}
+.issue-warn{background:var(--color-background-warning)}
+.issue-err{background:color-mix(in srgb,var(--color-background-danger) 30%,transparent)}
+.issue-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.dot-ok{background:var(--color-text-success)}
+.dot-warn{background:var(--color-text-warning)}
+.dot-err{background:var(--color-text-danger)}
+.issue-title{font-size:11px;font-weight:500;margin-bottom:2px}
+.issue-desc{font-size:10px;color:var(--color-text-secondary);line-height:1.4}
+.sprint-row{display:flex;gap:10px;margin-bottom:5px;align-items:flex-start}
+.sprint-num{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:500;flex-shrink:0;margin-top:1px}
+.s1{background:var(--color-background-success);color:var(--color-text-success)}
+.s2{background:var(--color-background-info);color:var(--color-text-info)}
+.s3{background:var(--color-background-warning);color:var(--color-text-warning)}
+.s4{background:color-mix(in srgb,#c4a0e0 25%,transparent);color:#6b3fa0}
+.sprint-text{font-size:11px;line-height:1.5}
+.done{text-decoration:line-through;color:var(--color-text-tertiary)}
+
+/* Endpoint spec */
+.ep-spec{background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.ep-spec-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ep-method-badge{font-size:10px;padding:2px 6px;border-radius:3px;font-weight:600}
+.post-b{background:var(--color-background-info);color:var(--color-text-info)}
+.get-b{background:var(--color-background-success);color:var(--color-text-success)}
+.ep-spec-path{font-family:var(--font-mono,"monospace");font-size:12px;font-weight:500}
+.ep-field{display:flex;gap:8px;font-size:10px;padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.ep-field:last-child{border-bottom:none}
+.ef-name{font-family:var(--font-mono,"monospace");color:var(--color-text-info);min-width:120px;flex-shrink:0}
+.ef-type{color:var(--color-text-tertiary);min-width:70px;flex-shrink:0}
+.ef-desc{color:var(--color-text-secondary);flex:1}
+</style>
+</head>
+<body>
+<h2 class="sr-only">AstroCRM UX-спецификация: мокап дашборда, исправления, план спринтов</h2>
+<div style="padding:16px 0">
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('t-mockup')">Мокап дашборда</div>
+  <div class="tab" onclick="showTab('t-fixes')">Исправления</div>
+  <div class="tab" onclick="showTab('t-fullprofile')">Спека /full-profile</div>
+  <div class="tab" onclick="showTab('t-plan')">Спринт-план</div>
+</div>
+
+<!-- TAB 1: MOCKUP -->
+<div class="pane active" id="t-mockup">
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+    <div class="phone-frame" style="flex:0 0 340px">
+      <div class="app-header">
+        <div class="app-logo">✦ AstroCRM</div>
+        <div class="app-mode">
+          <div class="mode-btn active">Простой</div>
+          <div class="mode-btn">Профи</div>
+        </div>
+      </div>
+
+      <!-- USER CHIP -->
+      <div style="display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:8px;padding:8px 10px;margin-bottom:10px;border:0.5px solid var(--color-border-tertiary)">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">АЕ</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:500">Александр</div>
+          <div style="font-size:10px;color:var(--color-text-secondary)">12.08.1979 · Тирасполь</div>
+        </div>
+        <div style="font-size:10px;color:var(--color-text-tertiary)">16 апр 2026</div>
+      </div>
+
+      <!-- BENTO GRID -->
+      <div class="bento">
+
+        <!-- Moon card -->
+        <div class="card moon">
+          <div class="card-label">Луна сегодня</div>
+          <div class="card-main">♋ Рак 14°</div>
+          <div class="card-sub">Убывающая, 71%</div>
+          <div class="card-hint">Вход Лев: завтра 11:43 <span class="voc-badge">VoC 09:30</span></div>
+        </div>
+
+        <!-- Timing card -->
+        <div class="card">
+          <div class="card-label">Тайминг</div>
+          <div class="timing-grid" style="gap:5px">
+            <div class="timing-cell">
+              <div class="timing-label">Профекция</div>
+              <div class="timing-val">Дом 7</div>
+              <div class="timing-sub">Венера</div>
+            </div>
+            <div class="timing-cell">
+              <div class="timing-label">Фирдари</div>
+              <div class="timing-val">♃ Юп</div>
+              <div class="timing-sub">—♂ Марс</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transits card — wide -->
+        <div class="card wide transit">
+          <div class="card-label">Активные транзиты</div>
+          <div class="transit-row">
+            <div class="t-planet">♄</div>
+            <div class="t-asp" style="color:#cc4444">□</div>
+            <div class="t-natal">нат. ♂ Марс</div>
+            <div class="t-orb">0.3°</div>
+            <div class="t-type" style="background:#cc4444"></div>
+            <div class="t-expand" onclick="toggleComp('c1')">↓</div>
+          </div>
+          <div id="c1" style="display:none;padding:7px 8px;background:color-mix(in srgb,var(--color-background-warning) 15%,transparent);border-radius:6px;margin:4px 0 2px">
+            <div style="font-size:11px;font-weight:500;margin-bottom:4px">🛠 Компенсаторика</div>
+            <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.5">Горный поход в высоком темпе · Структурированная физическая работа · план + немедленно первый шаг</div>
+            <div style="font-size:10px;color:var(--color-text-tertiary);margin-top:3px">Избегать: срочных необратимых решений</div>
+          </div>
+
+          <div class="transit-row">
+            <div class="t-planet">♆</div>
+            <div class="t-asp" style="color:#5588cc">☌</div>
+            <div class="t-natal">нат. ♄ Сатурн</div>
+            <div class="t-orb">0.7°</div>
+            <div class="t-type" style="background:#6060a0"></div>
+            <div class="t-expand" onclick="toggleComp('c2')">↓</div>
+          </div>
+          <div id="c2" style="display:none;padding:7px 8px;background:color-mix(in srgb,var(--color-background-info) 10%,transparent);border-radius:6px;margin:4px 0 2px">
+            <div style="font-size:11px;font-weight:500;margin-bottom:4px">🛠 Компенсаторика</div>
+            <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.5">Создать ритуал с повторяющимся действием · Начать дисциплинированную творческую практику ежедневно</div>
+          </div>
+
+          <div class="transit-row">
+            <div class="t-planet">♃</div>
+            <div class="t-asp" style="color:#44aa44">△</div>
+            <div class="t-natal">нат. ☉ Солнце</div>
+            <div class="t-orb">1.2°</div>
+            <div class="t-type" style="background:#44aa44"></div>
+            <div class="t-expand" onclick="toggleComp('c3')">↓</div>
+          </div>
+          <div id="c3" style="display:none;padding:7px 8px;background:color-mix(in srgb,var(--color-background-success) 15%,transparent);border-radius:6px;margin:4px 0">
+            <div style="font-size:11px;font-weight:500;margin-bottom:4px">🛠 Компенсаторика</div>
+            <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.5">Разворачивайся — поездка, новый контакт, большой шаг · Юпитер возвращается домой — принимай гостей</div>
+          </div>
+        </div>
+
+        <!-- Period background -->
+        <div class="card wide">
+          <div class="card-label">Фон периода</div>
+          <div style="font-size:12px;line-height:1.5;color:var(--color-text-primary)">♄ ☌ ♆ в Овне — построить храм из тумана.</div>
+          <div style="font-size:10px;color:var(--color-text-secondary);margin-top:3px;line-height:1.4">Мечта просит скелет. Дисциплинированная творческая практика — не вдохновение, а ежедневный труд.</div>
+        </div>
+
+      </div>
+
+      <button class="big-btn" onclick="sendPrompt('Покажи полный отчёт по натальной карте и всем транзитам')">
+        Полный отчёт ↗
+      </button>
+      <button class="big-btn secondary" style="margin-top:6px" onclick="sendPrompt('Покажи синастрию с Марией')">
+        Синастрия с партнёром
+      </button>
+    </div>
+
+    <!-- Right: UX rules -->
+    <div style="flex:1;min-width:200px">
+      <div class="spec-section">
+        <div class="spec-title">Принципы UX</div>
+        <div class="spec-row">
+          <div class="spec-label">Progressive disclosure</div>
+          <div class="spec-val">Простой режим — 4 карточки. Профи — полный набор вкладок.</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">Compensatory inline</div>
+          <div class="spec-val">Практики раскрываются прямо под транзитом по клику ↓. Не отдельный экран.</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">Один запрос</div>
+          <div class="spec-val"><span class="code">POST /full-profile</span> или <span class="code">POST /dashboard</span> — всё одним вызовом.</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">Карточки транзитов</div>
+          <div class="spec-val">Цветовая точка: красная = напряжение, зелёная = гармония, синяя = слияние. Орб в °.</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">VoC индикатор</div>
+          <div class="spec-val">Оранжевый бейдж в карточке Луны. Время начала VoC + следующий знак.</div>
+        </div>
+      </div>
+      <div class="spec-section">
+        <div class="spec-title">Профессиональный режим (+)</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">⊞ Прогрессии / Солар / Лунар</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">⏳ Зодиакальное высвобождение</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">◈ Первичные дирекции (ректиф.)</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">⬡ Human Design текущие гейты</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">🪐 Джйотиш / Накшатры</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">⊕ Мидпойнты / Космобиология</div>
+          <div style="font-size:11px;padding:4px 8px;background:var(--color-background-secondary);border-radius:5px">✦ Каббала / Gene Keys</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: FIXES -->
+<div class="pane" id="t-fixes">
+  <div class="spec-section">
+    <div class="spec-title">Критические баги — исправлены в v2</div>
+    <div class="issue-row issue-ok"><div class="issue-dot dot-ok"></div><div><div class="issue-title">Дубль POST /daily/personal (L1191 vs L4287)</div><div class="issue-desc">Удалена старая версия L1191–1320 (без compensatory). Осталась L4287 с фирдари + профекции + компенсаторика.</div></div></div>
+    <div class="issue-row issue-ok"><div class="issue-dot dot-ok"></div><div><div class="issue-title">Дубль GET /ephemeris/ingress-calendar (L1322 vs L4416)</div><div class="issue-desc">Удалена старая версия L1322–1423. Осталась одна.</div></div></div>
+    <div class="issue-row issue-ok"><div class="issue-dot dot-ok"></div><div><div class="issue-title">/predictive/perfections — неверное имя</div><div class="issue-desc">Переименован в /predictive/exact-aspects. Функция вызывала transit_exact_dates() — это «точные даты аспектов», не «перфекции».</div></div></div>
+    <div class="issue-row issue-ok"><div class="issue-dot dot-ok"></div><div><div class="issue-title">/report/generate не вызывал compensatory</div><div class="issue-desc">Добавлен блок SECTION 10 + HTML-секция 🛠 «Компенсаторные практики» в HTML-шаблон отчёта.</div></div></div>
+    <div class="issue-row issue-ok"><div class="issue-dot dot-ok"></div><div><div class="issue-title">Добавлены /full-profile и /couple/*</div><div class="issue-desc">POST /full-profile — агрегирует всё (natal + transits + compensatory + timing). /couple/forecast|timeline|compare — алиасы /interaction/* с понятными именами.</div></div></div>
+  </div>
+
+  <div class="spec-section">
+    <div class="spec-title">Архитектурные проблемы — рекомендации</div>
+    <div class="issue-row issue-warn"><div class="issue-dot dot-warn"></div><div><div class="issue-title">/interaction/* vs /couple/* — путаница назначений</div><div class="issue-desc">5 эндпоинтов /interaction/* — прогностика для двух людей, не для одного. Добавлены /couple/* алиасы. Рекомендовано переименовать в основном коде.</div></div></div>
+    <div class="issue-row issue-warn"><div class="issue-dot dot-warn"></div><div><div class="issue-title">/predictive/tertiary и /predictive/converse — слишком сложные</div><div class="issue-desc">Третичные и конверсные прогрессии — advanced-техники. Добавлен docstring. Рекомендовано скрыть за ?advanced=true param в следующем спринте.</div></div></div>
+    <div class="issue-row issue-warn"><div class="issue-dot dot-warn"></div><div><div class="issue-title">Human Design не в /dashboard</div><div class="issue-desc">9 HD-эндпоинтов существуют, но /dashboard их не включает. В /full-profile добавлен параметр include_human_design=true.</div></div></div>
+    <div class="issue-row issue-err"><div class="issue-dot dot-err"></div><div><div class="issue-title">CORS — проверить ALLOWED_ORIGINS env</div><div class="issue-desc">В коде настроен через env ALLOWED_ORIGINS. На production-сервере Railway убедитесь, что переменная задана явно (не «*»).</div></div></div>
+    <div class="issue-row issue-err"><div class="issue-dot dot-err"></div><div><div class="issue-title">pyswisseph не установлен → деградация точности</div><div class="issue-desc">Без Swiss Ephemeris точность падает до ~5'. Критично для первичных дирекций, ректификации. Проверить /health → se_ok: true.</div></div></div>
+  </div>
+</div>
+
+<!-- TAB 3: FULL PROFILE SPEC -->
+<div class="pane" id="t-fullprofile">
+  <div class="ep-spec">
+    <div class="ep-spec-head">
+      <span class="ep-method-badge post-b">POST</span>
+      <span class="ep-spec-path">/full-profile</span>
+      <span style="font-size:10px;padding:2px 5px;border-radius:3px;background:color-mix(in srgb,#c8e8f0 50%,transparent);color:#005878;margin-left:auto">НОВЫЙ в v2</span>
+    </div>
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;line-height:1.5">Агрегирует всё необходимое для главного дашборда одним запросом. Заменяет цепочку natal → transits → compensatory → profections → firdaria.</div>
+
+    <div style="font-size:10px;font-weight:500;color:var(--color-text-tertiary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Request</div>
+    <div class="ep-field"><span class="ef-name">date</span><span class="ef-type">str</span><span class="ef-desc">YYYY-MM-DD — дата рождения</span></div>
+    <div class="ep-field"><span class="ef-name">time</span><span class="ef-type">str = "12:00"</span><span class="ef-desc">HH:MM</span></div>
+    <div class="ep-field"><span class="ef-name">lat, lon</span><span class="ef-type">float</span><span class="ef-desc">координаты рождения</span></div>
+    <div class="ep-field"><span class="ef-name">utc</span><span class="ef-type">float = 0</span><span class="ef-desc">смещение UTC</span></div>
+    <div class="ep-field"><span class="ef-name">timezone_name</span><span class="ef-type">str?</span><span class="ef-desc">IANA зона (Europe/Moscow) — переопределяет utc</span></div>
+    <div class="ep-field"><span class="ef-name">target_date</span><span class="ef-type">str?</span><span class="ef-desc">дата анализа (default: сегодня)</span></div>
+    <div class="ep-field"><span class="ef-name">current_lat/lon</span><span class="ef-type">float?</span><span class="ef-desc">текущее местонахождение (для локации)</span></div>
+    <div class="ep-field"><span class="ef-name">depth</span><span class="ef-type">str = "full"</span><span class="ef-desc">brief | full | professional</span></div>
+    <div class="ep-field"><span class="ef-name">include_compensatory</span><span class="ef-type">bool = true</span><span class="ef-desc">практики под каждый транзит</span></div>
+    <div class="ep-field"><span class="ef-name">include_human_design</span><span class="ef-type">bool = false</span><span class="ef-desc">HD (тяжёлый, по запросу)</span></div>
+    <div class="ep-field"><span class="ef-name">include_jyotish</span><span class="ef-type">bool = false</span><span class="ef-desc">Джйотиш (требует jyotish_engine)</span></div>
+    <div class="ep-field"><span class="ef-name">include_relocation</span><span class="ef-type">bool = false</span><span class="ef-desc">релокационный блок по current_lat/lon</span></div>
+  </div>
+
+  <div class="ep-spec">
+    <div style="font-size:10px;font-weight:500;color:var(--color-text-tertiary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Response</div>
+    <div class="ep-field"><span class="ef-name">moon_today</span><span class="ef-type">object</span><span class="ef-desc">sign, degree, phase, void_of_course, mansion</span></div>
+    <div class="ep-field"><span class="ef-name">natal</span><span class="ef-type">object</span><span class="ef-desc">полная карта (brief: только asc/mc/планеты)</span></div>
+    <div class="ep-field"><span class="ef-name">active_transits</span><span class="ef-type">array</span><span class="ef-desc">топ-6 транзитов по орбу, каждый c полем compensatory[]</span></div>
+    <div class="ep-field"><span class="ef-name">period_background</span><span class="ef-type">object</span><span class="ef-desc">фоновый нарратив периода (Сатурн/Нептун в Овне и т.д.)</span></div>
+    <div class="ep-field"><span class="ef-name">profections</span><span class="ef-type">object</span><span class="ef-desc">активный дом, лорд года</span></div>
+    <div class="ep-field"><span class="ef-name">firdaria</span><span class="ef-type">object</span><span class="ef-desc">текущий период и подпериод</span></div>
+    <div class="ep-field"><span class="ef-name">solar_arc_hits</span><span class="ef-type">array</span><span class="ef-desc">топ-3 SA-аспекта к натальным точкам</span></div>
+    <div class="ep-field"><span class="ef-name">saturn_cycle</span><span class="ef-type">object</span><span class="ef-desc">статус цикла Сатурна</span></div>
+    <div class="ep-field"><span class="ef-name">relocation / human_design / jyotish</span><span class="ef-type">object</span><span class="ef-desc">если include_* = true</span></div>
+  </div>
+</div>
+
+<!-- TAB 4: PLAN -->
+<div class="pane" id="t-plan">
+  <div class="spec-section">
+    <div class="spec-title">Sprint 1 — Исправления (сделано в v2)</div>
+    <div class="sprint-row"><span class="sprint-num s1">✓</span><span class="sprint-text done">Удалить дубли /daily/personal и /ephemeris/ingress-calendar</span></div>
+    <div class="sprint-row"><span class="sprint-num s1">✓</span><span class="sprint-text done">Переименовать /predictive/perfections → /exact-aspects</span></div>
+    <div class="sprint-row"><span class="sprint-num s1">✓</span><span class="sprint-text done">Добавить compensatory в /report/generate (Section 10)</span></div>
+    <div class="sprint-row"><span class="sprint-num s1">✓</span><span class="sprint-text done">Добавить /full-profile (один запрос — всё)</span></div>
+    <div class="sprint-row"><span class="sprint-num s1">✓</span><span class="sprint-text done">Добавить /couple/* алиасы для /interaction/*</span></div>
+  </div>
+
+  <div class="spec-section">
+    <div class="spec-title">Sprint 2 — Связность (1-2 недели)</div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">Переименовать /interaction/* → /couple/* в основном коде (убрать дублирование алиасов)</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">Скрыть tertiary/converse за ?advanced=true query-param</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">Добавить compensatory_summary прямо в каждый объект transit aspect (не отдельный блок)</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">POST /dashboard?depth=full — вернуть всё одним запросом (аналог /full-profile)</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">Добавить Human Design текущие транзитные гейты в /dashboard ответ</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">CORS: задать ALLOWED_ORIGINS через Railway env var (не «*»)</span></div>
+    <div class="sprint-row"><span class="sprint-num s2">→</span><span class="sprint-text">Установить pyswisseph>=2.10.3 на сервер → se_ok: true</span></div>
+  </div>
+
+  <div class="spec-section">
+    <div class="spec-title">Sprint 3 — UX (2-3 недели)</div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">Frontend: переключатель Простой/Профи режим (localStorage)</span></div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">Карточки транзитов с inline компенсаторикой (expandable, без отдельного вызова)</span></div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">PDF-экспорт через /report/generate (кнопка → открытие в новом окне + Ctrl+P)</span></div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">Мобильная адаптация: bento-grid → single column, bottom-sheet для деталей</span></div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">VoC индикатор в header с обратным отсчётом до конца</span></div>
+    <div class="sprint-row"><span class="sprint-num s3">→</span><span class="sprint-text">Кнопка «Полный отчёт» → POST /full-profile + генерация PDF</span></div>
+  </div>
+
+  <div class="spec-section">
+    <div class="spec-title">Sprint 4 — Новые эндпоинты (месяц)</div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">POST /predictive/eclipse-personal — затмения в натальных домах + compensatory</span></div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">POST /predictive/ingress-personal — ингрессии через натальные дома</span></div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">GET /daily/global — глобальный астрологический фон без данных рождения</span></div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">POST /synastry/progressed — прогрессированная синастрия (метод Вэстрана)</span></div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">Интеграция лунных мансий (D22ALS) в /daily/moon ответ</span></div>
+    <div class="sprint-row"><span class="sprint-num s4">→</span><span class="sprint-text">ML-калибровка весов мультисигнального прогноза по истории событий клиента</span></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+function toggleComp(id){
+  const el=document.getElementById(id);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+</script>
+</body>
+</html>

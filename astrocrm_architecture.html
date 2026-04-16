@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,"system-ui");background:transparent;font-size:13px;color:var(--color-text-primary)}
+h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.wrap{padding:16px 0}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:var(--color-background-secondary);border-radius:8px;border:0.5px solid var(--color-border-tertiary)}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text-secondary)}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.module{border-radius:8px;border:0.5px solid var(--color-border-secondary);padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.module:hover{border-color:var(--color-border-primary);background:var(--color-background-secondary)}
+.module.active{border-width:1.5px}
+.mod-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.mod-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.mod-title{font-weight:500;font-size:12px}
+.mod-badge{font-size:10px;padding:1px 5px;border-radius:3px;margin-left:auto;flex-shrink:0}
+.ep-list{display:flex;flex-direction:column;gap:3px}
+.ep{font-size:10px;color:var(--color-text-secondary);padding:2px 5px;border-radius:3px;display:flex;align-items:center;gap:5px;transition:background .1s}
+.ep:hover{background:var(--color-background-secondary)}
+.ep-method{font-size:9px;font-weight:500;width:26px;flex-shrink:0}
+.ep-path{font-family:var(--font-mono,"monospace");font-size:10px}
+.ep-new{font-size:9px;padding:1px 4px;border-radius:2px;margin-left:auto}
+.divider-label{text-align:center;font-size:10px;font-weight:500;color:var(--color-text-tertiary);padding:6px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.flow-row{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.flow-arrow{font-size:14px;color:var(--color-text-tertiary);flex-shrink:0}
+.conn-badge{font-size:10px;padding:2px 7px;border-radius:12px;border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);background:var(--color-background-primary);white-space:nowrap}
+
+/* color themes */
+.c-core{background:color-mix(in srgb,var(--color-background-success) 20%,transparent);border-color:var(--color-border-success)}
+.c-core .mod-icon{background:var(--color-background-success);color:var(--color-text-success)}
+.c-core .mod-badge{background:var(--color-background-success);color:var(--color-text-success)}
+.c-predict{background:color-mix(in srgb,var(--color-background-info) 15%,transparent);border-color:var(--color-border-info)}
+.c-predict .mod-icon{background:var(--color-background-info);color:var(--color-text-info)}
+.c-predict .mod-badge{background:var(--color-background-info);color:var(--color-text-info)}
+.c-comp{background:color-mix(in srgb,var(--color-background-warning) 15%,transparent);border-color:var(--color-border-warning)}
+.c-comp .mod-icon{background:var(--color-background-warning);color:var(--color-text-warning)}
+.c-comp .mod-badge{background:var(--color-background-warning);color:var(--color-text-warning)}
+.c-syn{background:color-mix(in srgb,#c4a0e0 10%,transparent);border-color:#c4a0e080}
+.c-syn .mod-icon{background:#e8d5f5;color:#6b3fa0}
+.c-syn .mod-badge{background:#e8d5f5;color:#6b3fa0}
+.c-loc{background:color-mix(in srgb,#85d4a0 10%,transparent);border-color:#85d4a080}
+.c-loc .mod-icon{background:#c8eedb;color:#2a7a50}
+.c-loc .mod-badge{background:#c8eedb;color:#2a7a50}
+.c-esot{background:color-mix(in srgb,#f0a0c8 10%,transparent);border-color:#f0a0c880}
+.c-esot .mod-icon{background:#f8d8eb;color:#a03060}
+.c-esot .mod-badge{background:#f8d8eb;color:#a03060}
+.c-adv{background:color-mix(in srgb,var(--color-background-danger) 10%,transparent);border-color:var(--color-border-danger)}
+.c-adv .mod-icon{background:var(--color-background-danger);color:var(--color-text-danger)}
+.c-adv .mod-badge{background:var(--color-background-danger);color:var(--color-text-danger)}
+.c-infra{background:color-mix(in srgb,var(--color-background-tertiary) 40%,transparent);border-color:var(--color-border-tertiary)}
+.c-infra .mod-icon{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.c-infra .mod-badge{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+
+.tag-fixed{background:#ffe0cc;color:#b04000;font-size:9px;padding:1px 4px;border-radius:2px}
+.tag-new{background:#c8e8f0;color:#005878;font-size:9px;padding:1px 4px;border-radius:2px}
+.tag-adv{background:#f0ddf8;color:#6b2090;font-size:9px;padding:1px 4px;border-radius:2px}
+
+.detail-panel{display:none;margin-top:10px;padding:10px 12px;background:var(--color-background-primary);border-radius:8px;border:0.5px solid var(--color-border-secondary)}
+.detail-panel.open{display:block}
+.detail-title{font-weight:500;font-size:12px;margin-bottom:8px;color:var(--color-text-primary)}
+.detail-item{font-size:11px;color:var(--color-text-secondary);padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:flex-start;gap:8px}
+.detail-item:last-child{border-bottom:none}
+.detail-key{color:var(--color-text-primary);font-weight:500;min-width:90px;flex-shrink:0}
+.fix-indicator{display:flex;align-items:center;gap:5px;font-size:11px;padding:5px 8px;border-radius:5px;margin-bottom:5px}
+.fix-ok{background:var(--color-background-success);color:var(--color-text-success)}
+.fix-warn{background:var(--color-background-warning);color:var(--color-text-warning)}
+</style>
+</head>
+<body>
+<h2 class="sr-only">Карта архитектуры AstroCRM — 76 эндпоинтов, уровни 1-9</h2>
+<div class="wrap">
+
+<!-- Changes summary -->
+<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+  <div class="fix-indicator fix-ok">✓ Дубли удалены — 4292 → 4589 строк (вместо 4524, +65 чистых)</div>
+  <div class="fix-indicator fix-ok">✓ /full-profile добавлен (76 эндп.)</div>
+  <div class="fix-indicator fix-ok">✓ Compensatory → report/generate</div>
+  <div class="fix-indicator fix-warn">→ /interaction/* → рекомендовано /couple/*</div>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#2a7a50"></div>Ядро</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--color-text-info)"></div>Прогностика</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--color-text-warning)"></div>Компенсаторика</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#6b3fa0"></div>Синастрия</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#2a7a50;opacity:.6"></div>Локации</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#a03060"></div>Эзотерика</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--color-text-danger)"></div>ADVANCED</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--color-text-secondary)"></div>Инфраструктура</div>
+</div>
+
+<!-- LEVEL 1 — CORE -->
+<div class="divider-label">Уровень 1 — Ядро (ежедневная работа)</div>
+<div class="grid-4" style="grid-template-columns:1fr 1fr 1fr 1fr">
+  <div class="module c-core" onclick="toggle('m-fullprofile')">
+    <div class="mod-head">
+      <div class="mod-icon">★</div>
+      <div class="mod-title">Full Profile</div>
+      <span class="mod-badge"><span class="tag-new">NEW</span></span>
+    </div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/full-profile</span></div>
+    </div>
+    <div class="detail-panel" id="m-fullprofile">
+      <div class="detail-title">One-click агрегатор</div>
+      <div class="detail-item"><span class="detail-key">Возвращает</span>natal + moon_today + active_transits + compensatory + profections + firdaria + SA hits</div>
+      <div class="detail-item"><span class="detail-key">Параметры</span>depth: brief|full|professional, include_hd, include_jyotish, include_relocation</div>
+      <div class="detail-item"><span class="detail-key">Статус</span><span class="tag-new">ДОБАВЛЕН в v2</span></div>
+    </div>
+  </div>
+  <div class="module c-core" onclick="toggle('m-dashboard')">
+    <div class="mod-head">
+      <div class="mod-icon">⊞</div>
+      <div class="mod-title">Dashboard</div>
+    </div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/dashboard</span></div>
+    </div>
+    <div class="detail-panel" id="m-dashboard">
+      <div class="detail-title">Bento-grid дашборд</div>
+      <div class="detail-item"><span class="detail-key">Включает</span>moon, top transits, compensatory, firdaria, profections, fortune lot, chart_analysis</div>
+      <div class="detail-item"><span class="detail-key">Compensatory</span>build_compensatory_report() ✓ подключён</div>
+    </div>
+  </div>
+  <div class="module c-core" onclick="toggle('m-daily')">
+    <div class="mod-head">
+      <div class="mod-icon">☽</div>
+      <div class="mod-title">Daily</div>
+      <span class="mod-badge"><span class="tag-fixed">ДУБЛЬ УБРАН</span></span>
+    </div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/daily/moon</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/daily/personal</span></div>
+    </div>
+    <div class="detail-panel" id="m-daily">
+      <div class="detail-title">Ежедневные эндпоинты</div>
+      <div class="detail-item"><span class="detail-key">Было</span>2 версии /daily/personal (L1191 без comp, L4287 с comp)</div>
+      <div class="detail-item"><span class="detail-key">Стало</span>Одна версия L4287 — с compensatory, профекциями, фирдари</div>
+    </div>
+  </div>
+  <div class="module c-core" onclick="toggle('m-natal')">
+    <div class="mod-head">
+      <div class="mod-icon">◎</div>
+      <div class="mod-title">Natal</div>
+    </div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal/asteroids</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal/lilith-extended</span></div>
+    </div>
+    <div class="detail-panel" id="m-natal">
+      <div class="detail-title">Натальная карта</div>
+      <div class="detail-item"><span class="detail-key">Флаги</span>include_aspects, include_dignities, include_arabic, include_fixed_stars, include_sect</div>
+      <div class="detail-item"><span class="detail-key">Дополнения</span>asteroid nodes, 3 вида Лилит (mean/true/interpolated)</div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW DIAGRAM -->
+<div style="background:var(--color-background-secondary);border-radius:8px;border:0.5px solid var(--color-border-tertiary);padding:10px 14px;margin-bottom:10px">
+  <div style="font-size:11px;font-weight:500;margin-bottom:8px;color:var(--color-text-secondary)">Поток данных — как модули связаны друг с другом</div>
+  <div class="flow-row">
+    <div class="conn-badge" style="background:var(--color-background-success);color:var(--color-text-success)">POST /natal</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge" style="background:var(--color-background-info);color:var(--color-text-info)">/predictive/*</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge" style="background:var(--color-background-warning);color:var(--color-text-warning)">/compensatory/practices</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge">/report/generate ✓</div>
+  </div>
+  <div class="flow-row">
+    <div class="conn-badge" style="background:var(--color-background-success);color:var(--color-text-success)">POST /natal</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge" style="background:var(--color-background-warning);color:var(--color-text-warning)">/dashboard (агрегирует)</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge">bento-grid UI</div>
+  </div>
+  <div class="flow-row" style="margin-bottom:0">
+    <div class="conn-badge" style="background:color-mix(in srgb,#c4a0e0 20%,transparent);color:#6b3fa0">/synastry/*</div>
+    <div class="flow-arrow">+</div>
+    <div class="conn-badge" style="background:color-mix(in srgb,#c4a0e0 20%,transparent);color:#6b3fa0">/interaction/* → /couple/*</div>
+    <div class="flow-arrow">→</div>
+    <div class="conn-badge">two-person forecast</div>
+    <div style="margin-left:auto;font-size:10px;color:var(--color-text-tertiary)">NEW: /couple aliases</div>
+  </div>
+</div>
+
+<!-- LEVEL 2 — PREDICTIVE -->
+<div class="divider-label">Уровень 2 — Основная прогностика</div>
+<div class="grid">
+  <div class="module c-predict" onclick="toggle('m-transit')">
+    <div class="mod-head"><div class="mod-icon">⟳</div><div class="mod-title">Транзиты</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/transits</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/ephemerides</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/astrosummary</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/saturn-cycle</span></div>
+    </div>
+    <div class="detail-panel" id="m-transit">
+      <div class="detail-item"><span class="detail-key">Транзиты</span>аспекты транзитных планет к натальным, orb 0.5-3°</div>
+      <div class="detail-item"><span class="detail-key">Астросаммари</span>сжатое резюме всех прогностик за период</div>
+      <div class="detail-item"><span class="detail-key">Цикл Сатурна</span>возвраты, квадратуры, оппозиции к натальному Сатурну</div>
+    </div>
+  </div>
+  <div class="module c-predict" onclick="toggle('m-prog')">
+    <div class="mod-head"><div class="mod-icon">↗</div><div class="mod-title">Прогрессии</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/secondary</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/solar-arc</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/solar-return</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/lunar-return</span></div>
+    </div>
+    <div class="detail-panel" id="m-prog">
+      <div class="detail-item"><span class="detail-key">SP</span>вторичные прогрессии, 1 день = 1 год</div>
+      <div class="detail-item"><span class="detail-key">SA</span>солнечные дуги, все планеты на одну дугу</div>
+      <div class="detail-item"><span class="detail-key">Солар/лунар</span>возвратные карты года/месяца</div>
+    </div>
+  </div>
+  <div class="module c-predict" onclick="toggle('m-timing')">
+    <div class="mod-head"><div class="mod-icon">⏳</div><div class="mod-title">Тайминг-системы</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/profections</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/firdaria</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/probability-tree</span></div>
+    </div>
+    <div class="detail-panel" id="m-timing">
+      <div class="detail-item"><span class="detail-key">Профекции</span>ежегодная активация домов, лорд года</div>
+      <div class="detail-item"><span class="detail-key">Фирдарии</span>персидские планетарные периоды, дневная/ночная секта</div>
+      <div class="detail-item"><span class="detail-key">Вероятности</span>матрица Сет-модели, зоны точки сборки</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL 3 — COMPENSATORY -->
+<div class="divider-label">Уровень 3 — Компенсаторика (связана с транзитами)</div>
+<div class="grid-2">
+  <div class="module c-comp" onclick="toggle('m-comp')">
+    <div class="mod-head"><div class="mod-icon">🛠</div><div class="mod-title">Compensatory Engine</div><span class="mod-badge"><span class="tag-fixed">ИСПРАВЛЕН</span></span></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/compensatory/practices</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/compensatory/current</span></div>
+    </div>
+    <div class="detail-panel" id="m-comp">
+      <div class="detail-title">Было: отдельный вызов. Стало: подключён везде</div>
+      <div class="detail-item"><span class="detail-key">/daily/personal</span>practices[:3] для топ-транзитов ✓</div>
+      <div class="detail-item"><span class="detail-key">/dashboard</span>comp_report в ответе ✓</div>
+      <div class="detail-item"><span class="detail-key">/report/generate</span>секция 🛠️ в HTML <span class="tag-new">NEW</span></div>
+      <div class="detail-item"><span class="detail-key">/full-profile</span>compensatory per transit <span class="tag-new">NEW</span></div>
+      <div class="detail-item"><span class="detail-key">Слои</span>одиночные планеты → аспектные пары → фоновый нарратив</div>
+    </div>
+  </div>
+  <div class="module c-comp" onclick="toggle('m-report')">
+    <div class="mod-head"><div class="mod-icon">📄</div><div class="mod-title">Отчёт</div><span class="mod-badge"><span class="tag-fixed">+COMP</span></span></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/report/generate</span></div>
+    </div>
+    <div class="detail-panel" id="m-report">
+      <div class="detail-title">Полный HTML/PDF отчёт</div>
+      <div class="detail-item"><span class="detail-key">Секции</span>natal, transits, firdaria, profections, numerology, jyotish, human-design, solar-arc, probability, <strong>compensatory ✓</strong></div>
+      <div class="detail-item"><span class="detail-key">Глубина</span>brief (4 секции) | full (все) | professional (все)</div>
+      <div class="detail-item"><span class="detail-key">Формат</span>html (default) | json</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL 4 — SYNASTRY -->
+<div class="divider-label">Уровень 4 — Синастрия и взаимодействие</div>
+<div class="grid-2">
+  <div class="module c-syn" onclick="toggle('m-syn')">
+    <div class="mod-head"><div class="mod-icon">⊕</div><div class="mod-title">Synastry</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/synastry/aspects</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/synastry/composite</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/synastry/davison</span></div>
+    </div>
+  </div>
+  <div class="module c-syn" onclick="toggle('m-couple')">
+    <div class="mod-head"><div class="mod-icon">⇄</div><div class="mod-title">Couple / Interaction</div><span class="mod-badge"><span class="tag-new">+ALIASES</span></span></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/couple/forecast</span><span class="ep-new tag-new">new</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/couple/timeline</span><span class="ep-new tag-new">new</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/couple/compare</span><span class="ep-new tag-new">new</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/interaction/*</span></div>
+    </div>
+    <div class="detail-panel" id="m-couple">
+      <div class="detail-item"><span class="detail-key">Назначение</span>прогностика для двух людей (subject + influencer)</div>
+      <div class="detail-item"><span class="detail-key">/couple/*</span>алиасы /interaction/* с понятными именами</div>
+      <div class="detail-item"><span class="detail-key">Рекомендация</span>использовать /couple/* в новом клиенте</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVELS 5-6 -->
+<div class="divider-label">Уровни 5-6 — Локации и расширенные системы</div>
+<div class="grid">
+  <div class="module c-loc" onclick="toggle('m-loc')">
+    <div class="mod-head"><div class="mod-icon">🌍</div><div class="mod-title">Локации</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/relocation/chart</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/relocation/acg</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/relocation/local-space</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/relocation/parans</span></div>
+    </div>
+  </div>
+  <div class="module c-loc" onclick="toggle('m-ext')">
+    <div class="mod-head"><div class="mod-icon">⛎</div><div class="mod-title">Расширенная натальная</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal/sidereal</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/heliocentric</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal/planetary-nodes</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/natal/void-of-course</span></div>
+    </div>
+  </div>
+  <div class="module c-esot" onclick="toggle('m-esot')">
+    <div class="mod-head"><div class="mod-icon">✦</div><div class="mod-title">Эзотерические системы</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/numerology/profile</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/kabbalah/*</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/gene-keys/profile</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/human-design/*</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/jyotish</span></div>
+    </div>
+    <div class="detail-panel" id="m-esot">
+      <div class="detail-item"><span class="detail-key">Каббала</span>tree-mapping, 72-angels, four-worlds — 3 эндпоинта</div>
+      <div class="detail-item"><span class="detail-key">Human Design</span>9 эндпоинтов (calc, transits, synastry, reference/*)</div>
+      <div class="detail-item"><span class="detail-key">Зависимость</span>HD и Jyotish требуют доп. движков (опц. install)</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL 7 — ADVANCED -->
+<div class="divider-label">Уровень 7 — Продвинутые техники (ADVANCED)</div>
+<div class="grid-2">
+  <div class="module c-adv" onclick="toggle('m-adv')">
+    <div class="mod-head"><div class="mod-icon">⚙</div><div class="mod-title">Advanced прогностика</div><span class="mod-badge"><span class="tag-adv">ADVANCED</span></span></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/tertiary</span><span class="ep-new tag-adv">adv</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/converse</span><span class="ep-new tag-adv">adv</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/zodiacal-releasing</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/primary-directions</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/exact-aspects</span><span class="ep-new tag-fixed">RENAME</span></div>
+    </div>
+    <div class="detail-panel" id="m-adv">
+      <div class="detail-item"><span class="detail-key">exact-aspects</span>БЫЛО: /predictive/perfections (неверное название). СТАЛО: /predictive/exact-aspects</div>
+      <div class="detail-item"><span class="detail-key">tertiary/converse</span>помечены как ADVANCED в docstring</div>
+      <div class="detail-item"><span class="detail-key">primary-directions</span>требует точного времени рождения (ошибка 1 мин = ±1 год)</div>
+    </div>
+  </div>
+  <div class="module c-adv" onclick="toggle('m-adv2')">
+    <div class="mod-head"><div class="mod-icon">◈</div><div class="mod-title">Астрологические события</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/eclipses</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/stations</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/ingress</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/prenatal-syzygy</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/ephemeris/ingress-calendar</span><span class="ep-new tag-fixed">ДУБЛЬ УБРАН</span></div>
+    </div>
+    <div class="detail-panel" id="m-adv2">
+      <div class="detail-item"><span class="detail-key">Затмения</span>исправлен порог полутеневых (12.5° → 14.0°), лейбл "total/annular" → "central"</div>
+      <div class="detail-item"><span class="detail-key">ingress-calendar</span>дубль L1322 удалён, осталась одна версия</div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL 9 — INFRA -->
+<div class="divider-label">Уровень 9 — Инфраструктура</div>
+<div class="grid-4" style="grid-template-columns:repeat(4,1fr)">
+  <div class="module c-infra">
+    <div class="mod-head"><div class="mod-icon">❤</div><div class="mod-title">Health</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/health</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/ephemeris/status</span></div>
+    </div>
+  </div>
+  <div class="module c-infra">
+    <div class="mod-head"><div class="mod-icon">🌙</div><div class="mod-title">Лунный</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/lunar-calendar</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/planetary-hours/today</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/planetary-hours</span></div>
+    </div>
+  </div>
+  <div class="module c-infra">
+    <div class="mod-head"><div class="mod-icon">⊙</div><div class="mod-title">Ректификация</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/predictive/rectification</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/timezone</span></div>
+    </div>
+  </div>
+  <div class="module c-infra">
+    <div class="mod-head"><div class="mod-icon">⬇</div><div class="mod-title">Эфемериды</div></div>
+    <div class="ep-list">
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-info)">POST</span><span class="ep-path">/ephemeris/download</span></div>
+      <div class="ep"><span class="ep-method" style="color:var(--color-text-success)">GET</span><span class="ep-path">/natal/sidereal/systems</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats footer -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;text-align:center">
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-success)">76</div>
+    <div style="font-size:11px;color:var(--color-text-secondary)">эндпоинтов</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;text-align:center">
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-danger)">0</div>
+    <div style="font-size:11px;color:var(--color-text-secondary)">дублей</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;text-align:center">
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-warning)">4</div>
+    <div style="font-size:11px;color:var(--color-text-secondary)">модуля с compensatory</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px 12px;text-align:center">
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-info)">4589</div>
+    <div style="font-size:11px;color:var(--color-text-secondary)">строк v2</div>
+  </div>
+</div>
+
+</div>
+<script>
+function toggle(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('open');
+}
+</script>
+</body>
+</html>
