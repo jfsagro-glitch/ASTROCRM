@@ -468,6 +468,7 @@ class PredictiveRequest(BaseModel):
     houses:       str = "placidus"
     advanced:     bool = False           # unlock tertiary/converse progressions
     timezone_name: Optional[str] = None  # IANA tz e.g. "Europe/Moscow" (improves DST accuracy)
+    include_compensatory: bool = False   # enrich each transit aspect with compensatory_summary
 
 
 class EphemeridesRequest(BaseModel):
@@ -1174,6 +1175,8 @@ class DashboardRequest(BaseModel):
     target_time: str = "12:00"
     houses: str = "placidus"
     julian: bool = False
+    depth: str = "default"              # default | full — full adds HD gates + SA hits
+    include_human_design: bool = False  # add current transit HD gates
 
 
 # ── DAILY PERSONAL (personalised daily summary) ───────────────────────────────
@@ -1443,8 +1446,44 @@ def dashboard(req: DashboardRequest):
         except Exception:
             comp_report = {}
 
+        # ── depth=full extras ──────────────────────────────────────────────
+        extra: dict = {}
+        if req.depth == "full" or req.include_human_design:
+            # HD transit gates (gates activated by planet positions today)
+            if _HUMAN_DESIGN_OK and calc_human_design is not None:
+                try:
+                    hd_transit = calc_human_design(
+                        target_date, req.target_time, req.lat, req.lon, req.utc,
+                        mode="brief",
+                    )
+                    extra["hd_transit_gates"] = {
+                        "gates":    hd_transit.get("gates", hd_transit.get("defined_gates", [])),
+                        "channels": hd_transit.get("channels", hd_transit.get("defined_channels", [])),
+                        "type":     hd_transit.get("type", ""),
+                    }
+                except Exception:
+                    extra["hd_transit_gates"] = {}
+
+        if req.depth == "full":
+            # Solar-arc top hit today
+            try:
+                sa = solar_arc(natal_jd, req.lat, req.lon, target_date)
+                hits = sorted(sa.get("hits", sa.get("aspects", [])),
+                              key=lambda x: abs(x.get("orb", 99)))
+                extra["solar_arc_top"] = hits[:1]
+            except Exception:
+                extra["solar_arc_top"] = []
+
+            # Saturn cycle status
+            try:
+                from astro_predictive import saturn_cycle as _scfn
+                extra["saturn_cycle"] = _scfn(req.date, req.time, req.lat, req.lon, req.utc)
+            except Exception:
+                extra["saturn_cycle"] = {}
+
         return _present({
             "target_date":    target_date,
+            "depth":          req.depth,
             "moon":           moon_status,
             "top_transits":   top_transits,
             "compensatory":   comp_report,
@@ -1453,6 +1492,7 @@ def dashboard(req: DashboardRequest):
             "fortune_today":  fortune_lot,
             "arabic_natal":   natal.get("arabic_parts", {}),
             "chart_analysis": chart_analysis,
+            **extra,
         })
     except HTTPException:
         raise
@@ -1841,6 +1881,38 @@ def calc_transits(req: PredictiveRequest):
         natal_jd = _to_jd(req.date, req.time, req.utc)
         result = transits(natal_jd, req.target_date, req.target_time or "12:00",
                           lat=req.lat, lon=req.lon)
+
+        # ── Inline compensatory_summary per aspect ──────────────────────────
+        if req.include_compensatory and _COMPENSATORY_OK and build_compensatory_report is not None:
+            try:
+                yr, mo, dy = _parse_date(req.date)
+                h,  mi, sc = _parse_time(req.time)
+                natal_chart = calc_chart(
+                    yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
+                    include_aspects=False, include_dignities=False,
+                )
+                enriched: list = []
+                for asp in result.get("aspects", []):
+                    try:
+                        comp = build_compensatory_report(  # type: ignore[misc]
+                            natal_chart=natal_chart,
+                            transit_aspects=[asp],
+                            depth="light",
+                        )
+                        practices = comp.get("practices", [])
+                        asp = dict(asp)  # copy so we don't mutate
+                        asp["compensatory_summary"] = {
+                            "top_practice": practices[0] if practices else None,
+                            "count": len(practices),
+                        }
+                    except Exception:
+                        pass
+                    enriched.append(asp)
+                result = dict(result)
+                result["aspects"] = enriched
+            except Exception:
+                pass
+
         return _present(result)
     except HTTPException:
         raise
@@ -2290,8 +2362,12 @@ def compensatory_current(target_date: Optional[str] = None,
 
 
 # ── INTERACTION-ADJUSTED PERSONAL FORECAST ──────────────────────────────────
-@app.post("/interaction/personal-forecast")
+@app.post("/couple/forecast")
+@app.post("/interaction/personal-forecast")  # deprecated alias
 def interaction_personal_forecast(req: PersonalInteractionRequest):
+    """Personal forecast adjusted for interpersonal influence.
+    Primary route: /couple/forecast. Old name /interaction/personal-forecast kept for compat.
+    """
     try:
         result = _compute_interaction_model(req)
         return _present(result)
@@ -2319,8 +2395,12 @@ def interaction_routes(req: PersonalInteractionRequest):
         raise HTTPException(500, str(e))
 
 
-@app.post("/interaction/timeline")
+@app.post("/couple/timeline")
+@app.post("/interaction/timeline")  # deprecated alias
 def interaction_timeline(req: PersonalInteractionRequest):
+    """Synastry timeline with active windows.
+    Primary route: /couple/timeline. Old name /interaction/timeline kept for compat.
+    """
     try:
         result = _compute_interaction_model(req)
         return _present({
@@ -2890,8 +2970,10 @@ def _compute_location_scenarios(
     }
 
 
-@app.post("/interaction/compare-scenarios")
+@app.post("/couple/compare")
+@app.post("/interaction/compare-scenarios")  # deprecated alias
 def compare_scenarios(req: ScenarioCompareRequest):
+    # Primary route: /couple/compare. Old name /interaction/compare-scenarios kept for compat.
     """
     Multi-scenario location comparison.
     Returns scores for alone / with_partner / partner_stays_natal
@@ -3981,26 +4063,6 @@ async def full_profile(req: FullProfileRequest):  # noqa: C901
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# ─── COUPLE/* aliases for /interaction/* ──────────────────────────────────────
-
-@app.post("/couple/forecast")
-async def couple_forecast(req: PersonalInteractionRequest):
-    """Alias for /interaction/personal-forecast — used by couple dashboard."""
-    return interaction_personal_forecast(req)
-
-
-@app.post("/couple/timeline")
-async def couple_timeline(req: PersonalInteractionRequest):
-    """Alias for /interaction/timeline — synastry timeline."""
-    return interaction_timeline(req)
-
-
-@app.post("/couple/compare")
-async def couple_compare(req: ScenarioCompareRequest):
-    """Alias for /interaction/compare-scenarios — compare relationship scenarios."""
-    return compare_scenarios(req)
 
 
 def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
