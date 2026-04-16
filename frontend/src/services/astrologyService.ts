@@ -453,6 +453,7 @@ export interface DashboardData {
     degree: number;
     phase: string;
     phase_angle: number;
+    illumination?: number;
     is_void: boolean;
     void_end_sign: string | null;
     mansion: LunarMansion;
@@ -463,6 +464,11 @@ export interface DashboardData {
     aspect: string;
     orb: number;
     applying: boolean;
+    nature?: 'benefic' | 'malefic' | 'mixed';
+    compensatory_hint?: {
+      tension_signal: string;
+      top_practice: Record<string, unknown> | null;
+    };
   }>;
   compensatory: Record<string, unknown>;
   firdaria: Record<string, unknown>;
@@ -1279,5 +1285,51 @@ export async function getAnnualProfection(
   return post('/predictive/annual-profection', {
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
     target_date: targetDate,
+  });
+}
+
+// ── COMPENSATORY FORECAST ───────────────────────────────────────────────────
+
+export interface ForecastKeyTransit {
+  transit_planet: string;
+  natal_planet: string;
+  aspect: string;
+  orb: number;
+  applying: boolean;
+  transit_sign: string;
+  natal_sign: string;
+  nature: 'benefic' | 'malefic' | 'mixed';
+}
+
+export interface ForecastActivePractice {
+  planet: string;
+  sign: string;
+  tension_signal: string;
+  function: string;
+  practices: Array<{ practice: string; why?: string; timing?: string }>;
+}
+
+export interface ForecastWindow {
+  window: 'now' | 'near' | 'medium';
+  label: string;
+  sample_date: string;
+  key_transits: ForecastKeyTransit[];
+  active_transits: ForecastActivePractice[];
+  aspect_pairs: Array<Record<string, unknown>>;
+  opening: string;
+  background: Record<string, unknown>;
+}
+
+export interface CompensatoryForecastResult {
+  type: string;
+  natal_date: string;
+  windows: ForecastWindow[];
+  horizon_months: number;
+}
+
+export async function getCompensatoryForecast(b: BirthInput): Promise<CompensatoryForecastResult> {
+  return post('/predictive/compensatory-forecast', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    target_date: new Date().toISOString().slice(0, 10),
   });
 }

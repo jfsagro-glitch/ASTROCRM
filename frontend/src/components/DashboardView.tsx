@@ -3,10 +3,13 @@
 // fortune lot, 7-day lunar mini-calendar.
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Moon, Star, Zap, Clock, TrendingUp, Sparkles,
-  AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp,
+  Moon, Star, Zap, TrendingUp, Sparkles, Shield,
+  AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp, AlertCircle,
 } from 'lucide-react';
-import { getDashboard, getDailyGlobal, DailyGlobalResult } from '../services/astrologyService';
+import {
+  getDashboard, getDailyGlobal, getCompensatoryForecast,
+  DailyGlobalResult, CompensatoryForecastResult, ForecastWindow,
+} from '../services/astrologyService';
 import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
@@ -43,16 +46,41 @@ const SIGN_RU: Record<string, string> = {
   sagittarius: 'Стрелец', capricorn: 'Козерог', aquarius: 'Водолей', pisces: 'Рыбы',
 };
 
+const PLANET_GL: Record<string, string> = {
+  sun:'☀', moon:'☽', mercury:'☿', venus:'♀', mars:'♂', jupiter:'♃',
+  saturn:'♄', uranus:'⛢', neptune:'♆', pluto:'♇', node:'☊', chiron:'⚷',
+};
 const PLANET_RU: Record<string, string> = {
-  sun: '☀ Солнце', moon: '☽ Луна', mercury: '☿ Меркурий', venus: '♀ Венера',
-  mars: '♂ Марс', jupiter: '♃ Юпитер', saturn: '♄ Сатурн', uranus: '⛢ Уран',
-  neptune: '♆ Нептун', pluto: '♇ Плутон', node: '☊ Узел', chiron: '⚷ Хирон',
+  sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
+  mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
+  neptune: 'Нептун', pluto: 'Плутон', node: 'Узел', chiron: 'Хирон',
+};
+const PLANET_FIRD_INTERP: Record<string, string> = {
+  sun:     'фокус на самореализации, лидерстве и витальности',
+  moon:    'эмоции, интуиция и семейные темы на первом плане',
+  mercury: 'коммуникации, обучение, деловые переговоры активизированы',
+  venus:   'отношения, творчество, финансы — время для гармонии',
+  mars:    'энергия действия высокая, риск конфликтов — направляй силу',
+  jupiter: 'расширение, рост, удача и духовные откровения',
+  saturn:  'уроки, ограничения, долгосрочное строительство судьбы',
+  uranus:  'неожиданные перемены, свобода, прорывы',
+  neptune: 'мистика, растворение границ, духовный поиск',
+  pluto:   'глубокая трансформация, власть, скрытые процессы',
+};
+const HOUSE_THEME: Record<number, string> = {
+  1:'идентичность и тело', 2:'ресурсы и ценности', 3:'коммуникации',
+  4:'дом и семья', 5:'творчество и дети', 6:'здоровье и работа',
+  7:'партнёрство', 8:'трансформация', 9:'путешествия и философия',
+  10:'карьера и статус', 11:'друзья и цели', 12:'тайны и уединение',
 };
 
-const ASPECT_RU: Record<string, string> = {
-  conjunction: 'соединение (0°)', opposition: 'оппозиция (180°)',
-  trine: 'трин (120°)', square: 'квадрат (90°)', sextile: 'секстиль (60°)',
-  quincunx: 'квинкунс (150°)', semisextile: 'полусекстиль (30°)',
+const ASPECT_SYM: Record<string, string> = {
+  conjunction:'☌', opposition:'☍', trine:'△', square:'□',
+  sextile:'⚹', quincunx:'⚻',
+};
+const ASPECT_NAME: Record<string, string> = {
+  conjunction:'соединение', opposition:'оппозиция', trine:'трин',
+  square:'квадрат', sextile:'секстиль', quincunx:'квиникункс',
 };
 
 const ASPECT_COLOR: Record<string, string> = {
@@ -62,21 +90,24 @@ const ASPECT_COLOR: Record<string, string> = {
   quincunx: 'text-amber-400',
 };
 
-const NATURE_COLOR: Record<string, string> = {
-  benefic: 'text-emerald-400', malefic: 'text-red-400', mixed: 'text-amber-400',
+const NATURE_CONFIG = {
+  benefic: { label:'Благоприятный', color:'text-emerald-400', bg:'bg-emerald-500/10 border-emerald-500/30', icon:'▲' },
+  malefic: { label:'Напряжённый',   color:'text-red-400',     bg:'bg-red-500/10 border-red-500/30',         icon:'▼' },
+  mixed:   { label:'Смешанный',     color:'text-amber-400',   bg:'bg-amber-500/10 border-amber-500/30',     icon:'◈' },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Card({ title, icon: Icon, children, className = '', theme }: {
+function Card({ title, icon: Icon, children, className = '', theme, badge }: {
   title: string; icon: React.ElementType; children: React.ReactNode;
-  className?: string; theme: ThemeLike;
+  className?: string; theme: ThemeLike; badge?: React.ReactNode;
 }) {
   return (
     <div className={`rounded-2xl border ${theme.card} overflow-hidden ${className}`}>
       <div className="px-4 py-3 flex items-center gap-2 border-b border-white/10">
         <Icon size={14} className={theme.accent} />
         <span className={`text-sm font-medium ${theme.header}`}>{title}</span>
+        {badge}
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -119,79 +150,258 @@ function VocBadge({ isVoid, vocEndJd }: { isVoid: boolean; vocEndJd: number | nu
   );
 }
 
-// ─── TransitRow — expandable transit with inline compensatory ────────────────
+// ─── TransitRow — expandable transit with nature badge + compensatory_hint ────
 function TransitRow({ transit, theme }: { transit: Record<string, unknown>; theme: ThemeLike }) {
   const [expanded, setExpanded] = useState(false);
-  const t = transit;
-  const transitPlanet = String(t.transit_planet ?? '');
-  const natalPlanet   = String(t.natal_planet ?? '');
-  const aspect        = String(t.aspect ?? '');
-  const orb           = typeof t.orb === 'number' ? t.orb : 0;
-  const applying      = Boolean(t.applying);
-
-  // compensatory_summary injected by /predictive/transits?include_compensatory=true
-  // or compensatory[] array from /full-profile
-  const compSummary = t.compensatory_summary as Record<string, unknown> | undefined;
-  const compList    = Array.isArray(t.compensatory) ? (t.compensatory as unknown[]) : null;
-  const hasComp     = Boolean(compSummary || (compList && compList.length > 0));
+  const tp     = String(transit.transit_planet ?? '');
+  const np     = String(transit.natal_planet ?? '');
+  const asp    = String(transit.aspect ?? '');
+  const orb    = typeof transit.orb === 'number' ? transit.orb : 0;
+  const app    = Boolean(transit.applying);
+  const nature = (transit.nature as 'benefic'|'malefic'|'mixed') ?? 'mixed';
+  const cfg    = NATURE_CONFIG[nature] ?? NATURE_CONFIG.mixed;
+  const hint   = transit.compensatory_hint as { tension_signal: string; top_practice: Record<string,unknown>|null } | undefined;
 
   return (
-    <div className="border-b border-white/5 last:border-0">
+    <div className={`rounded-lg border mb-2 last:mb-0 ${cfg.bg} overflow-hidden`}>
       <button
-        onClick={() => hasComp && setExpanded(e => !e)}
-        className={`w-full flex items-start gap-2 py-2.5 text-left ${hasComp ? 'cursor-pointer' : 'cursor-default'}`}
+        onClick={() => hint && setExpanded(e => !e)}
+        className={`w-full flex items-start gap-2 px-3 py-2.5 text-left ${hint ? 'cursor-pointer' : 'cursor-default'}`}
       >
+        <span className={`text-xs mt-0.5 shrink-0 font-bold ${cfg.color}`}>{cfg.icon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={`text-xs font-medium ${theme.header}`}>
-              {PLANET_RU[transitPlanet] ?? transitPlanet}
+            <span className={`text-xs font-semibold ${theme.header}`}>
+              {PLANET_GL[tp] ?? ''} {PLANET_RU[tp] ?? tp}
             </span>
-            <span className={`text-xs ${ASPECT_COLOR[aspect] ?? 'text-gray-400'}`}>
-              {ASPECT_RU[aspect] ?? aspect}
+            <span className={`text-xs font-medium ${ASPECT_COLOR[asp] ?? 'text-gray-400'}`}>
+              {ASPECT_SYM[asp] ?? ''} {ASPECT_NAME[asp] ?? asp}
             </span>
             <span className={`text-xs ${theme.text} opacity-70`}>
-              {PLANET_RU[natalPlanet]?.replace(/^[☀☽☿♀♂♃♄⛢♆♇☊⚷]\s/, '') ?? natalPlanet}
+              {PLANET_GL[np] ?? ''} {PLANET_RU[np] ?? np}
             </span>
           </div>
-          <div className={`text-[10px] ${theme.text} opacity-50 mt-0.5`}>
-            орб {orb.toFixed(2)}° · {applying ? '↗ применяющийся' : '↘ разделяющийся'}
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`text-[10px] ${theme.text} opacity-40`}>орб {orb.toFixed(2)}°</span>
+            <span className={`text-[10px] ${app ? 'text-amber-300' : 'text-slate-400'}`}>
+              {app ? '↗ применяется' : '↘ разделяется'}
+            </span>
+            {hint?.tension_signal && (
+              <span className={`text-[10px] italic ${cfg.color} opacity-70`}>{hint.tension_signal}</span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border
-            ${applying ? 'border-amber-400/40 text-amber-300' : 'border-slate-500/40 text-slate-400'}`}>
-            {applying ? '↗' : '↘'}
-          </span>
-          {hasComp && (
-            expanded
-              ? <ChevronUp size={12} className={`${theme.text} opacity-40`} />
-              : <ChevronDown size={12} className={`${theme.text} opacity-40`} />
-          )}
-        </div>
+        {hint && (
+          expanded
+            ? <ChevronUp size={12} className={`${theme.text} opacity-40 shrink-0`} />
+            : <ChevronDown size={12} className={`${theme.text} opacity-40 shrink-0`} />
+        )}
       </button>
 
-      {/* Inline compensatory panel */}
-      {expanded && hasComp && (
-        <div className="mb-2 pl-2 border-l-2 border-amber-500/30 space-y-1.5">
-          {compSummary && (
-            <div className="rounded-lg bg-amber-500/8 px-2.5 py-2">
-              <div className={`text-[10px] font-medium text-amber-300 mb-1`}>
-                <Sparkles size={9} className="inline mr-1" />
-                {compSummary.count != null ? `${String(compSummary.count)} практик` : 'Компенсаторика'}
-              </div>
-              {Boolean(compSummary.top_practice) && (
-                <div className={`text-[10px] ${theme.text} opacity-80`}>
-                  {String((compSummary.top_practice as Record<string,unknown>).practice ?? compSummary.top_practice)}
+      {expanded && hint?.top_practice && (
+        <div className="px-3 pb-3 pt-1 border-t border-white/8">
+          <div className={`text-[10px] font-semibold ${cfg.color} mb-1`}>
+            <Sparkles size={9} className="inline mr-1" />Компенсаторика
+          </div>
+          {Boolean(hint.top_practice['practice']) && (
+            <div className={`text-[11px] ${theme.header} font-medium`}>
+              {String(hint.top_practice['practice'])}
+            </div>
+          )}
+          {Boolean(hint.top_practice['why']) && (
+            <div className={`text-[10px] ${theme.text} opacity-60 mt-0.5`}>
+              {String(hint.top_practice['why'])}
+            </div>
+          )}
+          {Boolean(hint.top_practice['timing']) && (
+            <div className="text-[10px] text-amber-300/70 mt-0.5">
+              ⏰ {String(hint.top_practice['timing'])}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CompensatoryNow — reads active_transits/aspect_pairs from dashboard ─────
+function CompensatoryNow({ comp, theme }: { comp: Record<string, unknown>; theme: ThemeLike }) {
+  const active  = (comp.active_transits ?? []) as Array<Record<string, unknown>>;
+  const pairs   = (comp.aspect_pairs ?? []) as Array<Record<string, unknown>>;
+  const opening = comp.opening as string | undefined;
+
+  if (active.length === 0 && pairs.length === 0) {
+    return <p className={`text-xs ${theme.text} opacity-40`}>Нет рекомендаций на сегодня</p>;
+  }
+  return (
+    <div className="space-y-2.5">
+      {opening && (
+        <p className={`text-[11px] italic ${theme.text} opacity-60 border-l-2 border-white/20 pl-2`}>
+          {opening}
+        </p>
+      )}
+      {active.slice(0, 4).map((at, i) => {
+        const practices = (at.practices ?? []) as Array<Record<string,unknown>>;
+        const top = practices[0];
+        if (!top) return null;
+        return (
+          <div key={i} className="rounded-lg bg-white/5 border border-white/8 p-2.5">
+            <div className={`text-[10px] font-semibold ${theme.accent} mb-1`}>
+              {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet ?? '')}
+              {' в '}{SIGN_RU[String(at.sign ?? '')] ?? String(at.sign ?? '')}
+            </div>
+            {at.tension_signal && (
+              <div className="text-[10px] text-amber-300/80 mb-1 italic">{String(at.tension_signal)}</div>
+            )}
+            <div className={`text-[11px] font-medium ${theme.header}`}>
+              {Boolean(top.practice) && String(top.practice)}
+            </div>
+            {Boolean(top.why) && (
+              <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5`}>{String(top.why)}</div>
+            )}
+            {Boolean(top.timing) && (
+              <div className="text-[10px] text-amber-300/60 mt-0.5">⏰ {String(top.timing)}</div>
+            )}
+            {practices.length > 1 && (
+              <div className={`text-[10px] ${theme.text} opacity-30 mt-1`}>+ ещё {practices.length - 1} практик</div>
+            )}
+          </div>
+        );
+      })}
+      {pairs.slice(0, 2).map((p, i) => (
+        <div key={`pair-${i}`} className="rounded-lg bg-indigo-500/8 border border-indigo-500/20 p-2.5">
+          <div className="text-[10px] font-semibold text-indigo-300 mb-1">
+            Аспектная пара: {String(p.name ?? p.pair ?? '')}
+          </div>
+          {Boolean(p.tension) && (
+            <div className={`text-[10px] ${theme.text} opacity-60 mb-1`}>{String(p.tension)}</div>
+          )}
+          {Array.isArray(p.practices) && (p.practices as Array<Record<string,unknown>>).slice(0,2).map((pr, j) => (
+            <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5`}>
+              <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" />
+              {Boolean(pr.practice) ? String(pr.practice) : String(pr)}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── CompensatoryForecast — lazy 3-window accordion ──────────────────────────
+function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; theme: ThemeLike }) {
+  const [data, setData]       = useState<CompensatoryForecastResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [open, setOpen]       = useState<Record<string, boolean>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try { setData(await getCompensatoryForecast(birthData)); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  }, [birthData]);
+
+  const WINDOW_BORDER: Record<string, string> = {
+    now:'border-amber-500/30 bg-amber-500/5', near:'border-blue-500/30 bg-blue-500/5', medium:'border-violet-500/30 bg-violet-500/5',
+  };
+  const WINDOW_ACCENT: Record<string, string> = { now:'text-amber-300', near:'text-blue-300', medium:'text-violet-300' };
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <button
+        onClick={() => { if (!data && !loading) load(); setOpen(o => ({...o, __h: !o.__h})); }}
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Shield size={14} className={theme.accent} />
+          <span className={`text-sm font-medium ${theme.header}`}>🛡 Компенсаторный прогноз · 1–6 месяцев</span>
+          {data && <span className={`text-[10px] ${theme.text} opacity-40`}>{data.windows.length} окна</span>}
+        </div>
+        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+      </button>
+
+      {open.__h && (
+        <div className="border-t border-white/8 px-4 pb-4 space-y-3 pt-3">
+          {loading && (
+            <div className="py-6 text-center">
+              <RefreshCw size={18} className={`${theme.accent} animate-spin mx-auto mb-2`} />
+              <p className={`text-xs ${theme.text} opacity-50`}>Анализирую транзиты ближайших месяцев…</p>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 flex gap-2">
+              <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-300">{error}</p>
+            </div>
+          )}
+          {data && data.windows.map((win: ForecastWindow) => (
+            <div key={win.window} className={`rounded-xl border ${WINDOW_BORDER[win.window] ?? theme.card} overflow-hidden`}>
+              <button
+                onClick={() => setOpen(o => ({...o, [win.window]: !o[win.window]}))}
+                className="w-full px-3 py-2.5 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold text-sm ${WINDOW_ACCENT[win.window]}`}>{win.label}</span>
+                  <span className={`text-[10px] ${theme.text} opacity-40`}>{win.key_transits.length} транзитов</span>
+                </div>
+                {open[win.window] ? <ChevronUp size={12} className={`${theme.text} opacity-40`} /> : <ChevronDown size={12} className={`${theme.text} opacity-40`} />}
+              </button>
+
+              {open[win.window] && (
+                <div className="px-3 pb-3 space-y-2 border-t border-white/8">
+                  {win.key_transits.length > 0 && (
+                    <div className="pt-2">
+                      <p className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-40 mb-1.5`}>Ключевые транзиты</p>
+                      {win.key_transits.map((kt, i) => {
+                        const nc = NATURE_CONFIG[kt.nature] ?? NATURE_CONFIG.mixed;
+                        return (
+                          <div key={i} className={`flex items-center gap-2 text-[11px] rounded px-2 py-1 mb-1 ${nc.bg}`}>
+                            <span className={`font-bold ${nc.color}`}>{nc.icon}</span>
+                            <span className={`font-medium ${theme.header}`}>{PLANET_GL[kt.transit_planet] ?? ''} {PLANET_RU[kt.transit_planet] ?? kt.transit_planet}</span>
+                            <span className={ASPECT_COLOR[kt.aspect] ?? ''}>{ASPECT_SYM[kt.aspect] ?? ''} {ASPECT_NAME[kt.aspect] ?? kt.aspect}</span>
+                            <span className={`${theme.text} opacity-60`}>{PLANET_GL[kt.natal_planet] ?? ''} {PLANET_RU[kt.natal_planet] ?? kt.natal_planet}</span>
+                            <span className={`ml-auto text-[10px] ${kt.applying ? 'text-amber-300' : 'text-slate-400'}`}>{kt.applying ? '↗' : '↘'} {kt.orb.toFixed(1)}°</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {win.opening && (
+                    <p className={`text-[11px] italic ${theme.text} opacity-60 border-l-2 border-white/15 pl-2`}>{win.opening}</p>
+                  )}
+                  {win.active_transits.slice(0, 3).map((at, i) => {
+                    const pList = at.practices as Array<Record<string,unknown>>;
+                    if (!pList?.length) return null;
+                    const top = pList[0];
+                    return (
+                      <div key={i} className="rounded-lg bg-white/5 p-2.5">
+                        <div className={`text-[10px] font-semibold ${theme.accent} mb-1`}>
+                          {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet)} · {at.tension_signal as string}
+                        </div>
+                        <div className={`text-[11px] font-medium ${theme.header}`}>{Boolean(top.practice) && String(top.practice)}</div>
+                        {Boolean(top.why) && <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5`}>{String(top.why)}</div>}
+                        {Boolean(top.timing) && <div className="text-[10px] text-amber-300/60 mt-0.5">⏰ {String(top.timing)}</div>}
+                        {pList.length > 1 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {pList.slice(1, 3).map((pr, j) => (
+                              <li key={j} className={`text-[10px] ${theme.text} opacity-50 flex gap-1.5`}>
+                                <span className={theme.accent}>›</span>
+                                {Boolean(pr.practice) ? String(pr.practice) : String(pr)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          )}
-          {compList && (compList as Array<Record<string,unknown>>).slice(0, 3).map((c, j) => (
-            <div key={j} className="rounded-lg bg-white/5 px-2.5 py-2">
-              {Boolean(c.practice) && <div className={`text-[10px] font-medium ${theme.accent}`}>{String(c.practice)}</div>}
-              {Boolean(c.why)     && <div className={`text-[10px] ${theme.text} opacity-60 mt-0.5`}>{String(c.why)}</div>}
-            </div>
           ))}
+          {data && data.windows.length === 0 && (
+            <p className={`text-sm ${theme.text} opacity-40 text-center py-3`}>Значимых транзитов в ближайшие 6 месяцев не обнаружено</p>
+          )}
         </div>
       )}
     </div>
@@ -247,28 +457,36 @@ export default function DashboardView({ birthData, theme }: Props) {
   const firSub     = (firdaria as Record<string, Record<string,string>>)?.sub_period;
 
   // Extract profections
-  const profYear  = (profections as Record<string, number>)?.profected_house;
-  const profLord  = (profections as Record<string, string>)?.lord_of_year;
-
-  // Compensatory practices
-  const compPractices = (compensatory as Record<string, unknown[]>)?.practices ?? [];
-  const compAspects   = (compensatory as Record<string, unknown[]>)?.aspect_recommendations ?? [];
+  const profYear  = (profections as Record<string, number>)?.annual_house
+                 ?? (profections as Record<string, number>)?.profected_house;
+  const profLord  = (profections as Record<string, string>)?.annual_lord
+                 ?? (profections as Record<string, string>)?.lord_of_year;
+  const profSign  = (profections as Record<string, string>)?.annual_sign;
 
   const today = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
 
-  // VoC countdown (uses JD if available from moon response)
-  const vocEndJd = moon.is_void ? ((moon as Record<string,unknown>).void_end_jd as number | null ?? null) : null;
+  // VoC countdown
+  const vocEndJd = moon.is_void ? ((moon as Record<string,unknown>).void_end_utc as number | null ?? null) : null;
+
+  // Illumination %
+  const illumination = moon.illumination ?? Math.round(((1 - Math.cos(moon.phase_angle * Math.PI / 180)) / 2) * 100);
+
+  // Day energy label
+  const maleficCount = top_transits.filter(t => (t as Record<string,unknown>).nature === 'malefic').length;
+  const beneficCount = top_transits.filter(t => (t as Record<string,unknown>).nature === 'benefic').length;
+  const dayScore = beneficCount - maleficCount;
+  const dayLabel = dayScore >= 2 ? { text:'Благоприятный день', color:'text-emerald-400' }
+                 : dayScore <= -2 ? { text:'Напряжённый день', color:'text-red-400' }
+                 : { text:'Нейтральный день', color:'text-amber-300' };
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className={`text-base font-semibold ${theme.header}`}>
-            Дашборд · {today}
-          </h2>
-          {/* VoC badge */}
+          <h2 className={`text-base font-semibold ${theme.header}`}>Дашборд · {today}</h2>
           <VocBadge isVoid={moon.is_void} vocEndJd={vocEndJd} />
+          <span className={`text-xs font-medium ${dayLabel.color}`}>{dayLabel.text}</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Простой / Профи switcher */}
@@ -304,7 +522,7 @@ export default function DashboardView({ birthData, theme }: Props) {
             {/* Phase + sign */}
             <div className="flex items-center gap-3">
               <span className="text-4xl leading-none">{PHASE_EMOJI[moon.phase] ?? '🌙'}</span>
-              <div>
+              <div className="flex-1">
                 <div className={`text-base font-semibold ${theme.header}`}>
                   {SIGN_RU[moon.sign] ?? moon.sign} · {moon.degree.toFixed(1)}°
                 </div>
@@ -312,6 +530,15 @@ export default function DashboardView({ birthData, theme }: Props) {
                   {PHASE_RU[moon.phase] ?? moon.phase}
                 </div>
               </div>
+              <div className="text-right shrink-0">
+                <div className={`text-lg font-bold ${theme.accent}`}>{illumination}%</div>
+                <div className={`text-[10px] ${theme.text} opacity-40`}>освещ.</div>
+              </div>
+            </div>
+            {/* Illumination bar */}
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-yellow-500/60 to-yellow-300/90 transition-all duration-500"
+                style={{ width: `${illumination}%` }} />
             </div>
 
             {/* VoC status */}
@@ -358,11 +585,18 @@ export default function DashboardView({ birthData, theme }: Props) {
         </Card>
 
         {/* ── TOP TRANSITS ───────────────────────────────────────────────────── */}
-        <Card title="Ключевые транзиты дня" icon={Zap} theme={theme}>
+        <Card title="Ключевые транзиты дня" icon={Zap} theme={theme}
+          badge={
+            <div className="flex gap-1 ml-auto">
+              {beneficCount > 0 && <span className="text-[10px] text-emerald-400 font-medium">▲{beneficCount}</span>}
+              {maleficCount > 0 && <span className="text-[10px] text-red-400 font-medium ml-1">▼{maleficCount}</span>}
+            </div>
+          }
+        >
           {top_transits.length === 0 ? (
             <p className={`text-xs ${theme.text} opacity-50`}>Нет активных транзитов</p>
           ) : (
-            <div className="space-y-1">
+            <div>
               {top_transits.slice(0, isPro ? 6 : 4).map((t, i) => (
                 <TransitRow key={i} transit={t as unknown as Record<string, unknown>} theme={theme} />
               ))}
@@ -370,51 +604,15 @@ export default function DashboardView({ birthData, theme }: Props) {
           )}
         </Card>
 
-        {/* ── COMPENSATORY PRACTICES ─────────────────────────────────────────── */}
-        <Card title="Компенсаторные практики" icon={Sparkles} theme={theme}>
-          {compPractices.length === 0 && compAspects.length === 0 ? (
-            <p className={`text-xs ${theme.text} opacity-50`}>Нет рекомендаций</p>
-          ) : (
-            <div className="space-y-2">
-              {/* Aspect-based recommendations */}
-              {(compAspects as Array<Record<string,unknown>>).slice(0, 3).map((a, i) => (
-                <div key={i} className="rounded-lg bg-white/5 p-2.5 space-y-1">
-                  <div className={`text-xs font-medium ${theme.accent}`}>
-                    {String(a.planet ?? '')} {String(a.aspect ?? '')} → {String(a.compensation ?? '')}
-                  </div>
-                  {Array.isArray(a.actions) && (
-                    <ul className={`text-[11px] ${theme.text} opacity-70 space-y-0.5`}>
-                      {(a.actions as string[]).slice(0, 3).map((act, j) => (
-                        <li key={j} className="flex gap-1.5 items-start">
-                          <CheckCircle size={9} className="text-emerald-400 mt-0.5 shrink-0" />
-                          {act}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-
-              {/* Planet practices */}
-              {(compPractices as Array<Record<string,unknown>>).slice(0, 2).map((p, i) => (
-                <div key={i} className="rounded-lg bg-white/5 p-2.5">
-                  <div className={`text-[11px] font-medium ${theme.header} mb-1`}>
-                    {PLANET_RU[String(p.planet ?? '')] ?? String(p.planet ?? '')}
-                    {' '}в {SIGN_RU[String(p.sign ?? '')] ?? String(p.sign ?? '')}
-                  </div>
-                  {Array.isArray(p.practices) && (
-                    <ul className={`text-[10px] ${theme.text} opacity-60 space-y-0.5`}>
-                      {(p.practices as string[]).slice(0, 2).map((pr, j) => (
-                        <li key={j} className="flex gap-1.5">
-                          <span className={theme.accent}>›</span>{pr}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+        {/* ── COMPENSATORY PRACTICES (NOW) ────────────────────────────────────── */}
+        <Card title="Компенсаторика сейчас" icon={Sparkles} theme={theme}
+          badge={
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 text-amber-300 ml-auto">
+              активные транзиты
+            </span>
+          }
+        >
+          <CompensatoryNow comp={compensatory as unknown as Record<string,unknown>} theme={theme} />
         </Card>
 
         {/* ── FIRDARIA + PROFECTIONS ─────────────────────────────────────────── */}
@@ -422,21 +620,22 @@ export default function DashboardView({ birthData, theme }: Props) {
           <div className="space-y-3">
             {/* Firdaria */}
             {firPeriod ? (
-              <div>
-                <div className="text-[10px] text-violet-400 font-medium uppercase tracking-wide mb-1">
-                  Фирдарий
-                </div>
-                <div className={`text-sm font-semibold ${theme.header}`}>
-                  {PLANET_RU[firPeriod.planet ?? ''] ?? firPeriod.planet ?? '—'}
+              <div className="rounded-lg bg-violet-500/8 border border-violet-500/20 p-3">
+                <div className="text-[10px] text-violet-400 font-semibold uppercase tracking-wide mb-1">Фирдарий</div>
+                <div className={`text-sm font-bold ${theme.header}`}>
+                  {PLANET_GL[firPeriod.planet ?? ''] ?? ''} {PLANET_RU[firPeriod.planet ?? ''] ?? firPeriod.planet ?? '—'}
                 </div>
                 {firPeriod.start && firPeriod.end && (
-                  <div className={`text-[11px] ${theme.text} opacity-60`}>
-                    {firPeriod.start} — {firPeriod.end}
-                  </div>
+                  <div className={`text-[11px] ${theme.text} opacity-50`}>{firPeriod.start} – {firPeriod.end}</div>
                 )}
                 {firSub && (
                   <div className={`text-[11px] ${theme.accent} mt-1`}>
-                    Суб-период: {PLANET_RU[firSub.planet ?? ''] ?? firSub.planet}
+                    Суб-период: {PLANET_GL[firSub.planet ?? ''] ?? ''} {PLANET_RU[firSub.planet ?? ''] ?? firSub.planet}
+                  </div>
+                )}
+                {firPeriod.planet && PLANET_FIRD_INTERP[firPeriod.planet] && (
+                  <div className={`text-[10px] ${theme.text} opacity-55 mt-1.5 italic`}>
+                    → {PLANET_FIRD_INTERP[firPeriod.planet]}
                   </div>
                 )}
               </div>
@@ -446,16 +645,20 @@ export default function DashboardView({ birthData, theme }: Props) {
 
             {/* Profections */}
             {profYear ? (
-              <div className="border-t border-white/10 pt-3">
-                <div className="text-[10px] text-amber-400 font-medium uppercase tracking-wide mb-1">
-                  Профекция
-                </div>
-                <div className={`text-sm font-semibold ${theme.header}`}>
-                  {profYear}-й дом
+              <div className="rounded-lg bg-amber-500/8 border border-amber-500/20 p-3">
+                <div className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide mb-1">Профекция года</div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-2xl font-bold ${theme.accent}`}>Дом {profYear}</span>
+                  {profSign && <span className={`text-sm ${theme.text} opacity-60`}>{SIGN_RU[profSign] ?? profSign}</span>}
                 </div>
                 {profLord && (
-                  <div className={`text-xs ${theme.accent}`}>
-                    Лорд года: {PLANET_RU[profLord] ?? profLord}
+                  <div className={`text-xs ${theme.header} mt-0.5`}>
+                    Лорд: {PLANET_GL[profLord] ?? ''} {PLANET_RU[profLord] ?? profLord}
+                  </div>
+                )}
+                {profYear && HOUSE_THEME[profYear] && (
+                  <div className={`text-[10px] ${theme.text} opacity-55 mt-1.5 italic`}>
+                    → тема года: {HOUSE_THEME[profYear]}
                   </div>
                 )}
               </div>
@@ -492,7 +695,12 @@ export default function DashboardView({ birthData, theme }: Props) {
           />
         </div>
 
-        {/* ── GLOBAL ASTRO BACKGROUND (Sprint 6) ──────────────────────────────── */}
+        {/* ── COMPENSATORY FORECAST (lazy 3-window) ──────────────────────────── */}
+        <div className="md:col-span-2 xl:col-span-3">
+          <CompensatoryForecast birthData={birthData} theme={theme} />
+        </div>
+
+        {/* ── GLOBAL ASTRO BACKGROUND ──────────────────────────────────────────── */}
         <div className="md:col-span-2 xl:col-span-3">
           <GlobalAstroPanel theme={theme} />
         </div>

@@ -1381,9 +1381,32 @@ def dashboard(req: DashboardRequest):
             transit_planets_dict = {}
             transit_result = {}
 
-        # Sort by orb, take top 5
-        raw_aspects.sort(key=lambda a: a.get("orb", 99))
-        top_transits = raw_aspects[:5]
+        # Sort by significance: applying first, then outer planets, then orb
+        _OUTER_RANK = {"jupiter": 0, "saturn": 1, "uranus": 2, "neptune": 3, "pluto": 4,
+                       "mars": 5, "sun": 6, "mercury": 7, "venus": 8, "moon": 9}
+        _HARD_ASP = {"conjunction", "opposition", "square"}
+        _BENEFIC_PL = {"jupiter", "venus"}
+        _MALEFIC_PL = {"saturn", "mars", "pluto", "uranus", "neptune"}
+        _BENEFIC_ASP = {"trine", "sextile"}
+
+        def _transit_nature(tp, np_, asp):
+            if tp in _BENEFIC_PL and asp in _BENEFIC_ASP: return "benefic"
+            if tp in _MALEFIC_PL and asp in _HARD_ASP:    return "malefic"
+            if tp in _BENEFIC_PL and asp == "conjunction": return "mixed"
+            if tp in _MALEFIC_PL and asp in _BENEFIC_ASP:  return "mixed"
+            return "mixed"
+
+        raw_aspects.sort(key=lambda a: (
+            not a.get("applying", False),
+            _OUTER_RANK.get(a.get("transit_planet", ""), 10),
+            a.get("orb", 99),
+        ))
+        top_transits = [
+            {**a, "nature": _transit_nature(a.get("transit_planet",""),
+                                              a.get("natal_planet",""),
+                                              a.get("aspect",""))}
+            for a in raw_aspects[:6]
+        ]
 
         # ── Moon status ───────────────────────────────────────────────────────
         jd_target = _to_jd(target_date, req.target_time, req.utc)
@@ -1401,12 +1424,14 @@ def dashboard(req: DashboardRequest):
 
         voc = void_of_course_moon(jd_target, look_ahead_days=2.0)
         mansion = lunar_mansion_full(moon_lon)
+        illumination = round(((1 - math.cos(math.radians(phase_angle))) / 2) * 100, 1)
 
         moon_status = {
             "sign":           sign_name(moon_lon),
             "degree":         round(moon_lon % 30, 2),
             "phase":          phase,
             "phase_angle":    round(phase_angle, 1),
+            "illumination":   illumination,
             "is_void":        voc.get("is_void", False),
             "void_end_sign":  voc.get("void_end_sign"),
             "void_end_utc":   voc.get("void_end_jd"),
@@ -1452,7 +1477,6 @@ def dashboard(req: DashboardRequest):
         # ── Compensatory recommendations for top transits ─────────────────────
         try:
             from astro_compensatory import build_compensatory_report
-            # Build minimal chart-like dicts for compensatory engine
             _natal_for_comp = natal
             _transit_for_comp = {
                 "planets": {
@@ -1461,8 +1485,18 @@ def dashboard(req: DashboardRequest):
                 }
             }
             comp_report = build_compensatory_report(
-                _natal_for_comp, _transit_for_comp, raw_aspects[:5], target_date,
+                _natal_for_comp, _transit_for_comp, raw_aspects[:6], target_date,
             )
+            # Attach per-transit compensatory hint to top_transits
+            _planet_to_comp: dict = {_at.get("planet",""): _at
+                                      for _at in comp_report.get("active_transits", [])}
+            for _t in top_transits:
+                _at = _planet_to_comp.get(_t.get("transit_planet",""))
+                if _at:
+                    _t["compensatory_hint"] = {
+                        "tension_signal": _at.get("tension_signal",""),
+                        "top_practice": _at.get("practices", [{}])[0] if _at.get("practices") else None,
+                    }
         except Exception:
             comp_report = {}
 
@@ -2211,6 +2245,112 @@ def annual_profection(req: PredictiveRequest):
         raise
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ── COMPENSATORY FORECAST ──────────────────────────────────────────────────────
+
+@app.post("/predictive/compensatory-forecast")
+def compensatory_forecast(req: PredictiveRequest):
+    """Proactive compensatory forecast for the next 1–6 months.
+
+    Scans 3 time windows (now, +45d, +135d) for significant slow-planet
+    transits to natal personal planets, then returns compensatory practices
+    grouped by window so the user can act before the transit peaks.
+    """
+    from astro_compensatory import build_compensatory_report as _bcr
+    from datetime import timedelta, date as _date
+
+    natal_jd = _to_jd(req.date, req.time, req.utc)
+    today_d  = datetime.now(timezone.utc).date()
+
+    windows_spec = [
+        ("now",    today_d,                          "Сейчас (0–30 дней)"),
+        ("near",   today_d + timedelta(days=45),     "Ближайшие 1–3 месяца"),
+        ("medium", today_d + timedelta(days=135),    "Через 3–6 месяцев"),
+    ]
+
+    # Significance filter
+    _OUTER     = {"jupiter","saturn","uranus","neptune","pluto","chiron","node"}
+    _PERSONAL  = {"sun","moon","mercury","venus","mars","asc","mc","node"}
+    _HARD_ASPS = {"conjunction","opposition","square"}
+    _SOFT_ASPS = {"trine","sextile"}
+
+    def _nature(tp, asp):
+        if tp in {"jupiter","venus"} and asp in _SOFT_ASPS:  return "benefic"
+        if tp in {"saturn","mars","pluto"} and asp in _HARD_ASPS: return "malefic"
+        return "mixed"
+
+    yr_n, mo_n, dy_n = _parse_date(req.date)
+    h_n, mi_n, sc_n  = _parse_time(req.time)
+    natal_chart = calc_chart(
+        yr_n, mo_n, dy_n, h_n, mi_n, sc_n,
+        req.lat, req.lon, req.utc,
+        houses_system=req.houses, include_aspects=False, include_dignities=True,
+    )
+
+    result_windows = []
+    for win_key, win_date, win_label in windows_spec:
+        sample_date_str = win_date.isoformat()
+        try:
+            tr_result = transits(
+                natal_jd, sample_date_str, "12:00",
+                lat=req.lat, lon=req.lon,
+                transit_orb_major=3.5, transit_orb_minor=1.5,
+            )
+            aspects = tr_result.get("aspects", [])
+            sig = [
+                a for a in aspects
+                if a["transit_planet"] in _OUTER and a["natal_planet"] in _PERSONAL
+            ]
+            # Hard aspects first, then soft, then by orb
+            sig.sort(key=lambda a: (
+                a["aspect"] not in _HARD_ASPS,
+                not a.get("applying", False),
+                a.get("orb", 99),
+            ))
+
+            # Build transit chart (minimal) for compensatory engine
+            tr_chart = {
+                "planets": {
+                    p: {"longitude": d["lon"], "sign": d.get("sign","")}
+                    for p, d in tr_result.get("transit_planets", {}).items()
+                }
+            }
+            comp = _bcr(natal_chart, tr_chart, sig[:5], sample_date_str)
+
+            # Build human-readable key transits
+            key_transits = []
+            for a in sig[:5]:
+                key_transits.append({
+                    "transit_planet": a["transit_planet"],
+                    "natal_planet":   a["natal_planet"],
+                    "aspect":         a["aspect"],
+                    "orb":            round(a["orb"], 2),
+                    "applying":       a.get("applying", False),
+                    "transit_sign":   a.get("transit_sign",""),
+                    "natal_sign":     a.get("natal_sign",""),
+                    "nature":         _nature(a["transit_planet"], a["aspect"]),
+                })
+
+            result_windows.append({
+                "window":          win_key,
+                "label":           win_label,
+                "sample_date":     sample_date_str,
+                "key_transits":    key_transits,
+                "active_transits": comp.get("active_transits", []),
+                "aspect_pairs":    comp.get("aspect_pairs", []),
+                "opening":         comp.get("opening", ""),
+                "background":      comp.get("background", {}),
+            })
+        except Exception:
+            continue
+
+    return _present({
+        "type":          "compensatory_forecast",
+        "natal_date":    req.date,
+        "windows":       result_windows,
+        "horizon_months": 6,
+    })
 
 
 @app.post("/predictive/firdaria")
