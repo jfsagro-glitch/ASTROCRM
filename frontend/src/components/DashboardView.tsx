@@ -49,11 +49,14 @@ const SIGN_RU: Record<string, string> = {
 const PLANET_GL: Record<string, string> = {
   sun:'☀', moon:'☽', mercury:'☿', venus:'♀', mars:'♂', jupiter:'♃',
   saturn:'♄', uranus:'⛢', neptune:'♆', pluto:'♇', node:'☊', chiron:'⚷',
+  lilith:'⚸', asc:'AC', mc:'MC', dc:'DC', ic:'IC', southnode:'☋', ceres:'⚳',
 };
 const PLANET_RU: Record<string, string> = {
   sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
   mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
   neptune: 'Нептун', pluto: 'Плутон', node: 'Узел', chiron: 'Хирон',
+  lilith: 'Лилит', asc: 'Асц', mc: 'MC', dc: 'Десц', ic: 'IC',
+  southnode: 'Ю.Узел', ceres: 'Церера',
 };
 const PLANET_FIRD_INTERP: Record<string, string> = {
   sun:     'фокус на самореализации, лидерстве и витальности',
@@ -76,11 +79,17 @@ const HOUSE_THEME: Record<number, string> = {
 
 const ASPECT_SYM: Record<string, string> = {
   conjunction:'☌', opposition:'☍', trine:'△', square:'□',
-  sextile:'⚹', quincunx:'⚻',
+  sextile:'⚹', quincunx:'⚻', semisextile:'⌲', semisquare:'∠',
+  sesquiquadrate:'⌓', sesquisquare:'⌓', biquintile:'⬡', quintile:'⬠',
+  novile:'⬟', semi_square:'∠', bi_quintile:'⬡',
 };
 const ASPECT_NAME: Record<string, string> = {
   conjunction:'соединение', opposition:'оппозиция', trine:'трин',
   square:'квадрат', sextile:'секстиль', quincunx:'квиникункс',
+  semisextile:'полусекстиль', semisquare:'полуквадрат',
+  sesquiquadrate:'полутораквадрат', sesquisquare:'полутораквадрат',
+  biquintile:'биквинтиль', quintile:'квинтиль', novile:'новиль',
+  semi_square:'полуквадрат', bi_quintile:'биквинтиль',
 };
 
 const ASPECT_COLOR: Record<string, string> = {
@@ -93,7 +102,7 @@ const ASPECT_COLOR: Record<string, string> = {
 const NATURE_CONFIG = {
   benefic: { label:'Благоприятный', color:'text-emerald-400', bg:'bg-emerald-500/10 border-emerald-500/30', icon:'▲' },
   malefic: { label:'Напряжённый',   color:'text-red-400',     bg:'bg-red-500/10 border-red-500/30',         icon:'▼' },
-  mixed:   { label:'Смешанный',     color:'text-amber-400',   bg:'bg-amber-500/10 border-amber-500/30',     icon:'◈' },
+  mixed:   { label:'Смешанный',     color:'text-amber-400',   bg:'bg-amber-500/10 border-amber-500/30',     icon:'~' },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -199,22 +208,20 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
       </button>
 
       {expanded && hint?.top_practice && (
-        <div className="px-3 pb-3 pt-1 border-t border-white/8">
-          <div className={`text-[10px] font-semibold ${cfg.color} mb-1`}>
-            <Sparkles size={9} className="inline mr-1" />Компенсаторика
-          </div>
+        <div className="px-3 pb-3 pt-2 border-t border-white/8 space-y-0.5">
           {Boolean(hint.top_practice['practice']) && (
-            <div className={`text-[11px] ${theme.header} font-medium`}>
+            <div className={`text-[11px] ${theme.header} font-medium flex gap-1.5`}>
+              <Sparkles size={9} className={`${cfg.color} mt-0.5 shrink-0`} />
               {String(hint.top_practice['practice'])}
             </div>
           )}
           {Boolean(hint.top_practice['why']) && (
-            <div className={`text-[10px] ${theme.text} opacity-60 mt-0.5`}>
+            <div className={`text-[10px] ${theme.text} opacity-55 pl-4`}>
               {String(hint.top_practice['why'])}
             </div>
           )}
           {Boolean(hint.top_practice['timing']) && (
-            <div className="text-[10px] text-amber-300/70 mt-0.5">
+            <div className="text-[10px] text-amber-300/60 pl-4">
               ⏰ {String(hint.top_practice['timing'])}
             </div>
           )}
@@ -729,9 +736,14 @@ const SIGN_RU_G: Record<string, string> = {
 const ASP_COLOR_G: Record<string, string> = {
   conjunction: 'text-violet-400', opposition: 'text-orange-400',
   trine: 'text-blue-400', square: 'text-red-400', sextile: 'text-cyan-400',
+  quincunx: 'text-amber-400', semisquare: 'text-rose-400', sesquiquadrate: 'text-rose-400',
+  sesquisquare: 'text-rose-400', biquintile: 'text-purple-400', quintile: 'text-purple-400',
+  semi_square: 'text-rose-400', bi_quintile: 'text-purple-400',
 };
 const ASP_RU_G: Record<string, string> = {
   conjunction: '☌', opposition: '☍', trine: '△', square: '□', sextile: '⚹',
+  quincunx: '⚻', semisquare: '∠', sesquiquadrate: '⌓', sesquisquare: '⌓',
+  biquintile: '⬡', quintile: '⬠', semi_square: '∠', bi_quintile: '⬡',
 };
 
 function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
