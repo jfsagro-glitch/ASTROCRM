@@ -1535,17 +1535,71 @@ def dashboard(req: DashboardRequest):
             except Exception:
                 extra["saturn_cycle"] = {}
 
+        # ── Retrograde transiting planets ─────────────────────────────────────
+        retrograde_planets = []
+        for pname, pdata in transit_result.get("transit_planets", {}).items():
+            if isinstance(pdata, dict) and pdata.get("retrograde", False):
+                retrograde_planets.append({
+                    "planet": pname,
+                    "sign": pdata.get("sign", ""),
+                    "degree": round(pdata.get("lon", 0) % 30, 1),
+                })
+
+        # ── Day score 0-100 ────────────────────────────────────────────────────
+        benefic_pts = sum(1 for t in top_transits if t.get("nature") == "benefic")
+        malefic_pts = sum(1 for t in top_transits if t.get("nature") == "malefic")
+        mixed_pts   = sum(0.3 for t in top_transits if t.get("nature") == "mixed")
+        raw_score = 50 + benefic_pts * 8 - malefic_pts * 8 + mixed_pts * 2
+        day_score = max(15, min(95, round(raw_score)))
+
+        # ── Sphere scores ──────────────────────────────────────────────────────
+        SPHERE_PLANET_WEIGHT = {
+            "love":     {"venus": 20, "mars": 10, "moon": 12, "jupiter": 8},
+            "work":     {"mercury": 18, "sun": 12, "saturn": 10, "mars": 8, "jupiter": 10},
+            "finance":  {"venus": 12, "jupiter": 20, "saturn": 8, "pluto": -8, "mercury": 8},
+            "health":   {"sun": 12, "moon": 10, "mars": 8, "saturn": -8},
+            "creative": {"venus": 15, "neptune": 15, "mercury": 10, "uranus": 10, "moon": 8},
+        }
+        ASPECT_MULT = {"trine": 1.0, "sextile": 0.7, "conjunction": 0.8, "square": -0.8, "opposition": -0.9, "quincunx": -0.3}
+
+        sphere_scores = {}
+        for sphere, weights in SPHERE_PLANET_WEIGHT.items():
+            base = 55
+            for t in top_transits:
+                tp = t.get("transit_planet", "")
+                asp = t.get("aspect", "")
+                if tp in weights:
+                    base += weights[tp] * ASPECT_MULT.get(asp, 0.2)
+            sphere_scores[sphere] = max(10, min(95, round(base)))
+
+        # ── Next lunation ──────────────────────────────────────────────────────
+        from datetime import date as _d, timedelta as _td
+        _pa = phase_angle
+        next_full_moon_days = round((180 - _pa) % 360 / 12.19, 0) if _pa < 180 else round((360 + 180 - _pa) % 360 / 12.19, 0)
+        next_new_moon_days  = round((360 - _pa) % 360 / 12.19, 0)
+        _today_date = _d.fromisoformat(target_date)
+        next_lunation = {
+            "full_moon":    str(_today_date + _td(days=int(next_full_moon_days))),
+            "new_moon":     str(_today_date + _td(days=int(next_new_moon_days))),
+            "days_to_full": int(next_full_moon_days),
+            "days_to_new":  int(next_new_moon_days),
+        }
+
         return _present({
-            "target_date":    target_date,
-            "depth":          req.depth,
-            "moon":           moon_status,
-            "top_transits":   top_transits,
-            "compensatory":   comp_report,
-            "firdaria":       firdaria_data,
-            "profections":    prof_data,
-            "fortune_today":  fortune_lot,
-            "arabic_natal":   natal.get("arabic_parts", {}),
-            "chart_analysis": chart_analysis,
+            "target_date":         target_date,
+            "depth":               req.depth,
+            "moon":                moon_status,
+            "top_transits":        top_transits,
+            "compensatory":        comp_report,
+            "firdaria":            firdaria_data,
+            "profections":         prof_data,
+            "fortune_today":       fortune_lot,
+            "arabic_natal":        natal.get("arabic_parts", {}),
+            "chart_analysis":      chart_analysis,
+            "retrograde_planets":  retrograde_planets,
+            "day_score":           day_score,
+            "sphere_scores":       sphere_scores,
+            "next_lunation":       next_lunation,
             **extra,
         })
     except HTTPException:

@@ -1,10 +1,12 @@
 // ─── DashboardView — Bento-grid daily dashboard ───────────────────────────────
-// Shows: Moon card, top 3 transits w/ compensatory, firdaria, profections,
-// fortune lot, 7-day lunar mini-calendar.
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+// Shows: HeroCard (score + sphere bars + retrogrades), Moon card, key transits,
+// upcoming events, firdaria/profections, fortune lot, planet positions, 7-day
+// lunar mini-calendar, compensatory forecast, global astro panel.
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Moon, Star, Zap, TrendingUp, Sparkles, Shield,
   AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp, AlertCircle,
+  Calendar, Globe,
 } from 'lucide-react';
 import {
   getDashboard, getDailyGlobal, getCompensatoryForecast,
@@ -24,6 +26,15 @@ interface ThemeLike {
 interface Props {
   birthData: BirthInput;
   theme: ThemeLike;
+}
+
+// ─── isDark helper ────────────────────────────────────────────────────────────
+function _isDark(theme: ThemeLike): boolean {
+  return theme.card.includes('bg-gray-9') || theme.card.includes('bg-slate-9')
+    || theme.card.includes('bg-zinc-9') || theme.card.includes('bg-neutral-9')
+    || theme.card.includes('border-white') || theme.card.includes('bg-gray-8')
+    || theme.header.includes('text-white') || theme.text.includes('text-gray-3')
+    || theme.text.includes('text-slate-3') || theme.text.includes('text-white');
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,6 +116,85 @@ const NATURE_CONFIG = {
   mixed:   { label:'Смешанный',     color:'text-amber-400',   bg:'bg-amber-500/10 border-amber-500/30',     icon:'~' },
 };
 
+// ─── Day narrative ────────────────────────────────────────────────────────────
+const DAY_NARRATIVES: Record<string, string[]> = {
+  high: [
+    'Небо работает на вас — используйте каждый час.',
+    'Юпитер расчищает путь. Действуйте смело.',
+    'Такие дни бывают раз в месяц. Не сидите дома.',
+  ],
+  mid: [
+    'День без особого попутного ветра — чистая личная воля.',
+    'Планеты нейтральны. Всё, что получится — вашими руками.',
+    'Тихий фон: хорошо для глубокой работы, плохо для стартов.',
+  ],
+  low: [
+    'Давление есть — это не сигнал остановиться, а сигнал замедлиться.',
+    'Напряжённый фон. Важные решения — не сегодня.',
+    'Сохраняйте силы. Конфликты сейчас стоят дороже.',
+  ],
+};
+
+function getDayNarrative(score: number): string {
+  const pool = score >= 65 ? DAY_NARRATIVES.high : score <= 40 ? DAY_NARRATIVES.low : DAY_NARRATIVES.mid;
+  return pool[new Date().getDate() % pool.length];
+}
+
+// ─── Retrograde meanings ──────────────────────────────────────────────────────
+const RETRO_MEANING: Record<string, string> = {
+  mercury: 'пересмотр планов, техника капризна',
+  venus:   'прошлое в отношениях всплывает',
+  mars:    'энергия уходит внутрь, не во вне',
+  jupiter: 'расширение через переосмысление',
+  saturn:  'уроки прошлых ограничений',
+  uranus:  'революция ревизии',
+  neptune: 'иллюзии обнажаются',
+  pluto:   'власть переосмысливается',
+};
+
+// ─── Transit quick theme ──────────────────────────────────────────────────────
+const TRANSIT_QUICK_THEME: Partial<Record<string, Partial<Record<string, string>>>> = {
+  jupiter: { conjunction: 'расширение и рост', trine: 'попутный ветер удачи', sextile: 'возможность', square: 'рост через преодоление', opposition: 'баланс и поиск меры' },
+  saturn:  { conjunction: 'структурный экзамен', trine: 'плоды дисциплины', square: 'ограничение → рост', opposition: 'проверка зрелости' },
+  mars:    { conjunction: 'мощный импульс', trine: 'энергия в ресурсе', square: 'трение → действие', opposition: 'конкуренция / конфликт' },
+  venus:   { conjunction: 'притяжение', trine: 'гармония', square: 'проверка ценностей', sextile: 'приятное совпадение' },
+  mercury: { conjunction: 'ясность мышления', trine: 'договорённости идут', square: 'путаница в словах', opposition: 'точки зрения расходятся' },
+  moon:    { conjunction: 'эмоциональный пик', trine: 'интуиция работает', square: 'перепады настроения', opposition: 'зеркало чувств' },
+  uranus:  { conjunction: 'неожиданный поворот', trine: 'прорыв', square: 'нестабильность' },
+  neptune: { conjunction: 'туман / вдохновение', trine: 'интуиция / мистика', square: 'иллюзии' },
+  pluto:   { conjunction: 'трансформация', trine: 'глубина', square: 'контроль / кризис' },
+};
+
+// ─── Firdaria narrative ───────────────────────────────────────────────────────
+const FIRDARIA_NARRATIVE: Record<string, string> = {
+  sun:     'Ваш солнечный период: пора самовыражения, лидерства, признания. Собирайте плоды — если сеяли.',
+  moon:    'Лунный цикл: всё внутреннее выходит наружу. Семья, дом, интуиция, прошлое.',
+  mercury: 'Меркурианское время: переговоры, обучение, связи. Слова решают больше, чем действия.',
+  venus:   'Венерианский период: отношения, деньги, творчество. Жизнь становится красивее — если вложить усилие.',
+  mars:    'Марсианский цикл: энергия высокая, конкуренция жёсткая. Побеждает дисциплина, не импульс.',
+  jupiter: 'Период Юпитера: расширение, рост, удача, смысл. Один из лучших периодов жизни — если не транжирить.',
+  saturn:  'Сатурнианский цикл: уроки, ограничения, строительство. Медленно, но навсегда.',
+  uranus:  'Уранический период: перемены без предупреждения. Гибкость — ваш главный навык.',
+  neptune: 'Нептунианское время: растворение старого, духовный поиск. Искусство и интуиция в ресурсе.',
+  pluto:   'Плутонианский цикл: трансформация в глубину. Умирает то, что изжило. Рождается то, что настоящее.',
+};
+
+// ─── Fortune sign interpretations ────────────────────────────────────────────
+const FORTUNE_SIGN_INTERP: Record<string, string> = {
+  aries:       'Удача приходит через действие и инициативу — не через ожидание.',
+  taurus:      'Фортуна улыбается терпеливым. Деньги идут к тем, кто строит медленно.',
+  gemini:      'Везение в словах, связях и информации. Нужный человек — рядом.',
+  cancer:      'Удача приходит через заботу и семейные связи.',
+  leo:         'Фортуна любит тех, кто выходит на сцену. Не прячьтесь.',
+  virgo:       'Везение — в деталях и мастерстве. Делайте лучше других.',
+  libra:       'Удача через партнёрство. Правильный союз — ключ к фортуне.',
+  scorpio:     'Фортуна скрыта. Ищите возможности там, где другие боятся смотреть.',
+  sagittarius: 'Везение в дальних горизонтах. Путешествуйте, учитесь, расширяйтесь.',
+  capricorn:   'Удача приходит к тем, кто работает, когда другие отдыхают.',
+  aquarius:    'Фортуна в неожиданных связях и нестандартных решениях.',
+  pisces:      'Интуиция — ваш навигатор к удаче. Слушайте сны и предчувствия.',
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Card({ title, icon: Icon, children, className = '', theme, badge }: {
@@ -124,12 +214,12 @@ function Card({ title, icon: Icon, children, className = '', theme, badge }: {
 }
 
 // ─── VoC countdown hook ───────────────────────────────────────────────────────
-function useVocCountdown(vocEndJd: number | null): string | null {  const [label, setLabel] = useState<string | null>(null);
+function useVocCountdown(vocEndJd: number | null): string | null {
+  const [label, setLabel] = useState<string | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!vocEndJd) { setLabel(null); return; }
-    // JD to unix ms: (JD - 2440587.5) * 86400000
     const endMs = (vocEndJd - 2440587.5) * 86400000;
 
     function tick() {
@@ -159,6 +249,246 @@ function VocBadge({ isVoid, vocEndJd }: { isVoid: boolean; vocEndJd: number | nu
   );
 }
 
+// ─── CircularScore — SVG ring ─────────────────────────────────────────────────
+function CircularScore({ score, isDark }: { score: number; isDark: boolean }) {
+  const r = 36, cx = 44, cy = 44;
+  const circumference = 2 * Math.PI * r;
+  const dash = (score / 100) * circumference;
+  const color = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
+  return (
+    <div className="relative w-[88px] h-[88px] shrink-0">
+      <svg width="88" height="88" className="-rotate-90">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="6"
+          strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-bold leading-none" style={{ color }}>{score}</span>
+        <span className="text-[9px] opacity-40 leading-none mt-0.5" style={{ color: isDark ? 'white' : '#333' }}>/ 100</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── SphereMini ───────────────────────────────────────────────────────────────
+function SphereMini({ emoji, label, score, isDark }: { emoji: string; label: string; score: number; isDark: boolean }) {
+  const color = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="text-base shrink-0">{emoji}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className={`text-[10px] ${isDark ? 'text-white/50' : 'text-gray-500'}`}>{label}</span>
+          <span className="text-[10px] font-bold" style={{ color }}>{score}</span>
+        </div>
+        <div className={`h-1 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200'} overflow-hidden`}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, backgroundColor: color }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── HeroCard — full-width first block ───────────────────────────────────────
+function HeroCard({ data, theme, isDark }: { data: DashboardData; theme: ThemeLike; isDark: boolean }) {
+  const score = data.day_score ?? 50;
+  const narrative = getDayNarrative(score);
+  const spheres = data.sphere_scores;
+  const retros = data.retrograde_planets ?? [];
+  const vocEndJd = data.moon.is_void ? ((data.moon as Record<string,unknown>).void_end_utc as number | null ?? null) : null;
+
+  const today = new Date();
+  const weekday = today.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const dateStr = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+  const scoreColor = score >= 65 ? 'text-emerald-400' : score <= 40 ? 'text-red-400' : 'text-amber-400';
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className="p-5">
+        <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
+
+          {/* Left: date + badges + narrative */}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-lg font-bold ${theme.header} capitalize`}>{weekday},</span>
+              <span className={`text-lg font-bold ${theme.header}`}>{dateStr}</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <VocBadge isVoid={data.moon.is_void} vocEndJd={vocEndJd} />
+              {retros.slice(0, 3).map(r => (
+                <span key={r.planet} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 font-medium">
+                  ⟲ {PLANET_RU[r.planet] ?? r.planet}
+                </span>
+              ))}
+              <span className={`text-xs font-semibold ${scoreColor}`}>
+                {score >= 65 ? 'Благоприятный день' : score <= 40 ? 'Напряжённый день' : 'Нейтральный день'}
+              </span>
+            </div>
+            <p className={`text-sm italic ${theme.text} opacity-70 leading-relaxed`}>
+              {narrative}
+            </p>
+          </div>
+
+          {/* Center: circular score */}
+          <div className="flex flex-col items-center gap-1.5 shrink-0">
+            <CircularScore score={score} isDark={isDark} />
+            <span className={`text-[10px] ${theme.text} opacity-40 text-center`}>энергия дня</span>
+          </div>
+
+          {/* Right: sphere bars */}
+          {spheres && (
+            <div className="flex flex-col gap-2 w-full sm:w-44 shrink-0">
+              <SphereMini emoji="❤️" label="Любовь" score={spheres.love} isDark={isDark} />
+              <SphereMini emoji="💼" label="Работа" score={spheres.work} isDark={isDark} />
+              <SphereMini emoji="💰" label="Финансы" score={spheres.finance} isDark={isDark} />
+              <SphereMini emoji="🌿" label="Здоровье" score={spheres.health} isDark={isDark} />
+              <SphereMini emoji="🎨" label="Творчество" score={spheres.creative} isDark={isDark} />
+            </div>
+          )}
+        </div>
+
+        {/* Retrogrades detail row */}
+        {retros.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/8">
+            <div className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-30 mb-2`}>Ретроградные планеты</div>
+            <div className="flex flex-wrap gap-2">
+              {retros.map(r => (
+                <div key={r.planet} className="flex items-center gap-1.5 rounded-lg bg-violet-500/8 border border-violet-500/20 px-2.5 py-1.5">
+                  <span className="text-violet-300 font-bold text-xs">⟲</span>
+                  <span className={`text-xs font-semibold ${theme.header}`}>
+                    {PLANET_GL[r.planet] ?? ''} {PLANET_RU[r.planet] ?? r.planet}
+                  </span>
+                  <span className={`text-[10px] ${theme.text} opacity-50`}>
+                    {SIGN_RU[r.sign] ?? r.sign} {r.degree}°
+                  </span>
+                  {RETRO_MEANING[r.planet] && (
+                    <span className={`text-[10px] italic ${theme.text} opacity-40`}>— {RETRO_MEANING[r.planet]}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── UpcomingEventsCard ───────────────────────────────────────────────────────
+function UpcomingEventsCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
+  const lunation = data.next_lunation;
+  const retros = data.retrograde_planets ?? [];
+  const vocEndJd = data.moon.is_void ? ((data.moon as Record<string,unknown>).void_end_utc as number | null ?? null) : null;
+
+  const events: Array<{ emoji: string; label: string; sub: string; color: string }> = [];
+
+  if (lunation && lunation.days_to_full <= 14) {
+    events.push({
+      emoji: '🌕',
+      label: `Полнолуние через ${lunation.days_to_full} дн.`,
+      sub: lunation.full_moon,
+      color: 'bg-yellow-500/10 border-yellow-500/25 text-yellow-300',
+    });
+  }
+  if (lunation && lunation.days_to_new <= 14) {
+    events.push({
+      emoji: '🌑',
+      label: `Новолуние через ${lunation.days_to_new} дн.`,
+      sub: lunation.new_moon,
+      color: 'bg-slate-500/15 border-slate-500/25 text-slate-300',
+    });
+  }
+  if (retros.length > 0) {
+    events.push({
+      emoji: '⟲',
+      label: `Ретро: ${retros.map(r => PLANET_RU[r.planet] ?? r.planet).join(', ')}`,
+      sub: 'переосмысление и пересмотр',
+      color: 'bg-violet-500/10 border-violet-500/25 text-violet-300',
+    });
+  }
+  if (data.moon.is_void) {
+    const countdown = vocEndJd ? '' : '';
+    events.push({
+      emoji: '🌙',
+      label: `Луна Пустого Хода`,
+      sub: data.moon.void_end_sign ? `→ до ${SIGN_RU[data.moon.void_end_sign] ?? data.moon.void_end_sign}` : (countdown || 'активен'),
+      color: 'bg-amber-500/10 border-amber-500/25 text-amber-300',
+    });
+  }
+
+  if (events.length === 0) return null;
+
+  return (
+    <Card title="Ближайшие события" icon={Calendar} theme={theme}>
+      <div className="grid grid-cols-1 gap-2">
+        {events.map((ev, i) => (
+          <div key={i} className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${ev.color}`}>
+            <span className="text-lg leading-none shrink-0">{ev.emoji}</span>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold leading-tight">{ev.label}</div>
+              <div className="text-[10px] opacity-60 mt-0.5">{ev.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ─── PlanetPositionsCard — compact planet grid (Pro) ──────────────────────────
+function PlanetPositionsCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
+  const retros = data.retrograde_planets ?? [];
+  const retroSet = new Set(retros.map(r => r.planet));
+
+  // Build unique planet list from top_transits
+  const transitPlanets = useMemo(() => {
+    const seen = new Set<string>();
+    return (data.top_transits as Array<Record<string, unknown>>).reduce<Array<{planet: string}>>((acc, t) => {
+      const p = t.transit_planet as string;
+      if (p && !seen.has(p)) { seen.add(p); acc.push({ planet: p }); }
+      return acc;
+    }, []);
+  }, [data.top_transits]);
+
+  // Also add retrogrades not in top_transits
+  retros.forEach(r => {
+    if (!transitPlanets.find(tp => tp.planet === r.planet)) {
+      transitPlanets.push({ planet: r.planet });
+    }
+  });
+
+  if (transitPlanets.length === 0) return null;
+
+  return (
+    <Card title="Планеты сегодня" icon={Globe} theme={theme}>
+      <div className="flex flex-wrap gap-1.5">
+        {transitPlanets.map(({ planet }) => {
+          const retroData = retros.find(r => r.planet === planet);
+          const isRetro = retroSet.has(planet);
+          return (
+            <div
+              key={planet}
+              className={`flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 border ${
+                isRetro
+                  ? 'bg-violet-500/10 border-violet-500/30 text-violet-300'
+                  : 'bg-white/3 border-white/12 text-white/70'
+              }`}
+            >
+              <span className={isRetro ? 'text-violet-400' : 'text-white/50'}>
+                {PLANET_GL[planet] ?? ''}
+              </span>
+              <span>{PLANET_RU[planet] ?? planet}</span>
+              {retroData && <span className="text-[10px] opacity-60">{SIGN_RU[retroData.sign] ?? retroData.sign} {retroData.degree}°</span>}
+              {isRetro && <span className="text-violet-400 font-bold">⟲</span>}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 // ─── TransitRow — expandable transit with nature badge + compensatory_hint ────
 function TransitRow({ transit, theme }: { transit: Record<string, unknown>; theme: ThemeLike }) {
   const [expanded, setExpanded] = useState(false);
@@ -170,6 +500,9 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
   const nature = (transit.nature as 'benefic'|'malefic'|'mixed') ?? 'mixed';
   const cfg    = NATURE_CONFIG[nature] ?? NATURE_CONFIG.mixed;
   const hint   = transit.compensatory_hint as { tension_signal: string; top_practice: Record<string,unknown>|null } | undefined;
+
+  // Quick theme phrase
+  const quickTheme = TRANSIT_QUICK_THEME[tp]?.[asp];
 
   return (
     <div className={`rounded-lg border mb-2 last:mb-0 ${cfg.bg} overflow-hidden`}>
@@ -190,12 +523,15 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
               {PLANET_GL[np] ?? ''} {PLANET_RU[np] ?? np}
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className={`text-[10px] ${theme.text} opacity-40`}>орб {orb.toFixed(2)}°</span>
             <span className={`text-[10px] ${app ? 'text-amber-300' : 'text-slate-400'}`}>
-              {app ? '↗ применяется' : '↘ разделяется'}
+              {app ? '→ нарастает' : '↘ слабеет'}
             </span>
-            {hint?.tension_signal && (
+            {quickTheme && (
+              <span className={`text-[10px] font-medium ${cfg.color} opacity-80`}>{quickTheme}</span>
+            )}
+            {hint?.tension_signal && !quickTheme && (
               <span className={`text-[10px] italic ${cfg.color} opacity-70`}>{hint.tension_signal}</span>
             )}
           </div>
@@ -257,7 +593,7 @@ function CompensatoryNow({ comp, theme }: { comp: Record<string, unknown>; theme
               {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet ?? '')}
               {' в '}{SIGN_RU[String(at.sign ?? '')] ?? String(at.sign ?? '')}
             </div>
-            {at.tension_signal && (
+            {Boolean(at.tension_signal) && (
               <div className="text-[10px] text-amber-300/80 mb-1 italic">{String(at.tension_signal)}</div>
             )}
             <div className={`text-[11px] font-medium ${theme.header}`}>
@@ -368,7 +704,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
                             <span className={`font-medium ${theme.header}`}>{PLANET_GL[kt.transit_planet] ?? ''} {PLANET_RU[kt.transit_planet] ?? kt.transit_planet}</span>
                             <span className={ASPECT_COLOR[kt.aspect] ?? ''}>{ASPECT_SYM[kt.aspect] ?? ''} {ASPECT_NAME[kt.aspect] ?? kt.aspect}</span>
                             <span className={`${theme.text} opacity-60`}>{PLANET_GL[kt.natal_planet] ?? ''} {PLANET_RU[kt.natal_planet] ?? kt.natal_planet}</span>
-                            <span className={`ml-auto text-[10px] ${kt.applying ? 'text-amber-300' : 'text-slate-400'}`}>{kt.applying ? '↗' : '↘'} {kt.orb.toFixed(1)}°</span>
+                            <span className={`ml-auto text-[10px] ${kt.applying ? 'text-amber-300' : 'text-slate-400'}`}>{kt.applying ? '→' : '↘'} {kt.orb.toFixed(1)}°</span>
                           </div>
                         );
                       })}
@@ -422,6 +758,8 @@ export default function DashboardView({ birthData, theme }: Props) {
   const [error, setError]     = useState<string | null>(null);
   const { mode, toggle: toggleMode, isPro } = useAppMode();
 
+  const isDark = _isDark(theme);
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -470,31 +808,21 @@ export default function DashboardView({ birthData, theme }: Props) {
                  ?? (profections as Record<string, string>)?.lord_of_year;
   const profSign  = (profections as Record<string, string>)?.annual_sign;
 
-  const today = new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
-
   // VoC countdown
   const vocEndJd = moon.is_void ? ((moon as Record<string,unknown>).void_end_utc as number | null ?? null) : null;
 
   // Illumination %
   const illumination = moon.illumination ?? Math.round(((1 - Math.cos(moon.phase_angle * Math.PI / 180)) / 2) * 100);
 
-  // Day energy label
+  // Transit counts for badge
   const maleficCount = top_transits.filter(t => (t as Record<string,unknown>).nature === 'malefic').length;
   const beneficCount = top_transits.filter(t => (t as Record<string,unknown>).nature === 'benefic').length;
-  const dayScore = beneficCount - maleficCount;
-  const dayLabel = dayScore >= 2 ? { text:'Благоприятный день', color:'text-emerald-400' }
-                 : dayScore <= -2 ? { text:'Напряжённый день', color:'text-red-400' }
-                 : { text:'Нейтральный день', color:'text-amber-300' };
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className={`text-base font-semibold ${theme.header}`}>Дашборд · {today}</h2>
-          <VocBadge isVoid={moon.is_void} vocEndJd={vocEndJd} />
-          <span className={`text-xs font-medium ${dayLabel.color}`}>{dayLabel.text}</span>
-        </div>
+        <h2 className={`text-base font-semibold ${theme.header}`}>Дашборд</h2>
         <div className="flex items-center gap-2">
           {/* Простой / Профи switcher */}
           <div className="flex rounded-lg overflow-hidden border border-white/10 text-xs">
@@ -519,6 +847,9 @@ export default function DashboardView({ birthData, theme }: Props) {
           </button>
         </div>
       </div>
+
+      {/* ── HeroCard — FULL WIDTH ─────────────────────────────────────────────── */}
+      <HeroCard data={data} theme={theme} isDark={isDark} />
 
       {/* Bento grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -611,6 +942,9 @@ export default function DashboardView({ birthData, theme }: Props) {
           )}
         </Card>
 
+        {/* ── UPCOMING EVENTS ────────────────────────────────────────────────── */}
+        <UpcomingEventsCard data={data} theme={theme} />
+
         {/* ── COMPENSATORY PRACTICES (NOW) ────────────────────────────────────── */}
         <Card title="Компенсаторика сейчас" icon={Sparkles} theme={theme}
           badge={
@@ -640,11 +974,16 @@ export default function DashboardView({ birthData, theme }: Props) {
                     Суб-период: {PLANET_GL[firSub.planet ?? ''] ?? ''} {PLANET_RU[firSub.planet ?? ''] ?? firSub.planet}
                   </div>
                 )}
-                {firPeriod.planet && PLANET_FIRD_INTERP[firPeriod.planet] && (
+                {/* Enhanced firdaria narrative */}
+                {firPeriod.planet && FIRDARIA_NARRATIVE[firPeriod.planet] ? (
+                  <div className={`text-[11px] ${theme.text} opacity-70 mt-2 leading-relaxed border-l-2 border-violet-500/30 pl-2`}>
+                    {FIRDARIA_NARRATIVE[firPeriod.planet]}
+                  </div>
+                ) : firPeriod.planet && PLANET_FIRD_INTERP[firPeriod.planet] ? (
                   <div className={`text-[10px] ${theme.text} opacity-55 mt-1.5 italic`}>
                     → {PLANET_FIRD_INTERP[firPeriod.planet]}
                   </div>
-                )}
+                ) : null}
               </div>
             ) : (
               <p className={`text-xs ${theme.text} opacity-40`}>Фирдарий не определён</p>
@@ -676,23 +1015,33 @@ export default function DashboardView({ birthData, theme }: Props) {
         {/* ── FORTUNE LOT ────────────────────────────────────────────────────── */}
         {fortune_today?.sign && (
           <Card title="Жребий Фортуны сегодня" icon={Star} theme={theme}>
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🎯</span>
-              <div>
-                <div className={`text-base font-semibold ${theme.header}`}>
-                  {SIGN_RU[fortune_today.sign] ?? fortune_today.sign}
-                  {fortune_today.deg_min ? ` · ${fortune_today.deg_min}` : ''}
-                </div>
-                <div className={`text-xs ${theme.text} opacity-60 mt-0.5`}>
-                  Фокус удачи на сегодня
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎯</span>
+                <div>
+                  <div className={`text-base font-semibold ${theme.header}`}>
+                    {SIGN_RU[fortune_today.sign] ?? fortune_today.sign}
+                    {fortune_today.deg_min ? ` · ${fortune_today.deg_min}` : ''}
+                  </div>
+                  <div className={`text-xs ${theme.text} opacity-60 mt-0.5`}>
+                    Фокус удачи на сегодня
+                  </div>
                 </div>
               </div>
+              {FORTUNE_SIGN_INTERP[fortune_today.sign] && (
+                <div className={`text-[11px] ${theme.text} opacity-65 leading-relaxed border-l-2 border-yellow-500/30 pl-2.5 italic`}>
+                  {FORTUNE_SIGN_INTERP[fortune_today.sign]}
+                </div>
+              )}
             </div>
           </Card>
         )}
 
+        {/* ── PLANET POSITIONS (Pro) ─────────────────────────────────────────── */}
+        {isPro && <PlanetPositionsCard data={data} theme={theme} />}
+
         {/* ── LUNAR MINI-CALENDAR ────────────────────────────────────────────── */}
-        <div className="md:col-span-2 xl:col-span-1">
+        <div className={isPro ? 'md:col-span-2 xl:col-span-2' : 'md:col-span-2 xl:col-span-1'}>
           <LunarCalendarCard
             theme={theme}
             utc={birthData.utc}
@@ -749,7 +1098,7 @@ const ASP_RU_G: Record<string, string> = {
 function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
   const [data, setData] = useState<DailyGlobalResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const load = useCallback(async () => {
     if (loading || data) return;
@@ -763,12 +1112,12 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
     }
   }, [loading, data]);
 
+  // Load on mount (open by default)
+  useEffect(() => { load(); }, [load]);
+
   const handleToggle = useCallback(() => {
-    setOpen(v => {
-      if (!v) load();
-      return !v;
-    });
-  }, [load]);
+    setOpen(v => !v);
+  }, []);
 
   return (
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>

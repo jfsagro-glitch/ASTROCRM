@@ -475,6 +475,11 @@ export interface DashboardData {
   profections: Record<string, unknown>;
   fortune_today: { lon?: number; sign?: string; deg_min?: string };
   arabic_natal: Record<string, unknown>;
+  retrograde_planets?: Array<{ planet: string; sign: string; degree: number }>;
+  day_score?: number;
+  sphere_scores?: { love: number; work: number; finance: number; health: number; creative: number };
+  next_lunation?: { full_moon: string; new_moon: string; days_to_full: number; days_to_new: number };
+  chart_analysis?: Record<string, unknown>;
 }
 
 export async function getDashboard(b: BirthInput, targetDate?: string): Promise<DashboardData> {
