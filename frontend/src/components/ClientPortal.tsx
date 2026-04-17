@@ -47,7 +47,7 @@ import SaturnCycleBlock from './SaturnCycleBlock';
 import { HeliocentricBlock } from './HeliocentricBlock';
 import { KabbalahTreeBlock } from './KabbalahTreeBlock';
 import { PlanetaryNodesBlock } from './PlanetaryNodesBlock';
-import { CompensatoryPracticesCard } from './CompensatoryPracticesCard';
+// CompensatoryPracticesCard moved into HoroscopeBlock (⚗️ Компенсаторика tab)
 import EclipsePersonalBlock from './EclipsePersonalBlock';
 import IngressPersonalBlock from './IngressPersonalBlock';
 import SignalWeightsBlock from './SignalWeightsBlock';
@@ -2146,7 +2146,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'compensatory'|'eclipse-personal'|'ingress-personal'|'signal-weights'|'annual-profection'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'eclipse-personal'|'ingress-personal'|'signal-weights'|'annual-profection'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2272,7 +2272,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     { key: 'heliocentric',        icon: Globe,     label: '☉ Гелиоцентр.' },
     { key: 'kabbalah-tree',       icon: Sparkles,  label: '✡ Каббала' },
     { key: 'planetary-nodes',     icon: Globe,     label: '☊ Планет. узлы' },
-    { key: 'compensatory',        icon: Sparkles,  label: '🌿 Компенсация' },
+    // Компенсаторные практики перенесены внутрь 🔮 Гороскоп → вкладка ⚗️ Компенсаторика
     { key: 'eclipse-personal',     icon: Star,      label: '🌑 Затмения' },
     { key: 'ingress-personal',     icon: Globe,     label: '🌠 Ингрессии·домов' },
     { key: 'signal-weights',       icon: Zap,       label: '⚡ Веса сигналов' },
@@ -2560,20 +2560,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
           )}
 
-          {activeTab === 'compensatory' && (
-            <div id="pdf-section-compensatory">
-              <div className={`rounded-xl border ${theme.card} p-4`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xl">🌿</span>
-                  <h2 className={`text-base font-bold font-serif ${theme.header}`}>Компенсаторные практики</h2>
-                  <span className={`text-xs ${theme.text} opacity-50 ml-auto`}>
-                    Три слоя: фон · транзиты · аспекты
-                  </span>
-                </div>
-                <CompensatoryPracticesCard birthData={birth} />
-              </div>
-            </div>
-          )}
+          {/* Компенсаторные практики переехали в 🔮 Гороскоп → вкладка ⚗️ Компенсаторика */}
 
           {activeTab === 'eclipse-personal' && (
             <div id="pdf-section-eclipse-personal">

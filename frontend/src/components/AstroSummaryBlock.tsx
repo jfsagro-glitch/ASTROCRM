@@ -324,9 +324,9 @@ const SPHERE_INTERP: Record<SphereKey, Record<EnergyLevel, { headline: string; b
       tip: 'Один конкретный вопрос лучше, чем ожидание.',
     },
     low: {
-      headline: 'Повышенный риск вспышек и разочарований',
-      body: 'Марс или Сатурн давят на любовную сферу — риск острых реакций, выяснения отношений "на горячую голову" и разочарований из-за завышенных ожиданий. Слова сейчас ранят глубже, чем обычно. Лучше не начинать важных разговоров с позиции обиды.',
-      tip: 'Возьмите паузу — дайте себе и партнёру пространство.',
+      headline: 'Небо сейчас не помощник в сердечных делах',
+      body: 'Активные напряжённые планеты создают помехи: слова ранят острее, ожидания не совпадают с реальностью, молчание читается как холодность. Это не означает кризис — это означает: сейчас не время для важных разговоров из позиции обиды. Подождите 2–3 дня, когда аспект пройдёт. Если разговор необходим прямо сейчас — начните с «я чувствую», не с «ты всегда».',
+      tip: 'Один конкретный "я-месседж" лучше, чем долгое выяснение.',
     },
   },
   work: {
@@ -341,9 +341,9 @@ const SPHERE_INTERP: Record<SphereKey, Record<EnergyLevel, { headline: string; b
       tip: 'Выберите одну главную задачу и доведите её до финала.',
     },
     low: {
-      headline: 'Осторожно с новыми стартами и необратимыми решениями',
-      body: 'Напряжённые аспекты проявляются как конфликты в рабочей среде, затянувшиеся переговоры и неожиданные задержки. Чужое торможение будет бесить — это нормально сейчас. Лучше завершать начатое, чем запускать новые цепочки.',
-      tip: 'Откладывайте необратимые решения на 2–3 дня.',
+      headline: 'Завершайте — не запускайте. Фон для доработки, не для старта',
+      body: 'Напряжённые аспекты → конфликты в рабочей среде → затянувшиеся переговоры → неожиданные задержки. Чужое торможение будет раздражать — это нормально сейчас. Лучше завершать начатое, чем запускать новые цепочки. Подпись под важным договором, отправка ключевого предложения, решение об увольнении — всё это лучше отложить на 2–3 дня.',
+      tip: 'Доделайте одно незавершённое дело — это разрядит напряжение лучше старта нового.',
     },
   },
   finance: {
@@ -358,9 +358,9 @@ const SPHERE_INTERP: Record<SphereKey, Record<EnergyLevel, { headline: string; b
       tip: 'Разберитесь с расходами — там, где "непонятно куда".',
     },
     low: {
-      headline: 'Повышенный риск неожиданных расходов',
-      body: 'Сатурн или Плутон давят на финансовую сферу — возможны неожиданные счета, нестабильные договорённости и соблазнительные, но сомнительные предложения. Держите резерв. Чужие срочные инвестиционные идеи — почти всегда ловушка в такой период.',
-      tip: 'Не спешите — подождите, когда туман рассеется.',
+      headline: 'Финансовый туман: не лучшее время для крупных решений',
+      body: 'Напряжённые аспекты → нестабильные договорённости → соблазнительные, но сомнительные предложения → риск неожиданных расходов. Держите резерв. Чужие «срочные инвестиционные идеи» в этот период — почти всегда ловушка. Если деньги уже ушли — не паникуйте, подождите пока пройдёт аспект.',
+      tip: 'Не подписывайте финансовых документов ещё 2–3 дня — фон улучшится.',
     },
   },
   health: {
@@ -494,32 +494,49 @@ const SUN_SIGN_FOCUS: Record<string, string> = {
   'Водолей': 'коллективного и новаторства', 'Рыбы': 'интуиции и духовности',
 };
 
+// ── Narrative openings pool ────────────────────────────────────────────────────
+
+const NARRATIVE_OPENINGS = [
+  'Что происходит в небе — уже происходит внутри. Вот как это читается.',
+  'Планеты не делают за нас — они задают климат. Вот ваш прогноз погоды.',
+  'Астрология — это не судьба. Это карта, которую вы держите в руках. Вот что на ней сейчас.',
+  'Если бы небо говорило словами — вот что оно сказало бы сегодня.',
+];
+
+function getNarrativeOpening(date: string): string {
+  const d = new Date(`${date}T12:00:00`);
+  const dayOfYear = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
+  return NARRATIVE_OPENINGS[dayOfYear % NARRATIVE_OPENINGS.length];
+}
+
+// ── Period opening by dominant transit ────────────────────────────────────────
+
+function pickPeriodOpening(aspects: string[], energy: string, focus: string): string {
+  const text = aspects.join(' ').toLowerCase();
+  if (text.includes('меркурий') && (text.includes('ретро') || energy === 'напряженный'))
+    return 'Меркурий тормозит — это сигнал, а не приговор. Пересматривайте, а не запускайте новое.';
+  if (text.includes('сатурн') && text.includes('нептун'))
+    return 'Туман сгустился — но это строительный материал. Реальность переписывается прямо сейчас.';
+  if (text.includes('марс') && energy !== 'благоприятный')
+    return 'Марс активен — и он не терпит промедлений. Энергия есть: вопрос куда её направить.';
+  if (text.includes('юпитер') && energy === 'благоприятный')
+    return 'Юпитер открыл ворота. Не стойте в проходе — этот период не для осторожных.';
+  if (text.includes('венера') && energy === 'благоприятный')
+    return 'Пространство притяжения открылось. Обаяние работает само — просто будьте.';
+  if (energy === 'благоприятный')
+    return `Планеты сложились в помогающую конфигурацию. ${focus} — это не абстракция, это буквально то, что сейчас легче обычного.`;
+  if (energy === 'напряженный')
+    return `Честно: фон непростой. Но напряжённые аспекты — это не приговор, а сигнал. Вопрос в том, куда направить накопившуюся энергию.`;
+  return `День не однородный. ${focus} — там, где волна поднимается. Оседлайте её — не ждите, пока схлынет.`;
+}
+
 // ── Narrative builder ─────────────────────────────────────────────────────────
 
 function buildNarrativeText(period: PeriodData): string {
-  const { sun_sign, moon_sign, energy, key_aspects, focus } = period;
+  const { sun_sign, moon_sign, energy, key_aspects, focus, start_date } = period;
 
-  // Opening hook — never start with "Главная тема"
-  const openings: Record<string, string[]> = {
-    'благоприятный': [
-      `Небо сегодня на вашей стороне — и это не просто красивые слова. Активные транзиты создают реальный коридор для тех, кто умеет им воспользоваться.`,
-      `Сегодня из тех дней, когда звонок в нужное время, правильное слово или смелое решение — работают. Фон благоприятный, окна открыты.`,
-      `Планеты сложились в помогающую конфигурацию. ${focus} — это не абстракция, это буквально то, что сейчас легче обычного.`,
-    ],
-    'напряженный': [
-      `Честно: день непростой. Но напряжённые аспекты — это не приговор, а сигнал. Вопрос в том, куда направить накопившуюся энергию.`,
-      `Небо сегодня давит. ${focus} — это та зона, где напряжение ощущается острее всего. Хорошая новость: зная это, вы уже в выигрыше.`,
-      `Конфигурация сложная — значит, всё, что сделаете правильно сегодня, будет стоить вдвойне. Напряжение — это топливо, если им управлять.`,
-    ],
-    'переменный': [
-      `День не однородный: утром одно, во второй половине — другое. Следите за переключениями — они будут.`,
-      `Переменный фон означает, что окна открываются и закрываются быстро. Кто замечает — успевает. Кто ждёт стабильности — нет.`,
-      `Небо сегодня работает волнами. ${focus} — там, где волна поднимается. Оседлайте её — не ждите, пока схлынет.`,
-    ],
-  };
-
-  const openList = openings[energy] ?? openings['переменный'];
-  const opening = openList[new Date().getDate() % openList.length];
+  const narrativeOpening = getNarrativeOpening(start_date ?? new Date().toISOString().slice(0, 10));
+  const periodOpening = pickPeriodOpening(key_aspects, energy, focus);
 
   // Detect dominant aspect pair
   let dominantNarrative: AspectNarrative | null = null;
@@ -541,18 +558,19 @@ function buildNarrativeText(period: PeriodData): string {
   const sunElement = SIGN_ELEMENT[sun_sign] ?? '';
   const moonQuality = SIGN_QUALITY[moon_sign] ?? '';
 
-  let text = `${opening}\n\n`;
+  let text = `${narrativeOpening}\n\n${periodOpening}\n\n`;
 
   if (dominantNarrative) {
     const [p1, p2] = dominantKey.split('_');
-    text += `Главный сюжет сейчас — это ${p1} и ${p2}. ${dominantNarrative.story}\n`;
-    text += `Где может зацепить: ${dominantNarrative.risk}\n`;
-    text += `Что с этим делать: ${dominantNarrative.window}\n\n`;
+    // Causal chain: planet → effect → risk → solution
+    text += `Главный сюжет сейчас — ${p1} и ${p2}. ${dominantNarrative.story}\n`;
+    text += `${p1} давит на ${p2} → ${dominantNarrative.risk}\n`;
+    text += `Решение: ${dominantNarrative.window}\n\n`;
     if (dominantNarrative.longTerm) {
-      text += `Это не только про сегодня: ${dominantNarrative.longTerm}\n\n`;
+      text += `Долгосрочно: ${dominantNarrative.longTerm}\n\n`;
     }
   } else if (key_aspects.length > 0) {
-    text += `Активные аспекты сейчас: ${key_aspects.slice(0, 2).join(' и ')}. Это задаёт характер всего периода.\n\n`;
+    text += `Активные аспекты: ${key_aspects.slice(0, 2).join(' и ')}. Это задаёт характер всего периода.\n\n`;
   }
 
   // Sun sign paragraph — specific, not generic
@@ -689,67 +707,76 @@ function buildActionGuide(period: PeriodData): ActionGuideData {
   const hasNeptune = key_aspects.some(a => a.includes('Нептун'));
   const hasJupiter = key_aspects.some(a => a.includes('Юпитер'));
   const hasMercury = key_aspects.some(a => a.includes('Меркурий'));
+  const hasRetro = key_aspects.some(a => a.toLowerCase().includes('ретро'));
   const hasTense = key_aspects.some(a => ['квадрат', 'оппозиция'].some(k => a.toLowerCase().includes(k)));
   const hasHarmonic = key_aspects.some(a => ['трин', 'секстиль', 'соединение'].some(k => a.toLowerCase().includes(k)));
 
   const yes: Array<{ icon: string; text: string }> = [];
   const no: Array<{ icon: string; text: string }> = [];
 
-  // Base energy
+  // Base energy — concrete actions with verbs
   if (energy === 'благоприятный' || hasHarmonic) {
-    yes.push({ icon: '🚀', text: 'Запускайте новые проекты и инициативы' });
-    yes.push({ icon: '🤝', text: 'Подписывайте подготовленные договоры' });
+    yes.push({ icon: '🚀', text: 'Запустите проект или инициативу, которую откладывали' });
+    yes.push({ icon: '🤝', text: 'Подпишите подготовленные договоры — фон поддерживает' });
   } else if (energy === 'напряженный' || hasTense) {
-    yes.push({ icon: '🔍', text: 'Завершайте начатое, не открывайте новое' });
-    no.push({ icon: '📝', text: 'Не подписывайте важные документы с ходу' });
-    no.push({ icon: '🔥', text: 'Не провоцируйте конфликты — они затянутся' });
+    yes.push({ icon: '🔍', text: 'Завершите одно незавершённое дело — не открывайте новых цепочек' });
+    no.push({ icon: '📝', text: 'Не подписывайте важных документов с ходу — подождите 2–3 дня' });
+    no.push({ icon: '🔥', text: 'Не провоцируйте конфликты сегодня — они затянутся надолго' });
   }
 
-  // Planet-specific
-  if (hasVenus) {
-    yes.push({ icon: '💬', text: 'Звоните тем, с кем давно не говорили' });
-    yes.push({ icon: '💰', text: 'Переговоры по деньгам дадут результат' });
+  // Planet-specific — concrete, with timing
+  if (hasVenus && !hasTense) {
+    yes.push({ icon: '💬', text: 'Напишите сообщение человеку, которому давно хотели — Венера помогает' });
+    yes.push({ icon: '💰', text: 'Инициируйте переговоры по деньгам — сейчас вас услышат' });
   }
-  if (hasMars && !hasNeptune) {
-    yes.push({ icon: '⚡', text: 'Принимайте решения быстро — импульс работает' });
+  if (hasMars && !hasNeptune && !hasTense) {
+    yes.push({ icon: '⚡', text: 'Марс сейчас на оперативном посту — принимайте решения быстро, он не терпит промедлений' });
   }
   if (hasMars && hasNeptune) {
-    no.push({ icon: '🌫️', text: 'Не начинайте дел в мутной ситуации' });
-    no.push({ icon: '💊', text: 'Алкоголь и стимуляторы — вдвойне опасны сейчас' });
+    no.push({ icon: '🌫️', text: 'Не начинайте дел в мутной ситуации — Марс+Нептун = действие вслепую' });
+    no.push({ icon: '🍷', text: 'Откажитесь от алкоголя на 2–3 дня — Нептун активен, чувствительность повышена' });
   }
-  if (hasSaturn) {
-    yes.push({ icon: '🏗️', text: 'Стройте систему — результат будет долгосрочным' });
-    no.push({ icon: '🏃', text: 'Не торопите то, что требует времени' });
+  if (hasSaturn && hasTense) {
+    yes.push({ icon: '🏗️', text: 'Стройте систему шаг за шагом — Сатурн давит на Луну → результат будет прочным' });
+    no.push({ icon: '🏃', text: 'Не форсируйте то, что требует времени — Сатурн не ускоряется от нетерпения' });
+  }
+  if (hasSaturn && !hasTense) {
+    yes.push({ icon: '📋', text: 'Распишите большую задачу на конкретные шаги — Сатурн сейчас помогает структуре' });
   }
   if (hasNeptune && !hasMars) {
-    yes.push({ icon: '🎨', text: 'Творческие проекты, музыка, медитация' });
-    no.push({ icon: '📊', text: 'Не принимайте финансовых решений в тумане' });
+    yes.push({ icon: '🎨', text: 'Запустите творческий проект, запись идей, медитацию — Нептун открывает канал' });
+    no.push({ icon: '📊', text: 'Не принимайте финансовых решений сегодня — Нептун туманит цифры' });
   }
   if (hasJupiter) {
-    yes.push({ icon: '📈', text: 'Расширяйте: новые рынки, аудитории, знакомства' });
+    yes.push({ icon: '📈', text: 'Расширяйтесь: предложите новую аудиторию, познакомьтесь с нужным человеком' });
   }
-  if (hasMercury) {
-    yes.push({ icon: '✍️', text: 'Пишите, переговаривайтесь, публикуйте' });
+  if (hasMercury && !hasRetro) {
+    yes.push({ icon: '✍️', text: 'Напишите сообщение, которое откладывали — Меркурий сейчас прямой' });
+  }
+  if (hasMercury && hasRetro) {
+    no.push({ icon: '📃', text: 'Не подписывайте договоров при ретро Меркурии — перепроверьте детали' });
+    yes.push({ icon: '🔄', text: 'Вернитесь к незавершённому проекту — ретро создан для доработки' });
   }
 
-  // Moon and sun element fallback
+  // Moon and sun element — concrete
   if (moonEl === 'вода') {
-    yes.push({ icon: '🧘', text: 'Работайте с интуицией и ощущениями' });
+    yes.push({ icon: '🧘', text: 'Доверьтесь первому ощущению в разговорах — Луна в водном знаке точна' });
   }
-  if (sunEl === 'огонь') {
-    no.push({ icon: '😤', text: 'Не действуйте на пике раздражения' });
+  if (sunEl === 'огонь' && hasTense) {
+    no.push({ icon: '😤', text: 'Не реагируйте на провокации — подождите 20 минут перед ответом' });
   }
   if (sunEl === 'земля') {
-    yes.push({ icon: '📦', text: 'Структурируйте и фиксируйте материальное' });
+    yes.push({ icon: '📦', text: 'Зафиксируйте договорённости письменно — земляной знак требует конкретики' });
   }
 
   // Ensure minimum length
   if (yes.length < 3) {
-    yes.push({ icon: '🎯', text: 'Фокусируйтесь на 2–3 приоритетах дня' });
+    yes.push({ icon: '🎯', text: 'Выберите 2–3 приоритета дня и не выходите за их рамки' });
+    yes.push({ icon: '📌', text: 'Запишите одну главную цель на сегодня — и сделайте только её' });
   }
   if (no.length < 2) {
-    no.push({ icon: '🔀', text: 'Не распыляйтесь на всё сразу' });
-    no.push({ icon: '⏳', text: 'Не откладывайте то, что созрело' });
+    no.push({ icon: '🔀', text: 'Не распыляйтесь на 10 задач сразу — сфокусируйтесь на одной' });
+    no.push({ icon: '⏳', text: 'Не откладывайте то, что уже созрело и ждёт решения' });
   }
 
   return { yes: yes.slice(0, 5), no: no.slice(0, 5) };
@@ -877,8 +904,10 @@ function NarrativeCard({ period, isDark, theme }: { period: PeriodData; isDark: 
   const [expanded, setExpanded] = useState(false);
   const narrative = useMemo(() => buildNarrativeText(period), [period]);
   const lines = narrative.split('\n\n').filter(Boolean);
-  const preview = lines[0] ?? '';
-  const rest = lines.slice(1).join('\n\n');
+  // lines[0] = narrative opening (meta-phrase about astrology), lines[1] = period opening, rest = detail
+  const metaOpening = lines[0] ?? '';
+  const periodOpening = lines[1] ?? '';
+  const rest = lines.slice(2).join('\n\n');
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${
@@ -897,8 +926,14 @@ function NarrativeCard({ period, isDark, theme }: { period: PeriodData; isDark: 
           }`}>AI-интерпретация</span>
         </div>
 
-        <p className={`text-sm leading-relaxed font-medium ${isDark ? 'text-violet-100' : 'text-violet-900'}`}>
-          {preview}
+        {/* Meta opening — changes daily */}
+        <p className={`text-xs italic mb-2 ${isDark ? 'text-violet-300/70' : 'text-violet-600/70'}`}>
+          {metaOpening}
+        </p>
+
+        {/* Period-specific opening — live phrase based on transits */}
+        <p className={`text-sm leading-relaxed font-semibold ${isDark ? 'text-violet-100' : 'text-violet-900'}`}>
+          {periodOpening}
         </p>
 
         {rest && (
@@ -1557,7 +1592,7 @@ export default function AstroSummaryBlock({ theme }: Props) {
         : 'bg-gradient-to-br from-indigo-50 to-amber-50 border-indigo-200'}`}>
         <div className="p-5">
           {/* Top row */}
-          <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <h3 className={`text-lg font-black ${theme.header}`}>🌟 Астросводка</h3>
               <p className={`text-xs ${theme.text} opacity-55 mt-0.5`}>{dateLabel}</p>
@@ -1567,6 +1602,10 @@ export default function AstroSummaryBlock({ theme }: Props) {
               {energyConf.icon} {energyConf.label}
             </span>
           </div>
+          {/* Live opening phrase */}
+          <p className={`text-sm leading-relaxed font-medium mb-4 ${isDark ? 'text-indigo-100/90' : 'text-indigo-900/80'}`}>
+            {pickPeriodOpening(period.key_aspects, period.energy, period.focus)}
+          </p>
 
           {/* Sun + Moon */}
           <div className="grid grid-cols-2 gap-3 mb-4">
