@@ -195,6 +195,38 @@ const FORTUNE_SIGN_INTERP: Record<string, string> = {
   pisces:      'Интуиция — ваш навигатор к удаче. Слушайте сны и предчувствия.',
 };
 
+// ─── Planet directional / location guidance ───────────────────────────────────
+const PLANET_DIRECTION: Record<string, { dir: string; places: string; travel: string }> = {
+  sun:     { dir: 'Восток', places: 'столичные города, горные регионы, открытые пространства', travel: 'Путешествие на восток или в места силы укрепит солнечную энергию' },
+  moon:    { dir: 'Запад / побережье', places: 'города у воды, острова, курорты', travel: 'Вода и прибрежные места питают лунную энергию — поезжайте к морю или реке' },
+  mercury: { dir: 'Северо-восток', places: 'торговые хабы, университетские города, транспортные узлы', travel: 'Деловые поездки и короткие путешествия в год Меркурия особенно продуктивны' },
+  venus:   { dir: 'Юго-восток / юг', places: 'культурные столицы, spa-курорты, цветущие города', travel: 'Путешествие в красивые места — не роскошь, а компенсаторная практика года Венеры' },
+  mars:    { dir: 'Юг', places: 'спортивные и горные регионы, динамичные города', travel: 'Активный отдых, поход в горы или на природу даст нужную разрядку Марса' },
+  jupiter: { dir: 'Северо-запад / заграница', places: 'иностранные страны, университетские города, религиозные центры', travel: 'Год Юпитера — обязательно одно зарубежное или дальнее путешествие' },
+  saturn:  { dir: 'Запад / север', places: 'деловые центры, исторические города, уединённые места', travel: 'Сатурн не любит бесцельных поездок — путешествуйте с конкретной целью' },
+  uranus:  { dir: 'Север', places: 'технологические хабы, нестандартные места, авангардные города', travel: 'Неожиданная поездка в непривычное место — именно то, что нужно в год Урана' },
+  neptune: { dir: 'Запад / океан', places: 'прибрежные курорты, духовные центры, острова', travel: 'Ретрит у воды, остров, тихое место — идеальная поездка для нептунианского года' },
+  pluto:   { dir: 'Юго-запад / далеко', places: 'места трансформации, дальние путешествия, пустыня', travel: 'Поездка в кардинально иную среду может запустить глубокую трансформацию' },
+  node:    { dir: 'Новые горизонты', places: 'незнакомые места, непривычные культуры', travel: 'Год Узла благоприятствует поездкам в новые, незнакомые места' },
+  lilith:  { dir: 'Дикие, нетронутые места', places: 'природа, уединённые локации', travel: 'Природа и уединение помогают интегрировать энергию Лилит' },
+};
+
+// ─── Short location advice per house ─────────────────────────────────────────
+const HOUSE_LOCATION_ADVICE: Record<number, string> = {
+  1:  'Ваша текущая локация работает на вас — вы заметны и притягательны там, где уже есть.',
+  2:  'Стабильное место — залог финансового роста. Не уезжайте надолго в год 2-го дома.',
+  3:  'Короткие поездки и переезды особенно благоприятны. Смена обстановки питает.',
+  4:  'Год 4-го дома — год обустройства места. Путешествуйте, но возвращайтесь к своей базе.',
+  5:  'Курорты, творческие места, романтические локации — идеальны для поездок года.',
+  6:  'Путешествия работают только как отдых и восстановление. Не берите работу в поездки.',
+  7:  'Партнёрские поездки усиливают связь. Съездите куда-то вдвоём — это лучше любого разговора.',
+  8:  'Поездки в трансформирующие места — горы, пустыни, монастыри — дают глубину.',
+  9:  'Год путешествий по определению. Запланируйте минимум одну дальнюю поездку.',
+  10: 'Профессиональные поездки и командировки особенно результативны в год 10-го дома.',
+  11: 'Коллективные путешествия, конференции, фестивали — лучший формат поездок года.',
+  12: 'Уединённые ретриты и тихие места — то, что нужно. Избегайте шумных туристических мест.',
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Card({ title, icon: Icon, children, className = '', theme, badge }: {
@@ -567,66 +599,268 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
   );
 }
 
-// ─── CompensatoryNow — reads active_transits/aspect_pairs from dashboard ─────
-function CompensatoryNow({ comp, theme }: { comp: Record<string, unknown>; theme: ThemeLike }) {
+// ─── CompensatoryNow — enhanced with transform/amplify framing ─────────────
+function CompensatoryNow({ comp, theme, topTransits }: {
+  comp: Record<string, unknown>;
+  theme: ThemeLike;
+  topTransits: Array<Record<string, unknown>>;
+}) {
   const active  = (comp.active_transits ?? []) as Array<Record<string, unknown>>;
   const pairs   = (comp.aspect_pairs ?? []) as Array<Record<string, unknown>>;
   const opening = comp.opening as string | undefined;
 
-  if (active.length === 0 && pairs.length === 0) {
-    return <p className={`text-xs ${theme.text} opacity-40`}>Нет рекомендаций на сегодня</p>;
+  // Build enriched list: merge with top_transits for natal planet context
+  const enriched = active.slice(0, 5).map(at => {
+    const planet = String(at.planet ?? '');
+    const sign   = String(at.sign ?? '');
+    // Find matching transit for natal context
+    const match = topTransits.find(t => String(t.transit_planet ?? '') === planet);
+    const natalPlanet = match ? String(match.natal_planet ?? '') : '';
+    const aspect      = match ? String(match.aspect ?? '') : '';
+    const nature      = match ? String(match.nature ?? 'mixed') : 'mixed';
+    const applying    = match ? Boolean(match.applying) : false;
+    return { raw: at, natalPlanet, aspect, nature, applying, planet, sign };
+  });
+
+  if (enriched.length === 0 && pairs.length === 0) {
+    return (
+      <div className="text-center py-4">
+        <span className="text-2xl block mb-1">✨</span>
+        <p className={`text-xs ${theme.text} opacity-50`}>Активных напряжений нет — хороший день для действий</p>
+      </div>
+    );
   }
+
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {opening && (
-        <p className={`text-[11px] italic ${theme.text} opacity-60 border-l-2 border-white/20 pl-2`}>
-          {opening}
-        </p>
+        <div className="rounded-lg bg-white/4 border border-white/10 px-3 py-2">
+          <p className={`text-[11px] italic ${theme.text} opacity-70 leading-relaxed`}>
+            {opening}
+          </p>
+        </div>
       )}
-      {active.slice(0, 4).map((at, i) => {
-        const practices = (at.practices ?? []) as Array<Record<string,unknown>>;
-        const top = practices[0];
-        if (!top) return null;
+
+      {enriched.map((at, i) => {
+        const practices = (at.raw.practices ?? []) as Array<Record<string, unknown>>;
+        const planet = at.planet;
+        const nature = at.nature;
+        const isNeg  = nature === 'malefic';
+        const isPos  = nature === 'benefic';
+
+        const borderCls = isNeg ? 'border-red-500/25 bg-red-500/5'
+                        : isPos ? 'border-emerald-500/25 bg-emerald-500/5'
+                        : 'border-amber-500/20 bg-amber-500/5';
+        const accentCls = isNeg ? 'text-red-300' : isPos ? 'text-emerald-300' : 'text-amber-300';
+        const statusEmoji = isNeg ? '⚡' : isPos ? '✦' : '~';
+
         return (
-          <div key={i} className="rounded-lg bg-white/5 border border-white/8 p-2.5">
-            <div className={`text-[10px] font-semibold ${theme.accent} mb-1`}>
-              {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet ?? '')}
-              {' в '}{SIGN_RU[String(at.sign ?? '')] ?? String(at.sign ?? '')}
+          <div key={i} className={`rounded-xl border ${borderCls} overflow-hidden`}>
+            {/* Header */}
+            <div className="px-3 pt-2.5 pb-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`text-sm ${accentCls}`}>{statusEmoji}</span>
+                <span className={`text-xs font-semibold ${theme.header}`}>
+                  {PLANET_GL[planet] ?? ''} {PLANET_RU[planet] ?? planet}
+                  {' в '}{SIGN_RU[at.sign] ?? at.sign}
+                </span>
+                {at.natalPlanet && (
+                  <span className={`text-[10px] ${theme.text} opacity-50`}>
+                    {ASPECT_SYM[at.aspect] ?? ''} {PLANET_GL[at.natalPlanet] ?? ''} {PLANET_RU[at.natalPlanet] ?? at.natalPlanet}
+                  </span>
+                )}
+                <span className={`text-[9px] px-1.5 py-px rounded-full border ml-auto ${
+                  at.applying ? 'border-amber-500/30 text-amber-400' : 'border-white/15 text-white/30'
+                }`}>
+                  {at.applying ? '→ нарастает' : '↘ слабеет'}
+                </span>
+              </div>
+              {/* Tension signal — что происходит */}
+              {Boolean(at.raw.tension_signal) && (
+                <p className={`text-[11px] italic ${accentCls} opacity-80 mt-1 leading-relaxed`}>
+                  {String(at.raw.tension_signal)}
+                </p>
+              )}
             </div>
-            {Boolean(at.tension_signal) && (
-              <div className="text-[10px] text-amber-300/80 mb-1 italic">{String(at.tension_signal)}</div>
-            )}
-            <div className={`text-[11px] font-medium ${theme.header}`}>
-              {Boolean(top.practice) && String(top.practice)}
-            </div>
-            {Boolean(top.why) && (
-              <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5`}>{String(top.why)}</div>
-            )}
-            {Boolean(top.timing) && (
-              <div className="text-[10px] text-amber-300/60 mt-0.5">⏰ {String(top.timing)}</div>
-            )}
-            {practices.length > 1 && (
-              <div className={`text-[10px] ${theme.text} opacity-30 mt-1`}>+ ещё {practices.length - 1} практик</div>
+
+            {/* Practices */}
+            {practices.length > 0 && (
+              <div className="px-3 pb-2.5 space-y-1.5 border-t border-white/6 pt-2">
+                <div className={`text-[9px] uppercase tracking-wider ${theme.text} opacity-30 mb-1`}>
+                  {isNeg ? '↓ нейтрализовать' : isPos ? '↑ усилить' : '→ практика'}
+                </div>
+                {practices.slice(0, 2).map((pr, j) => (
+                  <div key={j} className="flex items-start gap-1.5">
+                    <span className={`text-[10px] mt-0.5 ${accentCls} shrink-0`}>›</span>
+                    <div className="min-w-0">
+                      <div className={`text-[11px] font-medium ${theme.header} leading-tight`}>
+                        {Boolean(pr.practice) ? String(pr.practice) : ''}
+                      </div>
+                      {Boolean(pr.why) && (
+                        <div className={`text-[10px] ${theme.text} opacity-45 leading-tight mt-px`}>
+                          {String(pr.why)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {practices.length > 2 && (
+                  <div className={`text-[10px] ${theme.text} opacity-25 pl-3.5`}>+ ещё {practices.length - 2}</div>
+                )}
+              </div>
             )}
           </div>
         );
       })}
-      {pairs.slice(0, 2).map((p, i) => (
-        <div key={`pair-${i}`} className="rounded-lg bg-indigo-500/8 border border-indigo-500/20 p-2.5">
-          <div className="text-[10px] font-semibold text-indigo-300 mb-1">
-            Аспектная пара: {String(p.name ?? p.pair ?? '')}
+
+      {/* Aspect pairs */}
+      {pairs.slice(0, 1).map((p, i) => (
+        <div key={`pair-${i}`} className="rounded-xl bg-indigo-500/8 border border-indigo-500/20 p-3">
+          <div className="text-[10px] font-semibold text-indigo-300 mb-1.5 flex items-center gap-1">
+            <span>⚗</span> {String(p.name ?? p.pair ?? '')}
           </div>
           {Boolean(p.tension) && (
-            <div className={`text-[10px] ${theme.text} opacity-60 mb-1`}>{String(p.tension)}</div>
+            <p className={`text-[11px] italic ${theme.text} opacity-55 mb-1.5`}>{String(p.tension)}</p>
           )}
           {Array.isArray(p.practices) && (p.practices as Array<Record<string,unknown>>).slice(0,2).map((pr, j) => (
-            <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5`}>
+            <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5 mb-0.5`}>
               <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" />
               {Boolean(pr.practice) ? String(pr.practice) : String(pr)}
             </div>
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── LocationAdviceCard ───────────────────────────────────────────────────────
+function LocationAdviceCard({ data, birthData, theme }: {
+  data: DashboardData;
+  birthData: BirthInput;
+  theme: ThemeLike;
+}) {
+  const [open, setOpen] = useState(false);
+  const profections = data.profections as Record<string, unknown>;
+  const lord  = String(profections?.annual_lord ?? profections?.lord_of_year ?? '');
+  const house = Number(profections?.annual_house ?? profections?.profected_house ?? 0);
+  const dirInfo = lord ? PLANET_DIRECTION[lord] : null;
+  const houseAdvice = house ? HOUSE_LOCATION_ADVICE[house] : null;
+
+  // Find active benefic transits for travel timing
+  const topTransits = (data.top_transits ?? []) as Array<Record<string, unknown>>;
+  const beneficJupiter = topTransits.find(t =>
+    String(t.transit_planet ?? '') === 'jupiter' && String(t.nature ?? '') === 'benefic'
+  );
+  const activeMalefic = topTransits.filter(t => String(t.nature ?? '') === 'malefic').length;
+
+  if (!dirInfo && !houseAdvice) return null;
+
+  const cityName = (birthData as unknown as Record<string, unknown>).city as string || '';
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Globe size={14} className={theme.accent} />
+          <span className={`text-sm font-medium ${theme.header}`}>📍 Локации · Куда ехать в этот период</span>
+        </div>
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+      </button>
+
+      {open && (
+        <div className="border-t border-white/8 px-4 pb-4 pt-3 space-y-3">
+
+          {/* Year direction */}
+          {dirInfo && lord && (
+            <div className="rounded-xl border border-violet-500/25 bg-violet-500/8 p-3">
+              <div className="text-[10px] text-violet-400 font-semibold uppercase tracking-wide mb-1.5">
+                {PLANET_GL[lord] ?? ''} {PLANET_RU[lord] ?? lord} — лорд вашего года
+              </div>
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-xl">🧭</span>
+                <div>
+                  <div className={`text-sm font-semibold ${theme.header}`}>{dirInfo.dir}</div>
+                  <div className={`text-xs ${theme.text} opacity-60`}>{dirInfo.places}</div>
+                </div>
+              </div>
+              <p className={`text-[11px] ${theme.text} opacity-70 leading-relaxed border-l-2 border-violet-500/30 pl-2`}>
+                {dirInfo.travel}
+              </p>
+            </div>
+          )}
+
+          {/* House-based advice */}
+          {houseAdvice && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+              <div className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide mb-1">
+                Дом {house} — тема года
+              </div>
+              <p className={`text-xs ${theme.text} opacity-70 leading-relaxed`}>{houseAdvice}</p>
+            </div>
+          )}
+
+          {/* Travel timing based on current transits */}
+          <div className="rounded-xl border border-white/10 bg-white/3 p-3 space-y-2">
+            <div className="text-[10px] text-white/40 font-semibold uppercase tracking-wide mb-1">⏰ Прямо сейчас</div>
+            {beneficJupiter ? (
+              <div className="flex items-start gap-2">
+                <span className="text-base">✈️</span>
+                <p className={`text-xs ${theme.text} opacity-70`}>
+                  Юпитер делает благоприятный аспект — отличное время для путешествий. Поездка в ближайшие 2-3 недели откроет новые возможности.
+                </p>
+              </div>
+            ) : activeMalefic >= 3 ? (
+              <div className="flex items-start gap-2">
+                <span className="text-base">🏠</span>
+                <p className={`text-xs ${theme.text} opacity-70`}>
+                  Несколько напряжённых транзитов активны — лучше оставаться на знакомой территории. Путешествия отложите ещё на 2-3 недели.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <span className="text-base">🗺️</span>
+                <p className={`text-xs ${theme.text} opacity-70`}>
+                  Нейтральный транзитный фон — поездки не против, но и специально торопиться не нужно. Ориентируйтесь на рекомендацию лорда года.
+                </p>
+              </div>
+            )}
+            {cityName && (
+              <div className="flex items-start gap-2">
+                <span className="text-base">📌</span>
+                <p className={`text-xs ${theme.text} opacity-60`}>
+                  Текущая локация: <span className={theme.header}>{cityName}</span>.
+                  {dirInfo ? ` Для усиления энергии периода ищите направление: ${dirInfo.dir}.` : ''}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Tips list */}
+          <div className="space-y-1.5">
+            <div className={`text-[10px] ${theme.text} opacity-30 uppercase tracking-wide`}>Практические подсказки</div>
+            {[
+              lord === 'venus' ? '💐 Отдых в красивом месте — это не отпуск, это лечение. Запланируйте хотя бы 3 дня.' : null,
+              lord === 'jupiter' ? '🌍 Зарубежная поездка в год Юпитера расширит не только географию, но и мышление.' : null,
+              lord === 'saturn' ? '🏗️ Поездки только с целью. Деловая командировка или обучение — да. Пляж ради пляжа — малопродуктивно.' : null,
+              lord === 'mercury' ? '🚂 Короткие поездки 1-3 дня особенно хороши. Меркурий любит быстрые перемещения.' : null,
+              lord === 'moon' ? '🌊 Любая поездка к воде (море, озеро, река) восстанавливает лучше любого spa.' : null,
+              lord === 'mars' ? '⛺ Активный отдых, поход, горы — самые правильные направления в год Марса.' : null,
+              lord === 'neptune' ? '🏝️ Остров или тихий курорт у воды — идеальное направление. Шумные мегаполисы — нет.' : null,
+              lord === 'sun' ? '☀️ Путешествие в место, где можно получить много солнца — прямое топливо для лорда года.' : null,
+              'Куда бы вы ни поехали — главное взять с собой намерение для периода. Место работает через цель.',
+            ].filter(Boolean).slice(0, 3).map((tip, i) => (
+              <div key={i} className={`flex items-start gap-1.5 text-[11px] ${theme.text} opacity-60`}>
+                <span className="opacity-40 shrink-0 mt-px">›</span>
+                {tip}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -953,7 +1187,11 @@ export default function DashboardView({ birthData, theme }: Props) {
             </span>
           }
         >
-          <CompensatoryNow comp={compensatory as unknown as Record<string,unknown>} theme={theme} />
+          <CompensatoryNow
+            comp={compensatory as unknown as Record<string,unknown>}
+            theme={theme}
+            topTransits={top_transits as unknown as Array<Record<string, unknown>>}
+          />
         </Card>
 
         {/* ── FIRDARIA + PROFECTIONS ─────────────────────────────────────────── */}
@@ -1049,6 +1287,11 @@ export default function DashboardView({ birthData, theme }: Props) {
             lon={birthData.lon}
             days={7}
           />
+        </div>
+
+        {/* ── LOCATION ADVICE ────────────────────────────────────────────────── */}
+        <div className="md:col-span-2 xl:col-span-3">
+          <LocationAdviceCard data={data} birthData={birthData} theme={theme} />
         </div>
 
         {/* ── COMPENSATORY FORECAST (lazy 3-window) ──────────────────────────── */}
@@ -1194,12 +1437,35 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                 </div>
               )}
 
-              {/* Interpretation */}
-              {data.interpretation && (
-                <p className={`text-[11px] ${theme.text} opacity-50 leading-relaxed border-t border-white/8 pt-3`}>
-                  {data.interpretation}
-                </p>
-              )}
+              {/* Interpretation — cleaned up */}
+              {data.interpretation && (() => {
+                // Strip duplicated/ugly API text patterns
+                let interp = String(data.interpretation);
+                // Remove duplicate "Просто: ...same text..." pattern
+                const simpleIdx = interp.indexOf(' Просто: ');
+                if (simpleIdx > 0) interp = interp.slice(0, simpleIdx);
+                // Remove "Глобальный астрофон YYYY-MM-DD:" prefix
+                interp = interp.replace(/^Глобальный астрофон \d{4}-\d{2}-\d{2}:\s*/i, '');
+                // Replace English sign names with Russian
+                const signMap: Record<string,string> = {
+                  'aries':'Овен','taurus':'Телец','gemini':'Близнецы','cancer':'Рак',
+                  'leo':'Лев','virgo':'Дева','libra':'Весы','scorpio':'Скорпион',
+                  'sagittarius':'Стрелец','capricorn':'Козерог','aquarius':'Водолей','pisces':'Рыбы',
+                };
+                Object.entries(signMap).forEach(([en, ru]) => {
+                  interp = interp.replace(new RegExp(`\\b${en}\\b`, 'gi'), ru);
+                });
+                // Also replace "Солнце в Овен" → keep, just clean up whitespace
+                interp = interp.trim();
+                if (!interp) return null;
+                return (
+                  <div className="border-t border-white/8 pt-3">
+                    <p className={`text-xs ${theme.text} opacity-65 leading-relaxed`}>
+                      {interp}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
