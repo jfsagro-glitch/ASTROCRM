@@ -1,7 +1,7 @@
 /**
  * ForecastAdvisorBlock — Unified predictive synthesis.
  * Combines annual profection + solar ingress + eclipse + Saturn cycle
- * into ONE actionable block: interpretation + sphere advice + compensatory practices.
+ * + live dashboard transits into ONE actionable block.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, AlertTriangle, Zap, ChevronDown, ChevronUp } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
   getIngressPersonal,    IngressPersonalResult,
   getEclipsePersonal,    EclipsePersonalResult,
   getSaturnCycle,        SaturnCycleResult,
+  getDashboard,          DashboardData,
 } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 
@@ -183,6 +184,71 @@ const SATURN_PHASE_PRACTICES: Record<string, Practice[]> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DO / AVOID per house
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HOUSE_DO_AVOID: Record<number, { do: string[]; avoid: string[] }> = {
+  1:  { do: ['Начинайте новые проекты с нуля', 'Меняйте имидж и поведение', 'Заявляйте о себе публично'], avoid: ['Прятаться за других', 'Откладывать личные решения', 'Игнорировать тело'] },
+  2:  { do: ['Инвестируйте в свои навыки', 'Поднимите цены на услуги', 'Создайте финансовую подушку'], avoid: ['Транжирить на импульсивные покупки', 'Занимать деньги без чёткого плана', 'Недооценивать себя'] },
+  3:  { do: ['Подписывайте контракты', 'Звоните нужным людям', 'Записывайтесь на обучение'], avoid: ['Откладывать важные разговоры', 'Игнорировать соседей и коллег', 'Перегружать голову лишней информацией'] },
+  4:  { do: ['Занимайтесь недвижимостью', 'Решайте семейные вопросы', 'Обустраивайте дом'], avoid: ['Избегать родителей', 'Переезжать без острой необходимости', 'Игнорировать внутренний дискомфорт'] },
+  5:  { do: ['Начинайте творческие проекты', 'Флиртуйте и романтизируйте', 'Уделяйте время детям'], avoid: ['Играть на деньги', 'Заниматься только серьёзными делами', 'Подавлять радость ради продуктивности'] },
+  6:  { do: ['Делайте медицинские чек-апы', 'Оптимизируйте рабочие процессы', 'Выстраивайте ЗОЖ-режим'], avoid: ['Игнорировать тревожные симптомы', 'Работать без отдыха', 'Есть на бегу'] },
+  7:  { do: ['Заключайте союзы и контракты', 'Говорите с партнёром честно', 'Ищите деловых партнёров'], avoid: ['Принимать решения в одиночку', 'Избегать конфликтных разговоров', 'Нарушать договорённости'] },
+  8:  { do: ['Работайте с психологом', 'Инвестируйте чужие деньги мудро', 'Избавляйтесь от лишнего'], avoid: ['Скрывать правду от себя', 'Брать дорогие кредиты', 'Цепляться за изживший себя'] },
+  9:  { do: ['Запланируйте путешествие', 'Запишитесь на серьёзный курс', 'Читайте философов'], avoid: ['Засиживаться на месте', 'Игнорировать иностранные возможности', 'Мыслить слишком узко'] },
+  10: { do: ['Просите о повышении', 'Публикуйте достижения', 'Знакомьтесь с нужными людьми'], avoid: ['Уходить от публичности', 'Конфликтовать с руководством', 'Работать без имени и подписи'] },
+  11: { do: ['Вступайте в профессиональные сообщества', 'Обсуждайте мечты с единомышленниками', 'Запускайте коллаборации'], avoid: ['Работать в изоляции', 'Пренебрегать дружескими связями', 'Держать цели только в голове'] },
+  12: { do: ['Занимайтесь медитацией', 'Завершайте старые дела', 'Работайте за кулисами'], avoid: ['Начинать громкие публичные проекты', 'Вступать в конфликты', 'Игнорировать сны и интуицию'] },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transit → quick compensatory action (for live transits from dashboard)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TRANSIT_COMPENSATORY: Record<string, Record<string, { signal: string; action: string; avoid: string }>> = {
+  saturn: {
+    conjunction: { signal: 'Сатурн давит — ощущение стены, усталость, сомнение в себе', action: 'Составьте пошаговый план одной задачи. Один маленький шаг — и Сатурн становится союзником', avoid: 'Брать на себя слишком много сразу' },
+    square: { signal: 'Ограничение и трение — внешние или внутренние', action: 'Найдите один обходной путь вместо лобового столкновения. Сатурн-квадрат уважает умных, не упрямых', avoid: 'Биться в закрытую дверь' },
+    opposition: { signal: 'Чужой контроль или внешние требования давят', action: 'Установите чёткую границу — одно вежливое «нет» без объяснений. Это снимает давление', avoid: 'Сдаваться под давлением или бунтовать впустую' },
+  },
+  neptune: {
+    conjunction: { signal: 'Туман в голове, иллюзии, сложно сосредоточиться', action: 'Запишите от руки три конкретных факта о ситуации. Бумага возвращает в реальность', avoid: 'Принимать важные решения сегодня' },
+    square: { signal: 'Самообман, расплывчатость, уход от реальности', action: 'Прочитайте что-то на бумаге — не с экрана. 20 минут без телефона возвращают ясность', avoid: 'Верить слухам и непроверенной информации' },
+    opposition: { signal: 'Кто-то вводит вас в заблуждение или вы не видите ситуацию честно', action: 'Задайте себе: «Что я вижу? Что реально? Что я хочу видеть?» — письменно', avoid: 'Давать обещания в этом состоянии' },
+  },
+  pluto: {
+    conjunction: { signal: 'Ощущение неизбежности, давление изменений, контроль уходит', action: 'Отпустите одну вещь, которую пытаетесь контролировать. Буквально — напишите и скомкайте бумагу', avoid: 'Бороться с неизбежным' },
+    square: { signal: 'Борьба за власть, подавленная агрессия, скрытые процессы', action: 'Физическая нагрузка до усталости. Плутон нуждается в телесном выходе', avoid: 'Манипулировать в ответ на манипуляцию' },
+    opposition: { signal: 'Чужая сила или трансформация отношений против вашей воли', action: 'Выйдите из зоны комфорта в одном маленьком действии — это ваш ответ Плутону', avoid: 'Прятаться или замирать' },
+  },
+  mars: {
+    conjunction: { signal: 'Импульс и энергия — могут выражаться в раздражительности', action: 'Направьте энергию: пробежка, уборка, физический труд. Марс работает через действие', avoid: 'Принимать импульсивные решения в конфликте' },
+    square: { signal: 'Трение, конкурентное напряжение, риск конфликта', action: '10 отжиманий или быстрая прогулка перед любым трудным разговором', avoid: 'Доказывать правоту прямо сейчас' },
+    opposition: { signal: 'Конфликт или конкуренция с другим человеком', action: 'Сформулируйте своё решение письменно до разговора. Ясность снимает агрессию', avoid: 'Первым начинать конфронтацию' },
+  },
+  uranus: {
+    conjunction: { signal: 'Нестабильность, неожиданные изменения, тревога', action: 'Примите одно маленькое решение прямо сейчас — любое. Уран успокаивается через действие', avoid: 'Ждать стабильности перед тем, как действовать' },
+    square: { signal: 'Сопротивление переменам создаёт напряжение', action: 'Намеренно измените одну рутину сегодня. Уран-квадрат требует гибкости', avoid: 'Держаться за привычное любой ценой' },
+  },
+  jupiter: {
+    trine: { signal: 'Попутный ветер — возможности приходят', action: 'Действуйте! Это ваше окно. Отправьте письмо, позвоните, сделайте предложение', avoid: 'Упускать момент в ожидании «лучшего времени»' },
+    conjunction: { signal: 'Расширение возможностей, энергия роста', action: 'Сделайте запрос, который обычно боялись — шанс получить «да» максимален', avoid: 'Переусердствовать и взять слишком много' },
+    sextile: { signal: 'Приятная возможность рядом', action: 'Откройте глаза на то, что уже есть вокруг — возможность не там где ищете, а где не смотрите', avoid: 'Ждать «большого» шанса, пропуская малые' },
+  },
+  venus: {
+    conjunction: { signal: 'Притяжение, красота, гармония активны', action: 'Уделите внимание внешнему виду и окружению. Красивое место или разговор сегодня принесут плоды', avoid: 'Торопить события в отношениях' },
+    trine: { signal: 'Гармония в отношениях, деньги текут', action: 'Время просить — зарплату, скидку, помощь. Венера-трин открывает двери', avoid: 'Сидеть тихо, когда можно попросить' },
+    square: { signal: 'Проверка ценностей — что реально важно?', action: 'Запишите 3 вещи, которые вам действительно важны в отношениях. Ясность снимает тревогу', avoid: 'Ревновать или требовать подтверждения' },
+  },
+  mercury: {
+    square: { signal: 'Путаница в словах, информация противоречивая', action: 'Перечитайте все ключевые письма/договоры перед отправкой. Меркурий-квадрат любит опечатки', avoid: 'Подписывать важные документы без проверки' },
+    opposition: { signal: 'Точки зрения расходятся, диалог сложный', action: 'Выслушайте полностью, прежде чем отвечать. Пауза в 30 секунд меняет исход разговора', avoid: 'Перебивать и доказывать' },
+    conjunction: { signal: 'Ясность мышления, слова находятся легко', action: 'Напишите то важное письмо или документ — сейчас это выйдет лучше всего', avoid: 'Тратить этот ясный день на пустяки' },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Synthesis helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -322,6 +388,88 @@ function SphereRow({ sphere, advice, theme }: { sphere: string; advice: string; 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// buildTodayActions — live transits + house-based actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildTodayActions(
+  dashData: DashboardData | null,
+  house: number,
+  lord: string,
+  currentIngress: { natal_house: number } | null,
+): Array<{ emoji: string; title: string; body: string; type: 'do' | 'avoid' | 'now' }> {
+  const actions: Array<{ emoji: string; title: string; body: string; type: 'do' | 'avoid' | 'now' }> = [];
+
+  // Top 2 live transit compensatory actions
+  if (dashData?.top_transits) {
+    const topTransits = dashData.top_transits as Array<Record<string, unknown>>;
+    const maleficTransits = topTransits.filter(t =>
+      String(t.nature ?? '') === 'malefic' &&
+      Boolean(t.applying)
+    ).slice(0, 2);
+
+    maleficTransits.forEach(t => {
+      const tp = String(t.transit_planet ?? '');
+      const asp = String(t.aspect ?? '');
+      const comp = TRANSIT_COMPENSATORY[tp]?.[asp];
+      if (comp) {
+        actions.push({
+          emoji: tp === 'saturn' ? '♄' : tp === 'neptune' ? '♆' : tp === 'pluto' ? '♇' : tp === 'mars' ? '♂' : tp === 'uranus' ? '⛢' : '⚡',
+          title: comp.action,
+          body: comp.signal,
+          type: 'now',
+        });
+      }
+    });
+
+    // Also add a benefic if available
+    const beneficTransit = topTransits.find(t =>
+      String(t.nature ?? '') === 'benefic' &&
+      Boolean(t.applying) &&
+      ['jupiter', 'venus'].includes(String(t.transit_planet ?? ''))
+    );
+    if (beneficTransit) {
+      const tp = String(beneficTransit.transit_planet ?? '');
+      const asp = String(beneficTransit.aspect ?? '');
+      const comp = TRANSIT_COMPENSATORY[tp]?.[asp];
+      if (comp) {
+        actions.push({
+          emoji: tp === 'jupiter' ? '♃' : '♀',
+          title: comp.action,
+          body: comp.signal,
+          type: 'do',
+        });
+      }
+    }
+  }
+
+  // Add house-specific DO
+  const houseAdvice = HOUSE_DO_AVOID[house];
+  if (houseAdvice && actions.length < 4) {
+    actions.push({
+      emoji: '🎯',
+      title: houseAdvice.do[0],
+      body: `Год ${HOUSE_THEME[house]?.toLowerCase()} — это приоритет.`,
+      type: 'do',
+    });
+  }
+
+  // Add ingress-based action
+  if (currentIngress && currentIngress.natal_house !== house && actions.length < 4) {
+    const ingHouseAdvice = HOUSE_DO_AVOID[currentIngress.natal_house];
+    if (ingHouseAdvice) {
+      actions.push({
+        emoji: '☉',
+        title: ingHouseAdvice.do[0],
+        body: `Солнце сейчас в вашем ${currentIngress.natal_house}-м доме.`,
+        type: 'do',
+      });
+    }
+  }
+
+  return actions.slice(0, 4);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -330,6 +478,7 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
   const [ingress,    setIngress]    = useState<IngressPersonalResult | null>(null);
   const [eclipse,    setEclipse]    = useState<EclipsePersonalResult | null>(null);
   const [saturn,     setSaturn]     = useState<SaturnCycleResult | null>(null);
+  const [dashData,   setDashData]   = useState<DashboardData | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [practiceFilter, setPracticeFilter] = useState<'все' | 'активация' | 'нейтрализация'>('все');
@@ -342,18 +491,19 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
     if (!birth.date) return;
     setLoading(true); setError(null);
     try {
-      const [p, i, e, s] = await Promise.allSettled([
+      const [p, i, e, s, d] = await Promise.allSettled([
         getAnnualProfection(birth, today),
         getIngressPersonal(birth, year),
         getEclipsePersonal(birth, 6),
         getSaturnCycle(birth, 90),
+        getDashboard(birth, today),
       ]);
       if (p.status === 'fulfilled') setProfection(p.value);
-      else console.warn('profection failed:', p.reason);
       if (i.status === 'fulfilled') setIngress(i.value);
       if (e.status === 'fulfilled') setEclipse(e.value);
       if (s.status === 'fulfilled') setSaturn(s.value);
-      if (p.status === 'rejected') setError('Не удалось получить профекции: ' + p.reason?.message);
+      if (d.status === 'fulfilled') setDashData(d.value);
+      if (p.status === 'rejected') setError('Не удалось получить профекции: ' + (p.reason as Error)?.message);
     } finally {
       setLoading(false);
     }
@@ -419,6 +569,8 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
   const narrative = buildSynthesisNarrative(profection, ingress, eclipse, saturn);
   const allPractices = getPractices(lord, saturnMilestone);
   const sphereAdvice = HOUSE_SPHERE_ADVICE[house] ?? {};
+  const houseDoAvoid = HOUSE_DO_AVOID[house];
+  const todayActions = buildTodayActions(dashData, house, lord, currentIngress ?? null);
 
   const visiblePractices = allPractices.filter(p => {
     const intentOk = practiceFilter === 'все' || p.intent === practiceFilter;
@@ -428,49 +580,68 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
 
   const categories = Array.from(new Set(allPractices.map(p => p.category)));
 
+  // Live transit count from dashboard
+  const liveTransits = dashData?.top_transits as Array<Record<string,unknown>> | undefined;
+  const liveMalefic = liveTransits?.filter(t => String(t.nature ?? '') === 'malefic').length ?? 0;
+  const liveBenefic = liveTransits?.filter(t => String(t.nature ?? '') === 'benefic').length ?? 0;
+  const dayScore = dashData?.day_score ?? null;
+
   return (
     <div className="space-y-4">
+
       {/* ── Header ────────────────────────────────────────────────────── */}
       <div className={`rounded-xl border ${theme.card} p-4`}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className={`text-base font-bold font-serif ${theme.header}`}>
-              🎯 Астросоветник
-            </h2>
+            <h2 className={`text-base font-bold font-serif ${theme.header}`}>🎯 Астросоветник</h2>
             <p className={`text-xs ${theme.text} opacity-50 mt-0.5`}>
-              Синтез профекций · затмений · ингрессий · цикла Сатурна
+              Профекции · затмения · ингрессии · цикл Сатурна · активные транзиты
             </p>
           </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${theme.btn} disabled:opacity-50`}
-          >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            Обновить
-          </button>
+          <div className="flex items-center gap-2">
+            {dayScore !== null && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                dayScore >= 65 ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/8'
+                : dayScore <= 40 ? 'border-red-500/40 text-red-400 bg-red-500/8'
+                : 'border-amber-500/40 text-amber-400 bg-amber-500/8'
+              }`}>
+                {dayScore >= 65 ? '▲' : dayScore <= 40 ? '▼' : '~'} {dayScore}/100
+              </span>
+            )}
+            {liveMalefic > 0 && (
+              <span className="text-[10px] text-red-400 border border-red-500/25 bg-red-500/5 rounded-full px-1.5 py-0.5">
+                ▼{liveMalefic} напряж.
+              </span>
+            )}
+            {liveBenefic > 0 && (
+              <span className="text-[10px] text-emerald-400 border border-emerald-500/25 bg-emerald-500/5 rounded-full px-1.5 py-0.5">
+                ▲{liveBenefic} благоп.
+              </span>
+            )}
+            <button
+              onClick={load}
+              disabled={loading}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ${theme.btn} disabled:opacity-50`}
+            >
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              Обновить
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── Active signals summary ─────────────────────────────────────── */}
+      {/* ── 4-signal summary ──────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {/* Year house */}
         <div className={`rounded-xl border ${theme.card} p-3 text-center`}>
-          <div className={`text-2xl font-bold ${theme.accent}`}>
-            {house}
-          </div>
+          <div className={`text-2xl font-bold ${theme.accent}`}>{house}</div>
           <div className={`text-[10px] uppercase tracking-wider opacity-40 ${theme.text}`}>Дом года</div>
           <div className={`text-xs ${theme.header} mt-0.5`}>{HOUSE_THEME[house]}</div>
         </div>
-
-        {/* Lord */}
         <div className={`rounded-xl border ${theme.card} p-3 text-center`}>
           <div className={`text-2xl ${theme.symbol}`}>{PLANET_GLYPH[lord] ?? '●'}</div>
           <div className={`text-[10px] uppercase tracking-wider opacity-40 ${theme.text}`}>Лорд года</div>
           <div className={`text-xs ${theme.header} mt-0.5`}>{PLANET_RU[lord] ?? lord}</div>
         </div>
-
-        {/* Sun now */}
         <div className={`rounded-xl border ${theme.card} p-3 text-center`}>
           <div className={`text-2xl font-bold ${currentIngress ? 'text-amber-400' : theme.text} opacity-${currentIngress ? '100' : '30'}`}>
             {currentIngress ? currentIngress.natal_house : '—'}
@@ -480,8 +651,6 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
             {currentIngress ? HOUSE_THEME[currentIngress.natal_house] : 'нет данных'}
           </div>
         </div>
-
-        {/* Next eclipse */}
         <div className={`rounded-xl border ${theme.card} p-3 text-center`}>
           <div className={`text-2xl font-bold ${nextEclipse ? 'text-violet-400' : theme.text} opacity-${nextEclipse ? '100' : '30'}`}>
             {nextEclipse ? nextEclipse.natal_house : '—'}
@@ -493,7 +662,7 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
         </div>
       </div>
 
-      {/* Saturn active phase banner */}
+      {/* Saturn banner */}
       {saturnMilestone && saturn && (() => {
         const sm = saturn.milestones.find(m => m.type === saturnMilestone);
         return sm ? (
@@ -507,6 +676,37 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
         ) : null;
       })()}
 
+      {/* ── TODAY ACTIONS (live transits + house) ─────────────────────── */}
+      {todayActions.length > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+          <p className={`text-[10px] font-semibold uppercase tracking-wider text-amber-400 mb-3`}>
+            ⚡ Что сделать прямо сейчас
+          </p>
+          <div className="space-y-2.5">
+            {todayActions.map((action, i) => (
+              <div key={i} className={`flex items-start gap-2.5 rounded-lg p-2.5 ${
+                action.type === 'now' ? 'bg-red-500/8 border border-red-500/20'
+                : action.type === 'do' ? 'bg-emerald-500/8 border border-emerald-500/20'
+                : 'bg-white/5 border border-white/10'
+              }`}>
+                <span className="text-base flex-shrink-0 mt-0.5">{action.emoji}</span>
+                <div className="min-w-0">
+                  <div className={`text-xs font-semibold ${
+                    action.type === 'now' ? 'text-red-200' : action.type === 'do' ? 'text-emerald-200' : theme.header
+                  }`}>{action.title}</div>
+                  <div className={`text-[10px] ${theme.text} opacity-50 mt-0.5 leading-tight`}>{action.body}</div>
+                </div>
+                <span className={`text-[9px] flex-shrink-0 px-1.5 py-0.5 rounded-full border mt-0.5 ${
+                  action.type === 'now' ? 'border-red-500/30 text-red-400' : 'border-emerald-500/30 text-emerald-400'
+                }`}>
+                  {action.type === 'now' ? '↓ нейтрализовать' : '↑ активировать'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Synthesis narrative ────────────────────────────────────────── */}
       <div className={`rounded-xl border ${theme.card} p-4`}>
         <p className={`text-[10px] font-semibold uppercase tracking-wider opacity-40 mb-2 ${theme.text}`}>
@@ -514,6 +714,32 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
         </p>
         <p className={`text-sm leading-relaxed ${theme.text}`}>{narrative}</p>
       </div>
+
+      {/* ── DO / AVOID ────────────────────────────────────────────────── */}
+      {houseDoAvoid && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3">
+            <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider mb-2">✅ Делайте в этот год</p>
+            <ul className="space-y-1">
+              {houseDoAvoid.do.map((item, i) => (
+                <li key={i} className={`text-xs ${theme.text} opacity-75 flex gap-1.5`}>
+                  <span className="text-emerald-400 flex-shrink-0">›</span>{item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-3">
+            <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider mb-2">⛔ Избегайте</p>
+            <ul className="space-y-1">
+              {houseDoAvoid.avoid.map((item, i) => (
+                <li key={i} className={`text-xs ${theme.text} opacity-75 flex gap-1.5`}>
+                  <span className="text-red-400 flex-shrink-0">›</span>{item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* ── Sphere recommendations ────────────────────────────────────── */}
       {Object.keys(sphereAdvice).length > 0 && (
@@ -524,12 +750,7 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
           <div className="space-y-2">
             {['love','work','health','finance','creative'].map(sphere => (
               sphereAdvice[sphere] ? (
-                <SphereRow
-                  key={sphere}
-                  sphere={sphere}
-                  advice={sphereAdvice[sphere]}
-                  theme={theme}
-                />
+                <SphereRow key={sphere} sphere={sphere} advice={sphereAdvice[sphere]} theme={theme} />
               ) : null
             ))}
           </div>
@@ -541,59 +762,47 @@ export default function ForecastAdvisorBlock({ birth, theme }: Props) {
         <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
           <div>
             <p className={`text-[10px] font-semibold uppercase tracking-wider opacity-40 ${theme.text}`}>
-              ⚗️ Компенсаторные практики
+              ⚗️ Компенсаторные практики года
             </p>
             <p className={`text-[10px] ${theme.text} opacity-30 mt-0.5`}>
-              Для лорда {PLANET_RU[lord] ?? lord}{saturnMilestone ? ' + фаза Сатурна' : ''}
+              Лорд {PLANET_RU[lord] ?? lord}{saturnMilestone ? ' + фаза Сатурна' : ''} · {allPractices.length} практик
             </p>
           </div>
         </div>
-
         {/* Filters */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {(['все','активация','нейтрализация'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setPracticeFilter(f)}
+            <button key={f} onClick={() => setPracticeFilter(f)}
               className={`px-2.5 py-1 rounded-full text-[10px] transition-all ${
                 practiceFilter === f
                   ? f === 'активация' ? 'bg-emerald-600 text-white'
                     : f === 'нейтрализация' ? 'bg-orange-600 text-white'
                     : 'bg-white/15 text-white'
                   : 'bg-white/5 text-white/40 hover:text-white/60'
-              }`}
-            >
+              }`}>
               {f === 'активация' ? '▲ Активация' : f === 'нейтрализация' ? '▼ Нейтрализация' : 'Все'}
             </button>
           ))}
           <div className="w-px bg-white/10 mx-1" />
           {['все', ...categories].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCatFilter(cat)}
+            <button key={cat} onClick={() => setCatFilter(cat)}
               className={`px-2.5 py-1 rounded-full text-[10px] transition-all ${
-                catFilter === cat
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-white/5 text-white/40 hover:text-white/60'
-              }`}
-            >
+                catFilter === cat ? 'bg-violet-600 text-white' : 'bg-white/5 text-white/40 hover:text-white/60'
+              }`}>
               {cat}
             </button>
           ))}
         </div>
-
         {visiblePractices.length === 0 ? (
           <p className={`text-xs ${theme.text} opacity-40 text-center py-4`}>Нет практик для выбранных фильтров</p>
         ) : (
           <div className="space-y-2">
-            {visiblePractices.map((p, i) => (
-              <PracticeCard key={`${p.title}-${i}`} p={p} />
-            ))}
+            {visiblePractices.map((p, i) => <PracticeCard key={`${p.title}-${i}`} p={p} />)}
           </div>
         )}
       </div>
 
-      {/* ── This week focus ───────────────────────────────────────────── */}
+      {/* ── Weekly focus ──────────────────────────────────────────────── */}
       <div className={`rounded-xl border ${theme.card} p-4`}>
         <p className={`text-[10px] font-semibold uppercase tracking-wider opacity-40 mb-3 ${theme.text}`}>
           📅 Фокус на неделю
