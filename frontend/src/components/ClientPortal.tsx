@@ -53,6 +53,7 @@ import IngressPersonalBlock from './IngressPersonalBlock';
 import SignalWeightsBlock from './SignalWeightsBlock';
 import SynastryProgressedBlock from './SynastryProgressedBlock';
 import AnnualProfectionBlock from './AnnualProfectionBlock';
+import ForecastAdvisorBlock from './ForecastAdvisorBlock';
 import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -2146,7 +2147,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     () => people.find(p => p.name === birth.name) ?? null,
     [people, birth.name],
   );
-  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'eclipse-personal'|'ingress-personal'|'signal-weights'|'annual-profection'>('dashboard');
+  const [activeTab, setActiveTab]= useState<'dashboard'|'natal'|'human-design'|'horoscope'|'synastry'|'analysis'|'jyotish'|'navigation'|'holos'|'numerology'|'asteroids'|'planetary-hours'|'sidereal'|'zodiacal-releasing'|'primary-directions'|'probability'|'gene-keys'|'history'|'daily'|'ingress'|'voc'|'saturn-cycle'|'fixed-stars'|'heliocentric'|'kabbalah-tree'|'planetary-nodes'|'eclipse-personal'|'ingress-personal'|'signal-weights'|'annual-profection'|'advisor'>('dashboard');
   const [humanDesignMode, setHumanDesignMode] = useState<HumanDesignContentMode>('analyst');
   const [natalChart, setNatalChart] = useState<NatalChart | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2279,6 +2280,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     {
       key: 'forecast', label: 'Прогноз', emoji: '🔮',
       tabs: [
+        { key: 'advisor',           icon: Zap,       label: '🎯 Советник' },
         { key: 'horoscope',         icon: Sun,       label: 'Гороскоп' },
         { key: 'eclipse-personal',  icon: Star,      label: '🌑 Затмения' },
         { key: 'saturn-cycle',      icon: Clock,     label: '♄ Сатурн' },
@@ -2690,6 +2692,19 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           )}
 
           {/* Компенсаторные практики переехали в 🔮 Гороскоп → вкладка ⚗️ Компенсаторика */}
+
+          {activeTab === 'advisor' && (
+            <div id="pdf-section-advisor">
+              {birth.date ? (
+                <ForecastAdvisorBlock birth={birth} theme={theme} />
+              ) : (
+                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
+                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
+                  <p className={`${theme.text} text-sm`}>Введите дату рождения для персонального прогноза</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === 'eclipse-personal' && (
             <div id="pdf-section-eclipse-personal">
