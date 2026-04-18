@@ -2246,39 +2246,96 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     }
   }, [activeTab, birth.name, humanDesignMode]);
 
-  const tabs = [
-    { key: 'dashboard',      icon: Zap,       label: '⚡ Дашборд' },
-    { key: 'natal',          icon: Star,      label: tr.natalChart },
-    { key: 'horoscope',      icon: Sun,       label: '🔮 Гороскоп' },
-    { key: 'synastry',       icon: Heart,     label: tr.synastry },
-    { key: 'navigation',     icon: Globe,     label: '🌍 Релокация' },
-    { key: 'analysis',        icon: BookOpen,  label: '✦ Анализ' },
-    { key: 'human-design',   icon: Layers,    label: 'Human Design' },
-    { key: 'jyotish',        icon: Star,      label: 'Джйотиш' },
-    { key: 'numerology',     icon: Sparkles,  label: '🔢 Нумерология' },
-    { key: 'asteroids',      icon: Star,      label: '⚳ Астероиды' },
-    { key: 'planetary-hours', icon: Clock,    label: '⏱ Планет.часы' },
-    { key: 'sidereal',            icon: Globe,     label: '🌐 Сидерич.' },
-    { key: 'zodiacal-releasing',  icon: Clock,     label: '⏳ Зод.Высв.' },
-    { key: 'primary-directions',  icon: Star,      label: '✦ Примарные' },
-    { key: 'probability',         icon: Sparkles,  label: '🌀 Вероятн.' },
-    { key: 'gene-keys',           icon: Sparkles,  label: '✦ Gene Keys' },
-    { key: 'history',             icon: Sparkles,  label: '📋 История' },
-    { key: 'daily',               icon: Zap,       label: '📅 День' },
-    { key: 'ingress',             icon: Globe,     label: '🌠 Ингрессы' },
-    { key: 'voc',                 icon: Clock,     label: '🌙 VoC Луна' },
-    { key: 'saturn-cycle',        icon: Clock,     label: '♄ Цикл Сатурна' },
-    { key: 'fixed-stars',         icon: Star,      label: '✦ Неп. звёзды' },
-    { key: 'heliocentric',        icon: Globe,     label: '☉ Гелиоцентр.' },
-    { key: 'kabbalah-tree',       icon: Sparkles,  label: '✡ Каббала' },
-    { key: 'planetary-nodes',     icon: Globe,     label: '☊ Планет. узлы' },
-    // Компенсаторные практики перенесены внутрь 🔮 Гороскоп → вкладка ⚗️ Компенсаторика
-    { key: 'eclipse-personal',     icon: Star,      label: '🌑 Затмения' },
-    { key: 'ingress-personal',     icon: Globe,     label: '🌠 Ингрессии·домов' },
-    { key: 'signal-weights',       icon: Zap,       label: '⚡ Веса сигналов' },
-    { key: 'annual-profection',    icon: Calendar,  label: '🔄 Профекции года' },
-    { key: 'holos',               icon: Sparkles,  label: '✦ HOLOS' },
-  ] as const;
+  // ── Two-tier navigation: 5 sections → sub-tabs ──────────────────────────────
+  type SectionKey = 'today' | 'chart' | 'forecast' | 'partners' | 'systems';
+
+  const SECTIONS: Array<{
+    key: SectionKey;
+    label: string;
+    emoji: string;
+    tabs: Array<{ key: typeof activeTab; icon: React.ElementType; label: string }>;
+  }> = [
+    {
+      key: 'today', label: 'Сегодня', emoji: '🏠',
+      tabs: [
+        { key: 'dashboard',  icon: Zap,      label: 'Дашборд' },
+        { key: 'daily',      icon: Calendar, label: 'Личный день' },
+        { key: 'voc',        icon: Clock,    label: '🌙 VoC Луна' },
+        { key: 'ingress',    icon: Globe,    label: '🌠 Ингрессы' },
+      ],
+    },
+    {
+      key: 'chart', label: 'Карта', emoji: '✦',
+      tabs: [
+        { key: 'natal',             icon: Star,      label: tr.natalChart },
+        { key: 'analysis',          icon: BookOpen,  label: 'Анализ' },
+        { key: 'history',           icon: Sparkles,  label: 'История' },
+        { key: 'asteroids',         icon: Star,      label: '⚳ Астероиды' },
+        { key: 'fixed-stars',       icon: Star,      label: '✦ Звёзды' },
+        { key: 'heliocentric',      icon: Globe,     label: '☉ Гелио' },
+        { key: 'planetary-nodes',   icon: Globe,     label: '☊ Узлы' },
+      ],
+    },
+    {
+      key: 'forecast', label: 'Прогноз', emoji: '🔮',
+      tabs: [
+        { key: 'horoscope',         icon: Sun,       label: 'Гороскоп' },
+        { key: 'eclipse-personal',  icon: Star,      label: '🌑 Затмения' },
+        { key: 'saturn-cycle',      icon: Clock,     label: '♄ Сатурн' },
+        { key: 'annual-profection', icon: Calendar,  label: '🔄 Профекции' },
+        { key: 'ingress-personal',  icon: Globe,     label: '🌠 Ингрессии' },
+        { key: 'signal-weights',    icon: Zap,       label: '⚡ Веса' },
+      ],
+    },
+    {
+      key: 'partners', label: 'Партнёры', emoji: '💑',
+      tabs: [
+        { key: 'synastry',    icon: Heart,  label: tr.synastry },
+        { key: 'navigation',  icon: Globe,  label: '🌍 Релокация' },
+      ],
+    },
+    {
+      key: 'systems', label: 'Системы', emoji: '🔬',
+      tabs: [
+        { key: 'human-design',         icon: Layers,    label: 'Human Design' },
+        { key: 'jyotish',              icon: Star,      label: 'Джйотиш' },
+        { key: 'numerology',           icon: Sparkles,  label: '🔢 Нумерология' },
+        { key: 'sidereal',             icon: Globe,     label: '🌐 Сидерич.' },
+        { key: 'zodiacal-releasing',   icon: Clock,     label: '⏳ Зод.Высв.' },
+        { key: 'primary-directions',   icon: Star,      label: '✦ Примарные' },
+        { key: 'probability',          icon: Sparkles,  label: '🌀 Вероятн.' },
+        { key: 'planetary-hours',      icon: Clock,     label: '⏱ Планет.ч.' },
+        { key: 'kabbalah-tree',        icon: Sparkles,  label: '✡ Каббала' },
+        { key: 'gene-keys',            icon: Sparkles,  label: '✦ Gene Keys' },
+        { key: 'holos',                icon: Sparkles,  label: '✦ HOLOS' },
+      ],
+    },
+  ];
+
+  // Derive active section from active tab
+  const activeSection = useMemo<SectionKey>(() => {
+    for (const s of SECTIONS) {
+      if (s.tabs.some(t => t.key === activeTab)) return s.key;
+    }
+    return 'today';
+  }, [activeTab, tr]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeSectionTabs = useMemo(
+    () => SECTIONS.find(s => s.key === activeSection)?.tabs ?? [],
+    [activeSection, tr], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const handleSectionClick = useCallback((sectionKey: SectionKey) => {
+    const section = SECTIONS.find(s => s.key === sectionKey);
+    if (!section) return;
+    // If already in this section, don't change tab; otherwise go to first tab
+    if (activeSection !== sectionKey) {
+      setActiveTab(section.tabs[0].key);
+    }
+  }, [activeSection, tr]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Legacy flat tabs kept only for PDF export compatibility
+  const tabs = SECTIONS.flatMap(s => s.tabs);
 
   return (
     <div className={`relative min-h-screen ${theme.container} transition-all duration-500`}>
@@ -2328,55 +2385,127 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         </div>
       </nav>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <BirthForm
-          value={birth}
-          onChange={setBirth}
-          label={tr.birthData}
-          theme={theme}
-          people={people}
-          onSave={user ? handleSavePerson : undefined}
-          onDelete={user ? handleDeletePerson : undefined}
-        />
+      <div className="relative z-10 max-w-7xl mx-auto px-4 pt-4 pb-6 space-y-3">
+        {/* ── Collapsible birth form ──────────────────────────────────────────── */}
+        {(() => {
+          const [formOpen, setFormOpen] = React.useState(!natalChart);
+          // Auto-collapse when natal is calculated
+          React.useEffect(() => { if (natalChart) setFormOpen(false); }, [natalChart]); // eslint-disable-line react-hooks/exhaustive-deps
+          return (
+            <>
+              {/* Compact header bar */}
+              <div className={`rounded-2xl border ${theme.card} px-4 py-3`}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Summary pill (when collapsed) */}
+                  {!formOpen && birth.date && (
+                    <div className={`flex items-center gap-2 flex-1 min-w-0`}>
+                      <Star className={`h-4 w-4 shrink-0 ${theme.symbol}`} />
+                      <span className={`text-sm font-medium ${theme.header} truncate`}>
+                        {birth.name || 'Клиент'} · {birth.date}{birth.time ? ' ' + birth.time : ''} · UTC{birth.utc >= 0 ? '+' : ''}{birth.utc}
+                      </span>
+                      {natalChart && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
+                          ✓ Карта рассчитана
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {formOpen && (
+                    <span className={`text-sm font-semibold ${theme.header} flex-1`}>{tr.birthData}</span>
+                  )}
 
-        <div className="flex gap-3 flex-wrap">
-          <button onClick={calcNatal} disabled={loading}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${theme.btn} shadow-lg`}>
-            {loading ? <><Spin /><span>{tr.calculating}</span></> : <><Star className="h-4 w-4 inline mr-1.5" /><span>{tr.calcNatal}</span></>}
-          </button>
-          {natalChart && (
-            <button onClick={handleExportAll} disabled={isExporting}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
-              {isExporting
-                ? <><Spin /><span>{tr.exportPdf}…</span></>
-                : <><Download className="h-4 w-4 inline mr-1.5" /><span>{tr.exportPdf}</span></>}
-            </button>
-          )}
-          {birth.date && (
-            <button onClick={() => handleFullReport('full')} disabled={reportExporting}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50`}>
-              {reportExporting
-                ? <><Spin /><span>Генерация…</span></>
-                : <><Download className="h-4 w-4 inline mr-1.5" /><span>Полный отчёт PDF</span></>}
-            </button>
-          )}
-          {activeTab === 'human-design' && (
-            <button onClick={handleExportHumanDesign} disabled={isExporting}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${theme.card} disabled:opacity-50`}>
-              {isExporting
-                ? <><Spin /><span>PDF Human Design…</span></>
-                : <><Download className="h-4 w-4 inline mr-1.5" /><span>PDF Human Design</span></>}
-            </button>
-          )}
-        </div>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <button onClick={calcNatal} disabled={loading}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${theme.btn} shadow-sm`}>
+                      {loading ? <><Spin /><span>{tr.calculating}</span></> : <><Star className="h-3.5 w-3.5" /><span>{tr.calcNatal}</span></>}
+                    </button>
+                    {natalChart && (
+                      <button onClick={handleExportAll} disabled={isExporting}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
+                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tr.exportPdf}</span>
+                      </button>
+                    )}
+                    {birth.date && (
+                      <button onClick={() => handleFullReport('full')} disabled={reportExporting}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50`}>
+                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Полный PDF</span>
+                      </button>
+                    )}
+                    {activeTab === 'human-design' && (
+                      <button onClick={handleExportHumanDesign} disabled={isExporting}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
+                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">HD PDF</span>
+                      </button>
+                    )}
+                    {/* Toggle form expand */}
+                    <button
+                      onClick={() => setFormOpen(v => !v)}
+                      className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all ${theme.tabInactive}`}
+                    >
+                      {formOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                      <span className="hidden sm:inline">{formOpen ? 'Свернуть' : 'Изменить'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expanded form */}
+                {formOpen && (
+                  <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <BirthForm
+                      value={birth}
+                      onChange={setBirth}
+                      label=""
+                      theme={theme}
+                      people={people}
+                      onSave={user ? handleSavePerson : undefined}
+                      onDelete={user ? handleDeletePerson : undefined}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
 
         {error && <Err msg={error} />}
 
-        <div className="flex gap-2 border-b pb-1 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-          {tabs.map(({ key, icon: Icon, label }) => (
-            <button key={key} onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border whitespace-nowrap transition-all duration-300 ${key === 'human-design' ? 'ml-6 border-2 border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]' : ''} ${activeTab === key ? theme.tabActive : theme.tabInactive}`}>
-              <Icon className="h-4 w-4" /><span>{label}</span>
+        {/* ── Two-tier navigation ─────────────────────────────────────────── */}
+        {/* Row 1: 5 main sections */}
+        <div className="flex gap-1 border-b pb-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          {SECTIONS.map(s => {
+            const isActive = activeSection === s.key;
+            return (
+              <button
+                key={s.key}
+                onClick={() => handleSectionClick(s.key)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-all duration-200 whitespace-nowrap ${
+                  isActive
+                    ? 'bg-white/12 border-white/25 text-white shadow-sm'
+                    : 'border-transparent text-white/45 hover:text-white/75 hover:bg-white/6'
+                }`}
+              >
+                <span className="text-base leading-none">{s.emoji}</span>
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 2: sub-tabs of active section */}
+        <div className="flex gap-1.5 border-b pb-1.5 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          {activeSectionTabs.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap transition-all duration-200 ${
+                activeTab === key
+                  ? theme.tabActive
+                  : theme.tabInactive
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
             </button>
           ))}
         </div>
