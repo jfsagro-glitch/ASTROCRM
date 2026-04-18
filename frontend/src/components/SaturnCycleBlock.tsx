@@ -50,6 +50,39 @@ const MILESTONE_STYLE: Record<string, { icon: string; border: string; bg: string
   },
 };
 
+// ── milestone narratives ──────────────────────────────────────────────────────
+
+const SATURN_MILESTONE_NARRATIVE: Record<string, string[]> = {
+  conjunction: [
+    'Первый Возврат Сатурна (~29–30 лет) — один из главных рубежей жизни. Позади — молодость с её экспериментами и иллюзиями. Впереди — настоящая взрослость. Жизнь предъявляет счёт: всё, что строилось на ненастоящем фундаменте, начинает трещать. Карьера, отношения, самоощущение — что из этого ваше, а что было взято «по умолчанию»? Это не кризис — это экзамен на подлинность.',
+    'Второй Возврат Сатурна (~58–60 лет) — время переосмысления пройденного пути. Тело, время, приоритеты — всё говорит: хватит откладывать главное. Многие в этот период меняют профессию, уходят на пенсию или наоборот начинают дело мечты. Это зрелая мудрость, которая не боится честности.',
+    'Третий Возврат Сатурна (~88–90 лет) — редкий и глубокий. Итог целой жизни. Что осталось неизменным? Что вы поняли о себе? Это время тихой благодарности и принятия.',
+  ],
+  square_1: [
+    'Первый Квадрат Сатурна (~7 лет) — детский кризис структуры. Первые «надо» и «нельзя» сталкиваются с желаниями. Родители и мир устанавливают правила — ребёнок учится, как в них жить.',
+    'Второй Квадрат Сатурна (~36–37 лет) — квадрат второго цикла. Подводятся итоги первой взрослой декады. Что из построенного реально работает? Карьера, семья, тело — всё проходит проверку. Тихий, но настойчивый голос внутри: «Это точно то, чего я хочу?» Честный ответ меняет траекторию.',
+    'Следующий Квадрат Сатурна — ещё одна точка пересмотра. Жизнь предлагает скорректировать курс, пока не поздно.',
+  ],
+  opposition: [
+    'Оппозиция Сатурна (~14–15 лет) — подростковый кризис авторитетов. Мир взрослых впервые ощущается как несправедливый или лицемерный. Бунт против ограничений — это нормально. Важно, чтобы за бунтом стояло что-то настоящее.',
+    'Оппозиция второго цикла (~44–45 лет) — знаменитый «кризис середины жизни». Половина пути пройдена. Достижения видны — и видны их пределы. Отношения, карьера, тело — всё говорит: пора пересмотреть. Это не катастрофа, это развилка. Те, кто берут её честно, живут вторую половину жизни полнее.',
+    'Следующая Оппозиция Сатурна — новая точка честного взгляда на пройденное.',
+  ],
+  square_2: [
+    'Третий Квадрат Сатурна (~21–22 года) — переход во взрослость. Студенческая жизнь заканчивается, начинается настоящая. Первая серьёзная работа, первое жильё, первые взрослые решения. Кажется, что мир слишком жёсткий — на самом деле он просто настоящий.',
+    'Квадрат третьего цикла (~51–52 года) — ещё одна точка зрелой интеграции. Что из планов воплощено? Что так и осталось мечтой? Не для сожаления — для честной переоценки.',
+    'Следующий Квадрат — приглашение к интеграции накопленного опыта.',
+  ],
+};
+
+function getSaturnNarrative(m: SaturnMilestone): string {
+  const arr = SATURN_MILESTONE_NARRATIVE[m.type];
+  if (!arr) return '';
+  // Pick narrative based on cycle number (1-indexed, clamp to array length)
+  const idx = Math.min((m.cycle_number || 1) - 1, arr.length - 1);
+  return arr[Math.max(0, idx)];
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function isInPast(dateUtc: string): boolean {
@@ -65,6 +98,7 @@ function isNearNow(dateUtc: string, windowDays = 365): boolean {
 // ── milestone card ────────────────────────────────────────────────────────────
 
 function MilestoneCard({ m, isCurrent }: { m: SaturnMilestone; isCurrent: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   const style = MILESTONE_STYLE[m.type] ?? MILESTONE_STYLE.conjunction;
   const past  = isInPast(m.date_utc);
   const near  = isNearNow(m.date_utc);
@@ -109,6 +143,23 @@ function MilestoneCard({ m, isCurrent }: { m: SaturnMilestone; isCurrent: boolea
           </div>
 
           <p className="text-xs text-white/55 mt-1.5 leading-relaxed">{m.description}</p>
+
+              {/* Narrative */}
+              {getSaturnNarrative(m) && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => setExpanded(v => !v)}
+                    className={`text-[10px] hover:opacity-80 transition-opacity flex items-center gap-1 ${style.text} opacity-50`}
+                  >
+                    {expanded ? '▲ свернуть' : '▼ живая интерпретация'}
+                  </button>
+                  {expanded && (
+                    <p className="mt-2 text-xs text-white/65 leading-relaxed border-t border-white/8 pt-2">
+                      {getSaturnNarrative(m)}
+                    </p>
+                  )}
+                </div>
+              )}
         </div>
 
         {/* Date */}
@@ -207,6 +258,18 @@ export function SaturnCycleBlock({ birthData }: Props) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Current phase narrative */}
+      {currentMilestone && getSaturnNarrative(currentMilestone) && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <div className="text-[10px] text-amber-400/60 font-medium uppercase tracking-wider mb-1.5">
+            ♄ Что это значит для вас сейчас
+          </div>
+          <p className="text-sm text-white/70 leading-relaxed">
+            {getSaturnNarrative(currentMilestone)}
+          </p>
         </div>
       )}
 

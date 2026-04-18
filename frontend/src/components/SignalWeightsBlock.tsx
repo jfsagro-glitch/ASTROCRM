@@ -34,6 +34,12 @@ const ASP_COLOR: Record<string, string> = {
   square: 'bg-red-500', sextile: 'bg-cyan-500',
 };
 
+const SIGNAL_WEIGHTS_EXPLAINER = `Каждый прогноз — это не магия, а сумма астрологических сигналов. Планеты разные по скорости: быстрый Меркурий даёт точные, кратковременные сигналы, медленный Плутон — долгосрочные фоновые влияния. «Надёжность» планеты показывает, насколько её положение в карте поддаётся точному расчёту и исторической проверке.
+
+Аспекты (соединение, трин, квадрат...) имеют разный вес: соединение и оппозиция — самые мощные, они буквально «сталкивают» две планетарные энергии. Трин гармоничен и легко течёт, квадрат создаёт напряжение и действие.
+
+Орбы — это допустимое расстояние для аспекта. Чем уже орб, тем точнее и острее сигнал. Медленные планеты (Уран, Нептун, Плутон) имеют широкие орбы — их влияние растянуто во времени.`;
+
 export default function SignalWeightsBlock({ theme }: Props) {
   const [data, setData] = useState<SignalWeightsResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -102,6 +108,18 @@ export default function SignalWeightsBlock({ theme }: Props) {
           <span className={`${theme.text} opacity-40 text-[10px] uppercase tracking-wide`}>Методология</span>
           <span className={`${theme.text} opacity-70`}>{data.methodology}</span>
         </div>
+      </div>
+
+      {/* Plain-language explainer */}
+      <div className={`rounded-xl border ${theme.card} p-4`}>
+        <p className={`text-[10px] font-semibold uppercase tracking-wider opacity-50 mb-2 ${theme.text}`}>
+          💡 Что это такое и зачем нужно
+        </p>
+        {SIGNAL_WEIGHTS_EXPLAINER.split('\n\n').map((para, i) => (
+          <p key={i} className={`text-xs leading-relaxed ${theme.text} opacity-70 ${i > 0 ? 'mt-2' : ''}`}>
+            {para}
+          </p>
+        ))}
       </div>
 
       {/* Tab bar */}

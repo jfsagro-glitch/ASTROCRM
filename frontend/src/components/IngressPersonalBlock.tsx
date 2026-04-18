@@ -32,6 +32,21 @@ const HOUSE_COLOR: Record<number, string> = {
   12: 'text-purple-300 border-purple-500/30',
 };
 
+const INGRESS_HOUSE_NARRATIVE: Record<number, string> = {
+  1:  'Солнце освещает вас лично — как вы выглядите, как держитесь, что думаете о себе. Около 30 дней жизнь фокусируется на вашей идентичности. Хорошее время начинать что-то новое с нуля, менять образ, заявлять о себе.',
+  2:  'Солнце в доме денег и ценностей — финансовые вопросы выходят на первый план. Это не обязательно проблемы: часто именно сейчас приходят нужные деньги или появляется ясность, чего вы реально хотите от жизни.',
+  3:  'Солнце в доме коммуникаций — 30 дней активной умственной работы, переговоров, поездок. Пишите письма, подписывайте договоры, звоните тем, кому давно хотели. Братья, сёстры, соседи — они сейчас ближе.',
+  4:  'Солнце в доме семьи — время уделить внимание дому и близким. Семейные вопросы всплывают сами. Хорошее время для ремонта, переезда, разговоров с родителями о важном.',
+  5:  'Солнце в доме радости — один из лучших периодов года. Романтика, творчество, дети, игра. Позвольте себе быть лёгким и счастливым — жизнь сейчас это поддерживает.',
+  6:  'Солнце в доме здоровья и работы — время взять под контроль рутину. Запишитесь к врачу, наведите порядок в питании, оптимизируйте рабочие процессы. Небольшие усилия дают ощутимый результат.',
+  7:  'Солнце в доме партнёрств — отношения выходят на первый план. Около 30 дней активных переговоров, встреч, совместных решений. Важный человек появляется или существующие отношения требуют внимания.',
+  8:  'Солнце в доме трансформации — время для глубинной работы. Психология, финансы с партнёром, избавление от лишнего. Не самый лёгкий период, но зато — настоящий. Что готовы отпустить?',
+  9:  'Солнце в доме путешествий и знаний — расширяйтесь. Поездка, курс, новая книга, разговор с мудрым человеком — всё это сейчас особенно питательно. Горизонты расширяются буквально и метафорически.',
+  10: 'Солнце в доме карьеры — профессиональная видимость на пике. Просите о повышении, презентуйте проекты, знакомьтесь с нужными людьми. Жизнь смотрит на вашу работу — покажите лучшее.',
+  11: 'Солнце в доме дружбы и целей — время единомышленников. Вступайте в сообщества, обсуждайте мечты, заводите новые контакты. Коллективная энергия сейчас работает на вас.',
+  12: 'Солнце в доме уединения — время замедлиться. Ретрит, уединение, работа за кулисами. Именно сейчас полезнее всего: медитировать, вести дневник, завершать старые дела. Восстановите силы перед новым циклом.',
+};
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function formatIngressDate(dateStr: string): string {
@@ -68,47 +83,71 @@ function IngressRow({
   isCurrent: boolean;
   isNextRow: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const hc = HOUSE_COLOR[ing.natal_house] ?? 'text-white/50 border-white/20';
   const dateStr = formatIngressDate(ing.ingress_date);
+  const narrative = INGRESS_HOUSE_NARRATIVE[ing.natal_house];
 
   return (
-    <div
-      className={`grid grid-cols-[2rem_3rem_1fr_3rem_1fr] items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
-        isCurrent
-          ? 'bg-amber-500/10 border border-amber-500/30'
-          : isNextRow
-          ? 'bg-sky-500/5 border border-sky-500/20'
-          : 'border border-white/6 hover:bg-white/3'
-      }`}
-    >
-      {/* Glyph */}
-      <span className="text-base text-center">{SIGN_GLYPH[ing.sign] ?? '·'}</span>
+    <div className="space-y-0">
+      <div
+        className={`grid grid-cols-[2rem_3rem_1fr_3rem_1fr] items-center gap-2 px-3 py-2 text-sm transition-all ${
+          narrative ? 'cursor-pointer' : ''
+        } ${expanded ? 'rounded-t-lg' : 'rounded-lg'} ${
+          isCurrent
+            ? 'bg-amber-500/10 border border-amber-500/30'
+            : isNextRow
+            ? 'bg-sky-500/5 border border-sky-500/20'
+            : 'border border-white/6 hover:bg-white/3'
+        } ${expanded ? (isCurrent ? 'border-b-0' : isNextRow ? 'border-b-0' : 'border-b-0') : ''}`}
+        onClick={() => narrative && setExpanded(v => !v)}
+      >
+        {/* Glyph */}
+        <span className="text-base text-center">{SIGN_GLYPH[ing.sign] ?? '·'}</span>
 
-      {/* Date */}
-      <span className="text-white/50 text-xs text-center">{dateStr}</span>
+        {/* Date */}
+        <span className="text-white/50 text-xs text-center">{dateStr}</span>
 
-      {/* Sign name */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="text-white/80 text-xs font-medium truncate">{ing.sign_ru}</span>
-        {isCurrent && (
-          <span className="text-[9px] text-amber-300 bg-amber-500/15 rounded-full px-1.5 py-px flex-shrink-0">
-            сейчас
-          </span>
-        )}
-        {isNextRow && (
-          <span className="text-[9px] text-sky-300 bg-sky-500/15 rounded-full px-1.5 py-px flex-shrink-0">
-            след.
-          </span>
-        )}
+        {/* Sign name */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-white/80 text-xs font-medium truncate">{ing.sign_ru}</span>
+          {isCurrent && (
+            <span className="text-[9px] text-amber-300 bg-amber-500/15 rounded-full px-1.5 py-px flex-shrink-0">
+              сейчас
+            </span>
+          )}
+          {isNextRow && (
+            <span className="text-[9px] text-sky-300 bg-sky-500/15 rounded-full px-1.5 py-px flex-shrink-0">
+              след.
+            </span>
+          )}
+        </div>
+
+        {/* House number */}
+        <div className={`flex items-center justify-center text-xs font-bold border rounded-full w-7 h-7 flex-shrink-0 ${hc}`}>
+          {ing.natal_house}
+        </div>
+
+        {/* Theme + expand hint */}
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="text-[11px] text-white/35 truncate">{ing.activated_theme}</span>
+          {narrative && (
+            <span className="text-[9px] text-white/20 flex-shrink-0">{expanded ? '▲' : '▼'}</span>
+          )}
+        </div>
       </div>
 
-      {/* House number */}
-      <div className={`flex items-center justify-center text-xs font-bold border rounded-full w-7 h-7 flex-shrink-0 ${hc}`}>
-        {ing.natal_house}
-      </div>
-
-      {/* Theme */}
-      <span className="text-[11px] text-white/35 truncate">{ing.activated_theme}</span>
+      {expanded && narrative && (
+        <div className={`px-3 py-2.5 rounded-b-lg border-x border-b text-xs text-white/65 leading-relaxed ${
+          isCurrent
+            ? 'border-amber-500/30 bg-amber-500/5'
+            : isNextRow
+            ? 'border-sky-500/20 bg-sky-500/5'
+            : 'border-white/8 bg-white/3'
+        }`}>
+          {narrative}
+        </div>
+      )}
     </div>
   );
 }
