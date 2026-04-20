@@ -1417,7 +1417,7 @@ def dashboard(req: DashboardRequest):
         elif phase_angle < 315: phase = "last_quarter"
         else:                   phase = "waning_crescent"
 
-        voc = void_of_course_moon(jd_target, look_ahead_days=2.0)
+        voc = void_of_course_moon(jd_target, look_ahead_days=2.0, lat=req.lat, lon=req.lon)
         mansion = lunar_mansion_full(moon_lon)
         illumination = round(((1 - math.cos(math.radians(phase_angle))) / 2) * 100, 1)
 

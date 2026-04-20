@@ -838,8 +838,8 @@ export default function DailyForecastView({
   // Summary stats
   const goodDays = forecasts.filter(d => d.energyScore >= 62).length;
   const toughDays = forecasts.filter(d => d.energyScore < 48).length;
-  const bestDay = forecasts.reduce((best, d) => d.energyScore > best.energyScore ? d : best, forecasts[0]);
-  const worstDay = forecasts.reduce((worst, d) => d.energyScore < worst.energyScore ? d : worst, forecasts[0]);
+  const bestDay = forecasts.length > 0 ? forecasts.reduce((best, d) => d.energyScore > best.energyScore ? d : best, forecasts[0]) : null;
+  const worstDay = forecasts.length > 0 ? forecasts.reduce((worst, d) => d.energyScore < worst.energyScore ? d : worst, forecasts[0]) : null;
   const voidDays = forecasts.filter(d => d.voidOfCourse).length;
   const compDays = forecasts.filter(d => d.compensatorics.length > 0).length;
   // Top 3 days for "best windows"

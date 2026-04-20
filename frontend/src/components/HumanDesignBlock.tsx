@@ -359,13 +359,13 @@ export default function HumanDesignBlock({
   const selectedModeOption = HD_MODE_OPTIONS.find(option => option.key === contentMode) ?? HD_MODE_OPTIONS[1];
   const isReaderMode = contentMode === 'reader';
 
-  const crossTitle = result?.incarnation_cross.primary_title || result?.incarnation_cross.cross_name_ru || result?.incarnation_cross.name;
-  const crossText = result?.incarnation_cross.primary_text || result?.incarnation_cross.description;
-  const readerCrossFullText = result?.incarnation_cross.reader_full_report_ru;
-  const profileContext = result?.incarnation_cross.profile_context_ru;
+  const crossTitle = result?.incarnation_cross?.primary_title || result?.incarnation_cross?.cross_name_ru || result?.incarnation_cross?.name;
+  const crossText = result?.incarnation_cross?.primary_text || result?.incarnation_cross?.description;
+  const readerCrossFullText = result?.incarnation_cross?.reader_full_report_ru;
+  const profileContext = result?.incarnation_cross?.profile_context_ru;
 
-  const definedCenters = useMemo(() => result?.centers.filter(center => center.defined) ?? [], [result]);
-  const openCenters = useMemo(() => result?.centers.filter(center => !center.defined) ?? [], [result]);
+  const definedCenters = useMemo(() => result?.centers?.filter(center => center.defined) ?? [], [result]);
+  const openCenters = useMemo(() => result?.centers?.filter(center => !center.defined) ?? [], [result]);
   const topGateNames = useMemo(() => (result?.gates ?? []).slice(0, 4).map(g => `${g.gate} ${g.name}`), [result]);
 
   const readerNutrition = useMemo(() => {
