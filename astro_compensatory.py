@@ -648,7 +648,7 @@ def build_compensatory_report(
     natal_planets = natal_chart.get("planets", {})
     natal_sun_lon = natal_planets.get("sun", {})
     if isinstance(natal_sun_lon, dict):
-        natal_sun_lon = natal_sun_lon.get("longitude", 0)
+        natal_sun_lon = natal_sun_lon.get("lon", natal_sun_lon.get("longitude", 0))
     sun_sign = natal_chart.get("sun_sign") or _lon_to_sign(natal_sun_lon)
 
     sun_sign_data = SUN_SIGN_VOICE.get(sun_sign, {})
@@ -658,7 +658,7 @@ def build_compensatory_report(
     bg_input = {}
     for p in ("saturn", "neptune", "pluto", "uranus", "jupiter"):
         raw = tr_planets.get(p, {})
-        lon = raw.get("longitude", 0) if isinstance(raw, dict) else raw
+        lon = raw.get("lon", raw.get("longitude", 0)) if isinstance(raw, dict) else raw
         bg_input[f"{p}_lon"]  = lon
         bg_input[f"{p}_sign"] = _lon_to_sign(lon)
 
@@ -671,7 +671,7 @@ def build_compensatory_report(
         raw = tr_planets.get(planet, {})
         if not raw:
             continue
-        lon  = raw.get("longitude", 0) if isinstance(raw, dict) else raw
+        lon  = raw.get("lon", raw.get("longitude", 0)) if isinstance(raw, dict) else raw
         sign = _lon_to_sign(lon)
         data = SINGLE_PLANET_PRACTICES.get(planet, {})
         if not data:

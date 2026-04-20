@@ -3031,21 +3031,22 @@ def compensatory_practices(req: CompensatoryNatalRequest):
         raise HTTPException(503, "Compensatory engine not available")
     try:
         from astro_engine import calc_aspects as _calc_asp
-        natal_jd   = _to_jd(req.date, req.time, req.utc)
-        transit_jd = _to_jd(req.target_date, req.target_time, req.utc)
-        natal_chart   = calc_chart(natal_jd,   req.lat, req.lon,
-                                   houses_system=req.houses)
-        transit_chart = calc_chart(transit_jd, req.lat, req.lon,
-                                   houses_system=req.houses,
-                                   include_aspects=False,
-                                   include_patterns=False,
-                                   include_dignities=False,
-                                   include_arabic=False,
-                                   include_sect=False,
-                                   include_dispositors=False)
-        # Transit-to-transit aspects
+        natal_chart = calc_chart(
+            *_parse_date(req.date), *_parse_time(req.time),
+            req.lat, req.lon, req.utc,
+            houses_system=req.houses,
+        )
+        transit_chart = calc_chart(
+            *_parse_date(req.target_date), *_parse_time(req.target_time),
+            req.lat, req.lon, req.utc,
+            houses_system=req.houses,
+            include_aspects=False, include_patterns=False,
+            include_dignities=False, include_arabic=False,
+            include_sect=False, include_dispositors=False,
+        )
+        # Extract longitude floats for aspect calculation
         tr_planets = {
-            p: v.get("longitude", v) if isinstance(v, dict) else v
+            p: v.get("lon", v.get("longitude", v)) if isinstance(v, dict) else v
             for p, v in transit_chart.get("planets", {}).items()
         }
         transit_aspects = _calc_asp(tr_planets)
@@ -3089,7 +3090,7 @@ def compensatory_current(target_date: Optional[str] = None,
                                    include_sect=False,
                                    include_dispositors=False)
         tr_planets = {
-            p: v.get("longitude", v) if isinstance(v, dict) else v
+            p: v.get("lon", v.get("longitude", v)) if isinstance(v, dict) else v
             for p, v in transit_chart.get("planets", {}).items()
         }
         transit_aspects = _calc_asp(tr_planets)
@@ -5506,8 +5507,11 @@ def daily_personal(req: DailyPersonalRequest):
         # ── Transits to natal ─────────────────────────────────────────────────
         try:
             from astro_predictive import transits as calc_transits
-            transit_result = calc_transits(natal_jd, target,
-                                           req.lat, req.lon, req.utc)
+            transit_result = calc_transits(
+                natal_jd, target,
+                req.target_time,        # target_time_str (default "12:00")
+                lat=req.lat, lon=req.lon,
+            )
             top_transits = sorted(
                 transit_result.get("transit_aspects", []),
                 key=lambda x: x.get("orb", 99),
