@@ -1995,22 +1995,39 @@ def calc_transits(req: PredictiveRequest):
                     yr, mo, dy, h, mi, sc, req.lat, req.lon, req.utc,
                     include_aspects=False, include_dignities=False,
                 )
+                # Build minimal transit chart for compensatory engine
+                _tyr, _tmo, _tdy = _parse_date(req.target_date)
+                _tr_chart_comp = calc_chart(
+                    _tyr, _tmo, _tdy, 12, 0, 0, 0.0, 0.0, 0.0,
+                    include_aspects=False, include_patterns=False,
+                    include_dignities=False, include_arabic=False,
+                    include_sect=False, include_dispositors=False,
+                )
+                # Full compensatory report for all aspects at once (more efficient)
+                _all_asps = result.get("aspects", [])
+                try:
+                    _comp_full = build_compensatory_report(  # type: ignore[misc]
+                        natal_chart=natal_chart,
+                        transit_chart=_tr_chart_comp,
+                        transit_aspects=_all_asps,
+                        target_date=req.target_date,
+                        intensity="light",
+                    )
+                    _at_by_planet = {_at.get("planet", ""): _at
+                                     for _at in _comp_full.get("active_transits", [])}
+                except Exception:
+                    _at_by_planet = {}
                 enriched: list = []
-                for asp in result.get("aspects", []):
-                    try:
-                        comp = build_compensatory_report(  # type: ignore[misc]
-                            natal_chart=natal_chart,
-                            transit_aspects=[asp],
-                            depth="light",
-                        )
-                        practices = comp.get("practices", [])
-                        asp = dict(asp)  # copy so we don't mutate
+                for asp in _all_asps:
+                    asp = dict(asp)
+                    _at = _at_by_planet.get(asp.get("transit_planet", ""))
+                    if _at:
+                        _plist = _at.get("practices", [])
                         asp["compensatory_summary"] = {
-                            "top_practice": practices[0] if practices else None,
-                            "count": len(practices),
+                            "top_practice": _plist[0] if _plist else None,
+                            "tension": _at.get("tension_signal", ""),
+                            "count": len(_plist),
                         }
-                    except Exception:
-                        pass
                     enriched.append(asp)
                 result = dict(result)
                 result["aspects"] = enriched
@@ -2604,10 +2621,26 @@ def eclipse_personal(req: EclipsePersonalRequest):
                         "orb":            0.0,
                         "applying":       True,
                     }
-                    comp = build_compensatory_report(natal_chart=natal,
-                                                     transit_aspects=[synth_aspect],
-                                                     depth="light")
-                    entry["compensatory"] = comp.get("practices", [])[:2]
+                    _ecl_date = (ecl.get("date_utc") or start)[:10]
+                    _eyr, _emo, _edy = _parse_date(_ecl_date)
+                    _ecl_tr_chart = calc_chart(
+                        _eyr, _emo, _edy, 12, 0, 0, 0.0, 0.0, 0.0,
+                        include_aspects=False, include_patterns=False,
+                        include_dignities=False, include_arabic=False,
+                        include_sect=False, include_dispositors=False,
+                    )
+                    comp = build_compensatory_report(
+                        natal_chart=natal,
+                        transit_chart=_ecl_tr_chart,
+                        transit_aspects=[synth_aspect],
+                        target_date=_ecl_date,
+                        intensity="light",
+                    )
+                    _at_list = comp.get("active_transits", [])
+                    entry["compensatory"] = [
+                        _at.get("practices", [{}])[0] for _at in _at_list[:2]
+                        if _at.get("practices")
+                    ]
                 except Exception:
                     entry["compensatory"] = []
 
@@ -5566,12 +5599,30 @@ def daily_personal(req: DailyPersonalRequest):
                     include_aspects=False, include_patterns=False,
                     include_dignities=True, include_arabic=False,
                 )
-                comp = build_compensatory_report(  # type: ignore[misc]
-                    natal_chart=natal_chart,
-                    transit_aspects=top_transits,
-                    depth="light",
+                _td = datetime.strptime(target, "%Y-%m-%d")
+                transit_chart_comp = calc_chart(
+                    _td.year, _td.month, _td.day, 12, 0, 0,
+                    0.0, 0.0, 0.0,
+                    include_aspects=False, include_patterns=False,
+                    include_dignities=False, include_arabic=False,
+                    include_sect=False, include_dispositors=False,
                 )
-                advice = comp.get("practices", [])[:3]
+                comp = build_compensatory_report(
+                    natal_chart=natal_chart,
+                    transit_chart=transit_chart_comp,
+                    transit_aspects=top_transits,
+                    target_date=target,
+                    intensity="light",
+                )
+                for _at in comp.get("active_transits", [])[:3]:
+                    plist = _at.get("practices", [])
+                    if plist:
+                        top = plist[0]
+                        advice.append({
+                            "category": _at.get("function", "general"),
+                            "text":  str(top.get("practice", "")),
+                            "depth": str(top.get("depth", "light")),
+                        })
             except Exception:
                 pass
 
