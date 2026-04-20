@@ -188,12 +188,39 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 | `fc7117a` | 2026-04 | Phase 3-4: ZR, primary directions, probability tree, HTML report generator |
 | `d6a78c5` | 2026-04 | Phase 4: Gene Keys engine + frontend, SVG touch/pinch-zoom |
 | `5d6f88e` | 2026-04 | CRM history module: consultation notes timeline (Firestore sub-collection) |
-| current  | 2026-04-15 | Audit Section III: chart_analysis, ingress calendar, VoC windows, daily/personal, timezone_name |
+| `c638edc` | 2026-04-15 | Audit Section III: chart_analysis, ingress calendar, VoC windows, daily/personal, timezone_name |
+| `d3db50c` | 2026-04-20 | **АУДИТ #2**: human-design route fix, SPA catch-all moved to EOF, compensatory/current calc_chart fix, duplicate daily/personal deregistered |
+| `4b5d270` | 2026-04-20 | Frontend: DailyForecastView crash guard, HumanDesignBlock optional chaining fix, VoC lat/lon accuracy |
+| `6cd6b9e` | 2026-04-20 | Critical: /compensatory/practices calc_chart was passing JD as year; fix daily/personal transits arg order; fix lon/longitude key in compensatory engine |
+| `90f9517` | 2026-04-20 | /daily/personal v2: wrong keys firdaria (active_major vs current_period), profections (annual_house vs profected_house), transits (aspects vs transit_aspects) |
+| `7670d81` | 2026-04-20 | Fix all broken build_compensatory_report calls in /predictive/transits + /eclipse-personal + /daily/personal |
+
+---
+
+## VI. КРИТИЧЕСКИЕ БАГИ НАЙДЕНЫ И ИСПРАВЛЕНЫ (Аудит #2, 2026-04-20)
+
+| # | Файл | Баг | Статус |
+|---|------|-----|--------|
+| 1 | `astro_api.py` | `human_design()` без `@app.post` декоратора → 405 на фронте | ✅ |
+| 2 | `astro_api.py` | SPA catch-all `@app.get("/{full_path:path}")` на строке 4104 блокировал все последующие GET-роуты | ✅ |
+| 3 | `astro_api.py` | `/compensatory/current` вызывал `calc_chart(jd, 0, 0, ...)` — JD вместо года | ✅ |
+| 4 | `astro_api.py` | `/daily/personal` v1 переопределял v2 → лучший хендлер игнорировался | ✅ |
+| 5 | `astro_api.py` | `/compensatory/practices` вызывал `calc_chart(natal_jd, req.lat, req.lon, ...)` — JD вместо года | ✅ |
+| 6 | `astro_api.py` | `/daily/personal` v2: `transits()` вызывался с `(jd, date, req.lat, req.lon, req.utc)` — lat как target_time | ✅ |
+| 7 | `astro_compensatory.py` | `build_compensatory_report()` читал `"longitude"` ключ, но `calc_chart()` возвращает `"lon"` | ✅ |
+| 8 | `astro_api.py` | `/daily/personal` v2: `firdaria_result.get("current_period")` — ключ не существует, правильный: `"active_major"` | ✅ |
+| 9 | `astro_api.py` | `/daily/personal` v2: `profections_result.get("profected_house")` — правильный: `"annual_house"` | ✅ |
+| 10 | `astro_api.py` | `/daily/personal` v2: `result.get("transit_aspects")` — правильный: `"aspects"` | ✅ |
+| 11 | `astro_api.py` | `/predictive/transits`, `/eclipse-personal`, `/daily/personal` — `build_compensatory_report` вызывался без обязательных `transit_chart` и `target_date` | ✅ |
+| 12 | `frontend/DailyForecastView.tsx` | `forecasts.reduce(..., forecasts[0])` крашилось при пустом массиве | ✅ |
+| 13 | `frontend/HumanDesignBlock.tsx` | `result?.incarnation_cross.prop` — TypeError при null incarnation_cross | ✅ |
 
 ---
 
 ## V. ИТОГ
 
-Из 10 ключевых пунктов аудита — **10 / 10 выполнено** ✅
+Из 10 ключевых пунктов аудита #1 — **10 / 10 выполнено** ✅
 
-Из 7 дополнительных пожеланий (раздел III аудита) — **7 / 7 выполнено** ✅
+Из 7 дополнительных пожеланий — **7 / 7 выполнено** ✅
+
+Из 13 критических багов аудита #2 — **13 / 13 исправлено** ✅
