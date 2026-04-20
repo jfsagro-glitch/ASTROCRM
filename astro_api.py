@@ -1198,13 +1198,8 @@ class DailyPersonalRequest(BaseModel):
     target_date: Optional[str] = None   # defaults to today UTC
 
 
-@app.post("/daily/personal")
-def daily_personal(req: DailyPersonalRequest):
-    """Personalised daily summary: Moon, top-3 transits, profection, firdaria, advice.
-
-    Aggregates the most useful data for a daily client brief without
-    running a full compensatory engine calculation.
-    """
+def _daily_personal_v1(req: DailyPersonalRequest):
+    """Legacy daily/personal implementation (superseded by v2 below)."""
     try:
         if not req.target_date:
             target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -1730,6 +1725,7 @@ def natal_planetary_nodes(req: BirthData):
 
 
 
+@app.post("/human-design")
 def human_design(
     req: BirthData,
     mode: str = Query("analyst", pattern="^(reader|analyst|practitioner)$"),
@@ -3079,11 +3075,13 @@ def compensatory_current(target_date: Optional[str] = None,
         raise HTTPException(503, "Compensatory engine not available")
     try:
         from astro_engine import calc_aspects as _calc_asp
+        from datetime import datetime, timezone
         if not target_date:
-            from datetime import datetime, timezone
             target_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        transit_jd = _to_jd(target_date, "12:00", 0)
-        transit_chart = calc_chart(transit_jd, 0, 0,
+        # Parse date into components for calc_chart(yr, mo, dy, h, mi, sc, lat, lon, utc)
+        _d = datetime.strptime(target_date, "%Y-%m-%d")
+        transit_chart = calc_chart(_d.year, _d.month, _d.day, 12, 0, 0,
+                                   0.0, 0.0, 0.0,
                                    include_aspects=False,
                                    include_patterns=False,
                                    include_dignities=False,
@@ -4095,19 +4093,6 @@ def get_timezone(lat: float, lon: float, date: Optional[str] = None, time: Optio
     except Exception:
         return {"timezone": "UTC", "utc_offset": 0.0}
 
-
-if HAS_FRONTEND_BUILD:
-    assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
-    if os.path.isdir(assets_dir):
-        app.mount("/assets", FrontendAssetsStaticFiles(directory=assets_dir), name="assets")
-
-    @app.get("/{full_path:path}")
-    def spa_fallback(full_path: str):
-        requested_path = os.path.join(FRONTEND_DIST_DIR, full_path)
-        if full_path and os.path.isfile(requested_path):
-            return _file_response_with_cache(requested_path, "public, max-age=3600")
-        # Always revalidate index.html so clients pick up the latest asset hashes.
-        return _file_response_with_cache(FRONTEND_INDEX_FILE, "no-cache, no-store, must-revalidate")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -5727,6 +5712,23 @@ def calibration_signal_weights():
     if not _ML_WEIGHTS_OK or _get_signal_weights is None:
         raise HTTPException(503, "ML weights module not available (astro_ml_weights.py)")
     return _present(_get_signal_weights())
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SPA FALLBACK — must be LAST so it never shadows API routes
+# ═════════════════════════════════════════════════════════════════════════════
+if HAS_FRONTEND_BUILD:
+    assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", FrontendAssetsStaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        requested_path = os.path.join(FRONTEND_DIST_DIR, full_path)
+        if full_path and os.path.isfile(requested_path):
+            return _file_response_with_cache(requested_path, "public, max-age=3600")
+        # Always revalidate index.html so clients pick up the latest asset hashes.
+        return _file_response_with_cache(FRONTEND_INDEX_FILE, "no-cache, no-store, must-revalidate")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
