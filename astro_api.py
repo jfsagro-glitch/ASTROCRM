@@ -5513,7 +5513,7 @@ def daily_personal(req: DailyPersonalRequest):
                 lat=req.lat, lon=req.lon,
             )
             top_transits = sorted(
-                transit_result.get("transit_aspects", []),
+                transit_result.get("aspects", transit_result.get("transit_aspects", [])),
                 key=lambda x: x.get("orb", 99),
             )[:5]
         except Exception:
@@ -5529,8 +5529,10 @@ def daily_personal(req: DailyPersonalRequest):
             prof_result = calc_profs(natal_jd, target)
             profection_info = {
                 "age": age,
-                "profected_house": prof_result.get("profected_house"),
-                "lord_of_year":    prof_result.get("lord_of_year"),
+                "profected_house": (prof_result.get("profected_house")
+                                    or prof_result.get("annual_house")),
+                "lord_of_year":    (prof_result.get("lord_of_year")
+                                    or prof_result.get("annual_lord")),
             }
         except Exception:
             profection_info = {}
@@ -5539,9 +5541,17 @@ def daily_personal(req: DailyPersonalRequest):
         try:
             from astro_predictive import firdaria as calc_fird
             fird_result = calc_fird(natal_jd, target)
+            _am = fird_result.get("active_major") or {}
+            _as = fird_result.get("active_sub") or {}
             firdaria_info = {
-                "current_period": fird_result.get("current_period"),
-                "current_sub":    fird_result.get("current_sub"),
+                "current_period": {
+                    "planet": _am.get("major_lord"),
+                    "start":  str(int(_am.get("start_year", 0))),
+                    "end":    str(int(_am.get("end_year", 0))),
+                } if _am else None,
+                "current_sub": {
+                    "planet": _as.get("sub_lord"),
+                } if _as else None,
             }
         except Exception:
             firdaria_info = {}
