@@ -58,6 +58,30 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'http://localhost:8000'),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Firebase SDK → vendor-firebase
+            if (id.includes('node_modules/firebase')) return 'vendor-firebase';
+            // PDF export stack (heavy, only needed on demand) — kept as one chunk
+            if (id.includes('html2pdf') || id.includes('html2canvas')
+                || id.includes('jspdf') || id.includes('jsPDF')) return 'vendor-pdf';
+            // DOMPurify
+            if (id.includes('dompurify') || id.includes('purify')) return 'vendor-purify';
+            // React runtime
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')
+                || id.includes('node_modules/react-router')) return 'vendor-react';
+            // Lucide icons (icon-only, no heavy logic)
+            if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
+            // date-fns (CRM only)
+            if (id.includes('node_modules/date-fns')) return 'vendor-date';
+            // Everything else in node_modules → vendor-other
+            if (id.includes('node_modules')) return 'vendor-other';
+          },
+        },
+      },
+    },
     resolve: {
       alias: { '@': path.resolve(__dirname, './src') },
     },

@@ -19,41 +19,43 @@ import type { RelationshipForecast } from '../data/forecastData';
 import { Link } from 'react-router-dom';
 
 import ChartWheel, { ChartWheelResponsive } from './ChartWheel';
-import HumanDesignBlock from './HumanDesignBlock';
-import JyotishBlock from './JyotishBlock';
-import HolosBlock from './HolosBlock';
-import SynastryForecast from './SynastryForecast';
-import SynastryInteractionEngine from './SynastryInteractionEngine';
-import InteractionRelocationEngine from './InteractionRelocationEngine';
-import HoroscopeBlock from './HoroscopeBlock';
-import DateSegmentInput from './DateSegmentInput';
-import PAReportBlock from './PAReportBlock';
 import DashboardView from './DashboardView';
-import NumerologyBlock from './NumerologyBlock';
-import AsteroidsLilithBlock from './AsteroidsLilithBlock';
-import PlanetaryHoursBlock from './PlanetaryHoursBlock';
-import SiderealBlock from './SiderealBlock';
-import GeneKeysBlock from './GeneKeysBlock';
-import { ClientHistoryPanel } from './ClientHistoryPanel';
-import PrimaryDirectionsBlock from './PrimaryDirectionsBlock';
-import ProbabilityTreeBlock from './ProbabilityTreeBlock';
-import ZodiacalReleasingBlock from './ZodiacalReleasingBlock';
-import { ChartAnalysisSection } from './ChartAnalysisSection';
+import DateSegmentInput from './DateSegmentInput';
 import DailyPersonalBlock from './DailyPersonalBlock';
+import { ChartAnalysisSection } from './ChartAnalysisSection';
+import { FixedStarsBlock } from './FixedStarsBlock';
 import { IngressCalendarBlock } from './IngressCalendarBlock';
 import { VoCWindowsPanel } from './VoCWindowsPanel';
-import { FixedStarsBlock } from './FixedStarsBlock';
-import SaturnCycleBlock from './SaturnCycleBlock';
-import { HeliocentricBlock } from './HeliocentricBlock';
-import { KabbalahTreeBlock } from './KabbalahTreeBlock';
-import { PlanetaryNodesBlock } from './PlanetaryNodesBlock';
-// CompensatoryPracticesCard moved into HoroscopeBlock (⚗️ Компенсаторика tab)
-import EclipsePersonalBlock from './EclipsePersonalBlock';
-import IngressPersonalBlock from './IngressPersonalBlock';
-import SignalWeightsBlock from './SignalWeightsBlock';
-import SynastryProgressedBlock from './SynastryProgressedBlock';
-import AnnualProfectionBlock from './AnnualProfectionBlock';
-import ForecastAdvisorBlock from './ForecastAdvisorBlock';
+
+// ─── Lazy-loaded tab components (split into separate chunks) ─────────────────
+// These load only when the user first opens the respective tab.
+const HumanDesignBlock      = React.lazy(() => import('./HumanDesignBlock'));
+const JyotishBlock          = React.lazy(() => import('./JyotishBlock'));
+const HolosBlock            = React.lazy(() => import('./HolosBlock'));
+const SynastryForecast      = React.lazy(() => import('./SynastryForecast'));
+const SynastryInteractionEngine = React.lazy(() => import('./SynastryInteractionEngine'));
+const InteractionRelocationEngine = React.lazy(() => import('./InteractionRelocationEngine'));
+const HoroscopeBlock        = React.lazy(() => import('./HoroscopeBlock'));
+const PAReportBlock         = React.lazy(() => import('./PAReportBlock'));
+const NumerologyBlock       = React.lazy(() => import('./NumerologyBlock'));
+const AsteroidsLilithBlock  = React.lazy(() => import('./AsteroidsLilithBlock'));
+const PlanetaryHoursBlock   = React.lazy(() => import('./PlanetaryHoursBlock'));
+const SiderealBlock         = React.lazy(() => import('./SiderealBlock'));
+const GeneKeysBlock         = React.lazy(() => import('./GeneKeysBlock'));
+const ClientHistoryPanel    = React.lazy(() => import('./ClientHistoryPanel').then(m => ({ default: m.ClientHistoryPanel })));
+const PrimaryDirectionsBlock = React.lazy(() => import('./PrimaryDirectionsBlock'));
+const ProbabilityTreeBlock  = React.lazy(() => import('./ProbabilityTreeBlock'));
+const ZodiacalReleasingBlock = React.lazy(() => import('./ZodiacalReleasingBlock'));
+const SaturnCycleBlock      = React.lazy(() => import('./SaturnCycleBlock'));
+const HeliocentricBlock     = React.lazy(() => import('./HeliocentricBlock').then(m => ({ default: m.HeliocentricBlock })));
+const KabbalahTreeBlock     = React.lazy(() => import('./KabbalahTreeBlock').then(m => ({ default: m.KabbalahTreeBlock })));
+const PlanetaryNodesBlock   = React.lazy(() => import('./PlanetaryNodesBlock').then(m => ({ default: m.PlanetaryNodesBlock })));
+const EclipsePersonalBlock  = React.lazy(() => import('./EclipsePersonalBlock'));
+const IngressPersonalBlock  = React.lazy(() => import('./IngressPersonalBlock'));
+const SignalWeightsBlock    = React.lazy(() => import('./SignalWeightsBlock'));
+const SynastryProgressedBlock = React.lazy(() => import('./SynastryProgressedBlock'));
+const AnnualProfectionBlock = React.lazy(() => import('./AnnualProfectionBlock'));
+const ForecastAdvisorBlock  = React.lazy(() => import('./ForecastAdvisorBlock'));
 import { usePdfExport } from '../hooks/usePdfExport';
 import {
   getNatalChart, getTransits, getSecondaryProgressions, getSolarArc,
@@ -2582,6 +2584,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/30 to-transparent md:hidden" />
         </div>
 
+        <React.Suspense fallback={
+          <div className={`rounded-2xl border ${theme.card} p-10 flex items-center justify-center gap-3`}>
+            <Loader2 className={`h-5 w-5 animate-spin ${theme.accent}`} />
+            <span className={`text-sm ${theme.text} opacity-50`}>Загрузка…</span>
+          </div>
+        }>
         <div key={activeTab} className="tab-content-enter">
           {activeTab === 'dashboard' && (
             <div id="pdf-section-dashboard">
@@ -2952,6 +2960,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
           )}
         </div>
+        </React.Suspense>
       </div>
     </div>
   );
