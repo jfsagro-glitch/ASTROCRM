@@ -238,6 +238,36 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 
 ---
 
+---
+
+## VIII. UX-РЕФАКТОРИНГ И ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ (2026-04-20)
+
+### Производительность
+
+| Изменение | Результат |
+|-----------|-----------|
+| React.lazy() для 30 тяжёлых компонентов + `manualChunks` в vite | Начальный бандл **2801 kB → 362 kB** (−87%) |
+| Удалён неиспользуемый `framer-motion` | −150 kB из vendor-other |
+| vendor-react / vendor-icons / vendor-pdf / vendor-date — отдельные чанки | Браузер кэширует вендоры независимо от app-кода |
+| PDF-стек (html2pdf + html2canvas + jsPDF) = 1.8 MB загружается только при экспорте | Не блокирует первый рендер |
+
+### UX / Компоненты
+
+| Изменение | Коммит |
+|-----------|--------|
+| `DashboardView`: shimmer-skeleton вместо спиннера (hero + command + 3-col grid) | `cb24376` |
+| `ClientPortal`: IIFE с хуками → компонент `BirthFormPanel` (fix hooks anti-pattern) | `cb24376` |
+| `ClientPortal`: добавлена CSS-анимация `fadeSlideUp` при переключении вкладок | `cb24376` |
+| `ClientPortal`: `EmptyPlaceholder` — единый компонент для 14 пустых состояний | `cb24376` |
+| `ClientPortal`: секция-навигация — горизонтальный скролл + underline-индикатор активной секции | `3e116dc` |
+| `ClientPortal`: `Err` принимает `onRetry` — кнопка «Повторить» при ошибке расчёта карты | `3e116dc` |
+| `DailyPersonalBlock`: skeleton точно повторяет реальный layout (moon + профекции + 5 транзитов) | `cb24376` |
+| `DailyPersonalBlock`: ошибка API показывает кнопку «Повторить» | `cb24376` |
+| `index.css`: `scrollbar-none`, `focus-visible` кольцо, `shimmer` / `fadeSlideUp` keyframes | `cb24376` |
+| `astro_compensatory.py`: aspect-pair practices корректно читают ключи `transit_planet`/`natal_planet` | `ec11e43` |
+
+---
+
 ## V. ИТОГ
 
 Из 10 ключевых пунктов аудита #1 — **10 / 10 выполнено** ✅
@@ -247,3 +277,5 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 Из 13 критических багов аудита #2 — **13 / 13 исправлено** ✅
 
 Из 12 критических багов аудита #3 — **12 / 12 исправлено** ✅
+
+UX-рефакторинг + оптимизация перформанса — **выполнено** ✅
