@@ -258,8 +258,8 @@ def _gen_solar_return_interp(result: dict) -> str:
     try:
         chart_info = result.get("sr_date_utc", "")
         planets = result.get("planets", {})
-        sun_info = planets.get("Sun", {})
-        moon_info = planets.get("Moon", {})
+        sun_info  = planets.get("sun",  planets.get("Sun",  {}))
+        moon_info = planets.get("moon", planets.get("Moon", {}))
         
         return (
             f"Солнечный возврат на {chart_info}. "
