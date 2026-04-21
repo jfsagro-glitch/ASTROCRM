@@ -291,8 +291,10 @@ def _gen_lunar_return_interp(result: dict) -> str:
 def _gen_profections_interp(result: dict) -> str:
     """Generate interpretation for profections."""
     try:
-        current_year = result.get("current_year", "")
-        house_info = result.get("active_house", {}).get("name", "дома")
+        current_year = result.get("current_year", result.get("age", ""))
+        _house_num = result.get("annual_house") or result.get("profected_house") or result.get("active_house")
+        _lord = result.get("annual_lord") or result.get("lord_of_year") or result.get("year_lord") or ""
+        house_info = f"{_house_num}" if _house_num else "активного"
         
         return (
             f"Профекция на год: активный дом — {house_info}. "
