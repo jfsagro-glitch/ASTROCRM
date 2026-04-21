@@ -1221,6 +1221,56 @@ def dashboard(req: DashboardRequest):
         except Exception:
             chart_analysis = {}
 
+        # ── Natal essence (personal identity for dashboard header) ───────────
+        try:
+            def _planet_house(plon: float, houses: dict) -> int:
+                cusps = []
+                for i in range(1, 13):
+                    hv = houses.get(f"h{i}")
+                    if hv is None:
+                        return 0
+                    cusps.append(hv["lon"] if isinstance(hv, dict) else hv)
+                plon_norm = plon % 360
+                for i in range(12):
+                    start = cusps[i] % 360
+                    end   = cusps[(i + 1) % 12] % 360
+                    if start <= end:
+                        if start <= plon_norm < end:
+                            return i + 1
+                    else:
+                        if plon_norm >= start or plon_norm < end:
+                            return i + 1
+                return 0
+
+            np_ = natal.get("planets", {})
+            nh_ = natal.get("houses", {})
+            def _p_sign_lon(key):
+                pd = np_.get(key, {})
+                if isinstance(pd, dict):
+                    return pd.get("sign", ""), pd.get("lon", 0.0), pd.get("deg_min", "")
+                return "", float(pd or 0.0), ""
+            sun_sign,  sun_lon,  sun_deg  = _p_sign_lon("sun")
+            moon_sign, moon_lon, moon_deg = _p_sign_lon("moon")
+            mer_sign,  mer_lon,  _mer_deg = _p_sign_lon("mercury")
+            ven_sign,  ven_lon,  _v_deg   = _p_sign_lon("venus")
+            mar_sign,  mar_lon,  _m_deg   = _p_sign_lon("mars")
+            asc_raw = nh_.get("h1", {})
+            mc_raw  = nh_.get("h10", {})
+            asc_lon = asc_raw["lon"] if isinstance(asc_raw, dict) else float(asc_raw or 0.0)
+            mc_lon  = mc_raw["lon"]  if isinstance(mc_raw, dict)  else float(mc_raw or 0.0)
+            natal_essence = {
+                "sun":     {"sign": sun_sign,  "house": _planet_house(sun_lon,  nh_), "deg_min": sun_deg},
+                "moon":    {"sign": moon_sign, "house": _planet_house(moon_lon, nh_), "deg_min": moon_deg},
+                "mercury": {"sign": mer_sign,  "house": _planet_house(mer_lon,  nh_)},
+                "venus":   {"sign": ven_sign,  "house": _planet_house(ven_lon,  nh_)},
+                "mars":    {"sign": mar_sign,  "house": _planet_house(mar_lon,  nh_)},
+                "asc":     {"sign": sign_name(asc_lon), "lon": round(asc_lon, 2)},
+                "mc":      {"sign": sign_name(mc_lon),  "lon": round(mc_lon, 2)},
+                "sect":    natal.get("sect", {}).get("sect") if isinstance(natal.get("sect"), dict) else None,
+            }
+        except Exception:
+            natal_essence = {}
+
         # ── Today's transit aspects to natal ────────────────────────────────
         natal_jd = _to_jd(req.date, req.time, req.utc)
         try:
@@ -1320,6 +1370,7 @@ def dashboard(req: DashboardRequest):
             "fortune_today":  fortune_lot,
             "arabic_natal":   natal.get("arabic_parts", {}),
             "chart_analysis": chart_analysis,
+            "natal_essence":  natal_essence,
         })
     except HTTPException:
         raise
