@@ -152,11 +152,20 @@ const DAILY_MOTION: Record<string, number> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const Spin = () => <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />;
-const Err = ({ msg }: { msg: string }) => (
-  <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-    <AlertCircle className="h-4 w-4 shrink-0" /> {msg}
-  </div>
-);
+function Err({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+      <div className="flex items-center gap-2">
+        <AlertCircle className="h-4 w-4 shrink-0" /> {msg}
+      </div>
+      {onRetry && (
+        <button onClick={onRetry} className="shrink-0 px-2.5 py-1 text-xs rounded-lg border border-red-500/30 hover:bg-red-500/15 transition-colors">
+          Повторить
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ─── City Geocoder field ───────────────────────────────────────────────────────
 function CityField({
@@ -2535,25 +2544,31 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           configured={configured}
         />
 
-        {error && <Err msg={error} />}
+        {error && <Err msg={error} onRetry={calcNatal} />}
 
         {/* ── Two-tier navigation ─────────────────────────────────────────── */}
         {/* Row 1: 5 main sections */}
-        <div className="flex gap-1 border-b pb-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div
+          className="flex gap-1 border-b pb-2 overflow-x-auto scrollbar-none"
+          style={{ borderColor: 'rgba(255,255,255,0.08)', scrollbarWidth: 'none' }}
+        >
           {SECTIONS.map(s => {
             const isActive = activeSection === s.key;
             return (
               <button
                 key={s.key}
                 onClick={() => handleSectionClick(s.key)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-all duration-200 whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold rounded-xl border transition-all duration-200 whitespace-nowrap relative ${
                   isActive
                     ? 'bg-white/12 border-white/25 text-white shadow-sm'
                     : 'border-transparent text-white/45 hover:text-white/75 hover:bg-white/6'
                 }`}
               >
                 <span className="text-base leading-none">{s.emoji}</span>
-                <span>{s.label}</span>
+                <span className="hidden sm:inline">{s.label}</span>
+                {isActive && (
+                  <span className="absolute -bottom-[13px] left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-amber-400/80" />
+                )}
               </button>
             );
           })}
