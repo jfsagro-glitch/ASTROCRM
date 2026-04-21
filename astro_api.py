@@ -4737,7 +4737,10 @@ def generate_report(req: ReportRequest):
         # ── Solar Return ─────────────────────────────────────────────────────
         if req.depth in ("full", "professional") and "natal" in sections:
             try:
-                report_data["solar_return"] = solar_return(natal_jd, req.lat, req.lon, target)
+                report_data["solar_return"] = solar_return(
+                    natal_jd, int(target[:4]), req.lat, req.lon,
+                    houses_system=req.houses,
+                )
             except Exception:
                 report_data["solar_return"] = {}
 
@@ -5159,7 +5162,7 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
     # ── SECTION 2: Транзиты ──────────────────────────────────────────────────
     transits_html = ""
     for asp in sorted((transits_d.get("aspects") or transits_d.get("transit_aspects") or []), key=lambda x: x.get("orb",99))[:25]:
-        tp  = asp.get("transiting_planet","")
+        tp  = asp.get("transit_planet", asp.get("transiting_planet",""))
         np  = asp.get("natal_planet","")
         a   = asp.get("aspect",""); o = asp.get("orb",0)
         applying = "→" if asp.get("applying") else "←"
@@ -5173,14 +5176,19 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
     # ── SECTION 3: Фирдарии ──────────────────────────────────────────────────
     firdaria_html = ""
     if firdaria_d:
-        cp = firdaria_d.get("current_period",{})
-        cs = firdaria_d.get("current_sub",{})
-        pg = _PLANET_GLYPHS.get(cp.get("planet",""),'')
-        sg2 = _PLANET_GLYPHS.get(cs.get("planet",""),'')
-        p_ru = _PLANET_RU.get(cp.get('planet',''), cp.get('planet',''))
-        s_ru = _PLANET_RU.get(cs.get('planet',''), cs.get('planet',''))
-        ps = cp.get('start',''); pe = cp.get('end','')
-        ss = cs.get('start',''); se = cs.get('end','')
+        # Handle both legacy {current_period/current_sub} and new {active_major/active_sub} keys
+        cp = firdaria_d.get("active_major") or firdaria_d.get("current_period") or {}
+        cs = firdaria_d.get("active_sub")   or firdaria_d.get("current_sub")   or {}
+        cp_planet = cp.get("major_lord", cp.get("planet",""))
+        cs_planet = cs.get("sub_lord",   cs.get("planet",""))
+        pg  = _PLANET_GLYPHS.get(cp_planet,'')
+        sg2 = _PLANET_GLYPHS.get(cs_planet,'')
+        p_ru = _PLANET_RU.get(cp_planet, cp_planet)
+        s_ru = _PLANET_RU.get(cs_planet, cs_planet)
+        ps = str(int(cp.get('start_year', cp.get('start', '')) or 0)) if cp.get('start_year') or cp.get('start') else ''
+        pe = str(int(cp.get('end_year',   cp.get('end',   '')) or 0)) if cp.get('end_year')   or cp.get('end')   else ''
+        ss = str(int(cs.get('start_year', cs.get('start', '')) or 0)) if cs.get('start_year') or cs.get('start') else ''
+        se = str(int(cs.get('end_year',   cs.get('end',   '')) or 0)) if cs.get('end_year')   or cs.get('end')   else ''
         firdaria_html = f"""
         <p><strong>Главный период:</strong> {pg} {_esc(p_ru)} ({_esc(ps)} — {_esc(pe)})</p>
         <p><strong>Субпериод:</strong> {sg2} {_esc(s_ru)} ({_esc(ss)} — {_esc(se)})</p>
@@ -5189,15 +5197,16 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
     # ── SECTION 4: Профекции ─────────────────────────────────────────────────
     prof_html = ""
     if profections_d:
-        yr_lord = profections_d.get("year_lord","")
-        act_house = profections_d.get("active_house","")
-        theme = profections_d.get("theme","")
+        # profections() returns annual_house, annual_lord, age
+        act_house = profections_d.get("annual_house", profections_d.get("active_house",""))
+        yr_lord   = profections_d.get("annual_lord",  profections_d.get("year_lord",""))
+        annual_sign = profections_d.get("annual_sign","")
         age = profections_d.get("age","")
         prof_html = f"""
         <p><strong>Возраст:</strong> {_esc(str(age))}</p>
         <p><strong>Активный дом:</strong> {_esc(str(act_house))}</p>
         <p><strong>Лорд года:</strong> {_PLANET_GLYPHS.get(str(yr_lord).lower(),'')} {_esc(str(yr_lord))}</p>
-        <p><strong>Тема года:</strong> {_esc(str(theme))}</p>
+        <p><strong>Знак дома профекции:</strong> {_esc(annual_sign)}</p>
         """
 
     # ── SECTION 5: Соляр ────────────────────────────────────────────────────
