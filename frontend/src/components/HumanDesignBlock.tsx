@@ -750,7 +750,7 @@ export default function HumanDesignBlock({
               </div>
             ) : null}
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {result.incarnation_cross.gates.map(item => (
+              {(result.incarnation_cross?.gates ?? []).map(item => (
                 <div key={`${item.role}-${item.gate}`} className={`rounded-xl border ${theme.card} p-3`}>
                   <div className={`text-[11px] uppercase tracking-[0.18em] ${theme.text}`}>{CROSS_ROLE_MAP[item.role] ?? item.role}</div>
                   <div className={`mt-1 text-lg font-semibold ${theme.header}`}>Ворота {item.gate}.{item.line}</div>

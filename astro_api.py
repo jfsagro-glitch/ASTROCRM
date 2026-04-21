@@ -4595,7 +4595,7 @@ def probability_tree_endpoint(req: ProbabilityRequest):
             natal_jd, req.target_date, lat=req.lat, lon=req.lon,
             transit_orb_major=3.0, transit_orb_minor=2.0,
         )
-        transit_aspects = transit_data.get("transit_aspects", [])
+        transit_aspects = transit_data.get("aspects", [])
         result = _probability_tree(natal_chart, transit_aspects,
                                    target_date=req.target_date, context=req.context)
         return _present(result)
@@ -4784,7 +4784,7 @@ def generate_report(req: ReportRequest):
         if "probability" in sections and _PROBABILITY_OK:
             try:
                 natal_for_prob = report_data.get("natal") or {}
-                transit_aspects = report_data.get("transits", {}).get("transit_aspects", [])
+                transit_aspects = report_data.get("transits", {}).get("aspects", [])
                 report_data["probability"] = _probability_tree(natal_for_prob, transit_aspects, target)
             except Exception:
                 report_data["probability"] = {}
@@ -4793,12 +4793,22 @@ def generate_report(req: ReportRequest):
         if _COMPENSATORY_OK and build_compensatory_report is not None:
             try:
                 natal_for_comp = report_data.get("natal") or {}
-                transit_asps   = report_data.get("transits", {}).get("transit_aspects", [])
+                transit_asps   = report_data.get("transits", {}).get("aspects", [])
                 if natal_for_comp and transit_asps:
+                    _tyr, _tmo, _tdy = _parse_date(target)
+                    _tr_chart_rep = calc_chart(
+                        _tyr, _tmo, _tdy, 12, 0, 0, 0.0, 0.0, 0.0,
+                        include_aspects=False, include_patterns=False,
+                        include_dignities=False, include_arabic=False,
+                        include_sect=False, include_dispositors=False,
+                    )
+                    _intensity = "deep" if req.depth == "professional" else "medium"
                     comp = build_compensatory_report(  # type: ignore[misc]
                         natal_chart=natal_for_comp,
+                        transit_chart=_tr_chart_rep,
                         transit_aspects=transit_asps[:10],
-                        depth="full" if req.depth == "professional" else "light",
+                        target_date=target,
+                        intensity=_intensity,
                     )
                     report_data["compensatory"] = comp
             except Exception:
@@ -4898,16 +4908,21 @@ async def full_profile(req: FullProfileRequest):  # noqa: C901
         comp_per_transit: list = []
         if req.include_compensatory and _COMPENSATORY_OK and build_compensatory_report is not None and natal:
             try:
-                for ta in top_aspects:
-                    comp = build_compensatory_report(  # type: ignore[misc]
-                        natal_chart=natal,
-                        transit_aspects=[ta],
-                        depth="light",
-                    )
-                    comp_per_transit.append({
-                        "transit": ta,
-                        "practices": comp.get("practices", [])[:3],
-                    })
+                _tyr, _tmo, _tdy = _parse_date(target_date)
+                _tr_chart_comp = calc_chart(
+                    _tyr, _tmo, _tdy, 12, 0, 0, 0.0, 0.0, 0.0,
+                    include_aspects=False, include_patterns=False,
+                    include_dignities=False, include_arabic=False,
+                    include_sect=False, include_dispositors=False,
+                )
+                _comp_full = build_compensatory_report(  # type: ignore[misc]
+                    natal_chart=natal,
+                    transit_chart=_tr_chart_comp,
+                    transit_aspects=top_aspects,
+                    target_date=target_date,
+                    intensity="light",
+                )
+                comp_per_transit = _comp_full.get("active_transits", [])
             except Exception:
                 pass
 
@@ -4920,7 +4935,8 @@ async def full_profile(req: FullProfileRequest):  # noqa: C901
             phase_angle = (moon_lon - sun_lon) % 360
             phases = ["new_moon","waxing_crescent","first_quarter","waxing_gibbous",
                       "full_moon","waning_gibbous","last_quarter","waning_crescent"]
-            voc = void_of_course_moon(target_jd, look_ahead_days=2.0)
+            voc = void_of_course_moon(target_jd, look_ahead_days=2.0,
+                                      lat=req.lat, lon=req.lon)
             moon_today_data = {
                 "sign":        sign_name(moon_lon),
                 "degree":      round(moon_lon % 30, 2),
@@ -4979,7 +4995,11 @@ async def full_profile(req: FullProfileRequest):  # noqa: C901
         hd: dict = {}
         if req.include_human_design and _HUMAN_DESIGN_OK:
             try:
-                hd = calc_human_design(yr, mo, dy, h, mi, sc)
+                hd = calc_human_design(
+                    req.date, req.time, req.lat, req.lon, req.utc,
+                    timezone_name=getattr(req, "timezone_name", None),
+                    mode="analyst",
+                )
             except Exception:
                 pass
 
@@ -5138,7 +5158,7 @@ def _build_html_report(data: dict, depth: str) -> str:  # noqa: C901
 
     # ── SECTION 2: Транзиты ──────────────────────────────────────────────────
     transits_html = ""
-    for asp in sorted((transits_d.get("transit_aspects") or []), key=lambda x: x.get("orb",99))[:25]:
+    for asp in sorted((transits_d.get("aspects") or transits_d.get("transit_aspects") or []), key=lambda x: x.get("orb",99))[:25]:
         tp  = asp.get("transiting_planet","")
         np  = asp.get("natal_planet","")
         a   = asp.get("aspect",""); o = asp.get("orb",0)
