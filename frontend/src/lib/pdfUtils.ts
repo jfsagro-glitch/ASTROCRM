@@ -1,5 +1,10 @@
-import html2canvas from 'html2canvas-pro';
-import jsPDF from 'jspdf';
+async function loadPdfDeps() {
+  const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+    import('html2canvas-pro'),
+    import('jspdf'),
+  ]);
+  return { html2canvas, jsPDF };
+}
 
 async function waitForRenderable(el: HTMLElement, timeoutMs = 5000): Promise<void> {
   const start = Date.now();
@@ -33,6 +38,7 @@ export async function downloadPDF(
   if (!el) { alert(`Element #${elementId} not found`); return; }
 
   try {
+    const { html2canvas, jsPDF } = await loadPdfDeps();
     const canvas = await html2canvas(el, {
       scale: 2, useCORS: true, allowTaint: false, logging: false,
       backgroundColor: '#07090f',
@@ -93,6 +99,7 @@ export async function downloadTabsPDF(
   filename = 'full-report.pdf',
 ): Promise<void> {
   const BG = '#ffffff';
+  const { html2canvas, jsPDF } = await loadPdfDeps();
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pw  = pdf.internal.pageSize.getWidth();
   const ph  = pdf.internal.pageSize.getHeight();

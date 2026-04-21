@@ -1,6 +1,4 @@
 import React, { useMemo, useState, useRef } from 'react';
-import html2canvas from 'html2canvas-pro';
-import jsPDF from 'jspdf';
 import type { BirthInput, NatalChart, SynastryResult } from '../types/astro';
 
 type ThemeLike = {
@@ -1063,6 +1061,10 @@ export default function SynastryInteractionEngine({
     const el = routesPanelRef.current;
     if (!el) return;
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas-pro'),
+        import('jspdf'),
+      ]);
       const canvas = await html2canvas(el, {
         scale: 2, useCORS: true, allowTaint: false, logging: false,
         backgroundColor: '#07090f',
