@@ -217,6 +217,27 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 
 ---
 
+---
+
+## VII. КРИТИЧЕСКИЕ БАГИ — Аудит #3 (2026-04-20)
+
+| # | Файл | Баг | Коммит | Статус |
+|---|------|-----|--------|--------|
+| 1 | `astro_api.py` | `/full-profile`: `build_compensatory_report(depth="light")` — нет обязательных `transit_chart`, `target_date`; неверный kwarg `depth=` вместо `intensity=` | `50658a2` | ✅ |
+| 2 | `astro_api.py` | `/full-profile`: `calc_human_design(yr, mo, dy, h, mi, sc, lat, lon, utc)` — функция принимает строки `(date_str, time_str, lat, lon, utc)`, а не int-компоненты | `50658a2` | ✅ |
+| 3 | `astro_api.py` | `/full-profile`: `void_of_course_moon(jd)` без `lat`/`lon` → неточный расчёт по координатам (0,0) | `50658a2` | ✅ |
+| 4 | `astro_api.py` | `/report/generate`: `transits().get("transit_aspects")` — правильный ключ `"aspects"` | `50658a2` | ✅ |
+| 5 | `astro_api.py` | `/report/generate`: `solar_return(natal_jd, req.lat, req.lon, target)` — 2-й аргумент должен быть `int(year)`, а не `lat` | `d944af9` | ✅ |
+| 6 | `astro_api.py` | `/report/generate`: `build_compensatory_report` — те же ошибки: `depth=` вместо `intensity=`, нет `transit_chart`/`target_date` | `d944af9` | ✅ |
+| 7 | `astro_api.py` | HTML-report firdaria-секция: читала `"current_period"`/`"current_sub"` с `"planet"`/`"start"`/`"end"` → пустые поля | `d944af9` | ✅ |
+| 8 | `astro_api.py` | HTML-report profections-секция: читала `"active_house"`/`"year_lord"` — правильные: `"annual_house"`/`"annual_lord"` | `d944af9` | ✅ |
+| 9 | `astro_api.py` | HTML-report transits-таблица: `asp.get("transiting_planet")` → правильно: `"transit_planet"` | `bde0ee7` | ✅ |
+| 10 | `astro_probability.py` | `build_probability_tree`: читал `asp.get("transiting_planet")` → пустые имена планет в ветках вероятностей | `bde0ee7` | ✅ |
+| 11 | `astrologyService.ts` | `DailyTransitAspect.transiting_planet` → API возвращает `transit_planet` → глифы/имена планет не отображались | `bde0ee7` | ✅ |
+| 12 | `astro_api.py` | `_gen_solar_return_interp`: `planets.get("Sun")` → `calc_planets()` возвращает lowercase `"sun"`, `"moon"` | `9018ae7` | ✅ |
+
+---
+
 ## V. ИТОГ
 
 Из 10 ключевых пунктов аудита #1 — **10 / 10 выполнено** ✅
@@ -224,3 +245,5 @@ GET /daily/moon?date=2026-04-14&time=12:00&utc=3&look_ahead=3
 Из 7 дополнительных пожеланий — **7 / 7 выполнено** ✅
 
 Из 13 критических багов аудита #2 — **13 / 13 исправлено** ✅
+
+Из 12 критических багов аудита #3 — **12 / 12 исправлено** ✅

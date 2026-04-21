@@ -1419,11 +1419,66 @@ export default function DashboardView({ birthData, theme }: Props) {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return (
-    <div className="flex flex-col items-center gap-3 py-16">
-      <div className="relative">
-        <RefreshCw size={24} className={`${theme.accent} animate-spin`} />
+    <div className="space-y-4">
+      {/* Hero skeleton */}
+      <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
+            <div className="flex-1 space-y-3">
+              <div className="flex gap-2 flex-wrap">
+                <div className="h-4 w-24 rounded-full skeleton-shimmer" />
+                <div className="h-4 w-32 rounded-full skeleton-shimmer" />
+              </div>
+              <div className="flex gap-2">
+                <div className="h-5 w-32 rounded-full bg-white/8" />
+                <div className="h-5 w-20 rounded-full bg-white/8" />
+              </div>
+              <div className="h-3 w-64 rounded-full bg-white/6" />
+            </div>
+            <div className="w-[100px] h-[100px] rounded-full bg-white/8 shrink-0" />
+            <div className="flex flex-col gap-2.5 w-full sm:w-48 shrink-0">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <div className="w-3 h-3 rounded bg-white/10" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-2 w-16 rounded bg-white/8" />
+                    <div className="h-1.5 rounded-full bg-white/8" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-      <span className={`text-sm ${theme.text} opacity-50`}>Загрузка дашборда…</span>
+      {/* Command skeleton */}
+      <div className={`rounded-2xl border ${theme.card} p-4`}>
+        <div className="grid grid-cols-3 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3 w-20 rounded bg-white/10" />
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="h-2.5 rounded bg-white/6" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Grid skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+            <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+              <div className="w-3.5 h-3.5 rounded bg-white/15" />
+              <div className="h-3 w-24 rounded bg-white/10" />
+            </div>
+            <div className="p-4 space-y-3">
+              {[...Array(4)].map((_, j) => (
+                <div key={j} className="h-2.5 rounded bg-white/6" style={{ width: `${70 + j * 7}%` }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 

@@ -70,6 +70,25 @@ import { useAuth } from '../contexts/AuthContext';
 import type { SavedPerson } from '../services/peopleService';
 import { subscribePeople, addPerson, deletePerson } from '../services/peopleService';
 
+// ─── Shared empty-state placeholder ──────────────────────────────────────────
+function EmptyPlaceholder({
+  icon: Icon, title, hint, theme,
+}: {
+  icon?: React.ElementType;
+  title?: string;
+  hint?: string;
+  theme: typeof chartThemes[ThemeKey];
+}) {
+  const Ic = Icon ?? Star;
+  return (
+    <div className={`rounded-2xl border ${theme.card} p-14 text-center space-y-3`}>
+      <Ic className={`h-12 w-12 mx-auto ${theme.symbol} opacity-25`} />
+      {title && <p className={`text-sm font-semibold ${theme.header} opacity-70`}>{title}</p>}
+      {hint && <p className={`text-xs ${theme.text} opacity-45 max-w-xs mx-auto leading-relaxed`}>{hint}</p>}
+    </div>
+  );
+}
+
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const chartThemes = {
   cosmic: {
@@ -2089,6 +2108,110 @@ function SynastryPanel({ birth, theme, people }: { birth: BirthInput; theme: typ
   );
 }
 
+// ─── Collapsible birth-form panel (proper component to avoid IIFE hooks) ─────
+interface BirthFormPanelProps {
+  natalChart: NatalChart | null;
+  birth: BirthInput & { name?: string };
+  setBirth: (v: BirthInput & { name?: string }) => void;
+  loading: boolean;
+  isExporting: boolean;
+  reportExporting: boolean;
+  calcNatal: () => void;
+  handleExportAll: () => void;
+  handleFullReport: (depth?: 'brief' | 'full' | 'professional') => void;
+  handleExportHumanDesign: () => void;
+  activeTab: string;
+  theme: typeof chartThemes[ThemeKey];
+  people: SavedPerson[];
+  user: ReturnType<typeof useAuth>['user'];
+  handleSavePerson: (p: Omit<SavedPerson, 'id'>) => Promise<void>;
+  handleDeletePerson: (id: string) => Promise<void>;
+  tr: ReturnType<typeof useLang>['tr'];
+  configured: boolean;
+}
+
+function BirthFormPanel({
+  natalChart, birth, setBirth, loading, isExporting, reportExporting,
+  calcNatal, handleExportAll, handleFullReport, handleExportHumanDesign,
+  activeTab, theme, people, user, handleSavePerson, handleDeletePerson, tr, configured,
+}: BirthFormPanelProps) {
+  const [formOpen, setFormOpen] = useState(!natalChart);
+  useEffect(() => { if (natalChart) setFormOpen(false); }, [natalChart]);
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} px-4 py-3`}>
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Summary pill (when collapsed) */}
+        {!formOpen && birth.date && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Star className={`h-4 w-4 shrink-0 ${theme.symbol}`} />
+            <span className={`text-sm font-medium ${theme.header} truncate`}>
+              {birth.name || 'Клиент'} · {birth.date}{birth.time ? ' ' + birth.time : ''} · UTC{birth.utc >= 0 ? '+' : ''}{birth.utc}
+            </span>
+            {natalChart && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
+                ✓ Карта рассчитана
+              </span>
+            )}
+          </div>
+        )}
+        {formOpen && (
+          <span className={`text-sm font-semibold ${theme.header} flex-1`}>{tr.birthData}</span>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button onClick={calcNatal} disabled={loading}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${theme.btn} shadow-sm`}>
+            {loading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>{tr.calculating}</span></> : <><Star className="h-3.5 w-3.5" /><span>{tr.calcNatal}</span></>}
+          </button>
+          {natalChart && (
+            <button onClick={handleExportAll} disabled={isExporting}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
+              <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tr.exportPdf}</span>
+            </button>
+          )}
+          {birth.date && (
+            <button onClick={() => handleFullReport('full')} disabled={reportExporting}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50">
+              <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Полный PDF</span>
+            </button>
+          )}
+          {activeTab === 'human-design' && (
+            <button onClick={handleExportHumanDesign} disabled={isExporting}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
+              <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">HD PDF</span>
+            </button>
+          )}
+          {/* Toggle form */}
+          <button
+            onClick={() => setFormOpen(v => !v)}
+            className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all ${theme.tabInactive}`}
+          >
+            {formOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{formOpen ? 'Свернуть' : 'Изменить'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded form */}
+      {formOpen && (
+        <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <BirthForm
+            value={birth}
+            onChange={setBirth}
+            label=""
+            theme={theme}
+            people={people}
+            onSave={(configured && user) ? handleSavePerson : undefined}
+            onDelete={(configured && user) ? handleDeletePerson : undefined}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Language Toggle ──────────────────────────────────────────────────────────
 function LangToggle({ theme }: { theme: typeof chartThemes[ThemeKey] }) {
   const { lang, setLang, tr } = useLang();
@@ -2389,86 +2512,26 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 pt-4 pb-6 space-y-3">
         {/* ── Collapsible birth form ──────────────────────────────────────────── */}
-        {(() => {
-          const [formOpen, setFormOpen] = React.useState(!natalChart);
-          // Auto-collapse when natal is calculated
-          React.useEffect(() => { if (natalChart) setFormOpen(false); }, [natalChart]); // eslint-disable-line react-hooks/exhaustive-deps
-          return (
-            <>
-              {/* Compact header bar */}
-              <div className={`rounded-2xl border ${theme.card} px-4 py-3`}>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {/* Summary pill (when collapsed) */}
-                  {!formOpen && birth.date && (
-                    <div className={`flex items-center gap-2 flex-1 min-w-0`}>
-                      <Star className={`h-4 w-4 shrink-0 ${theme.symbol}`} />
-                      <span className={`text-sm font-medium ${theme.header} truncate`}>
-                        {birth.name || 'Клиент'} · {birth.date}{birth.time ? ' ' + birth.time : ''} · UTC{birth.utc >= 0 ? '+' : ''}{birth.utc}
-                      </span>
-                      {natalChart && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 shrink-0">
-                          ✓ Карта рассчитана
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {formOpen && (
-                    <span className={`text-sm font-semibold ${theme.header} flex-1`}>{tr.birthData}</span>
-                  )}
-
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button onClick={calcNatal} disabled={loading}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${theme.btn} shadow-sm`}>
-                      {loading ? <><Spin /><span>{tr.calculating}</span></> : <><Star className="h-3.5 w-3.5" /><span>{tr.calcNatal}</span></>}
-                    </button>
-                    {natalChart && (
-                      <button onClick={handleExportAll} disabled={isExporting}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
-                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tr.exportPdf}</span>
-                      </button>
-                    )}
-                    {birth.date && (
-                      <button onClick={() => handleFullReport('full')} disabled={reportExporting}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50`}>
-                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Полный PDF</span>
-                      </button>
-                    )}
-                    {activeTab === 'human-design' && (
-                      <button onClick={handleExportHumanDesign} disabled={isExporting}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${theme.card} disabled:opacity-50`}>
-                        <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">HD PDF</span>
-                      </button>
-                    )}
-                    {/* Toggle form expand */}
-                    <button
-                      onClick={() => setFormOpen(v => !v)}
-                      className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all ${theme.tabInactive}`}
-                    >
-                      {formOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                      <span className="hidden sm:inline">{formOpen ? 'Свернуть' : 'Изменить'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded form */}
-                {formOpen && (
-                  <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                    <BirthForm
-                      value={birth}
-                      onChange={setBirth}
-                      label=""
-                      theme={theme}
-                      people={people}
-                      onSave={user ? handleSavePerson : undefined}
-                      onDelete={user ? handleDeletePerson : undefined}
-                    />
-                  </div>
-                )}
-              </div>
-            </>
-          );
-        })()}
+        <BirthFormPanel
+          natalChart={natalChart}
+          birth={birth}
+          setBirth={setBirth}
+          loading={loading}
+          isExporting={isExporting}
+          reportExporting={reportExporting}
+          calcNatal={calcNatal}
+          handleExportAll={handleExportAll}
+          handleFullReport={handleFullReport}
+          handleExportHumanDesign={handleExportHumanDesign}
+          activeTab={activeTab}
+          theme={theme}
+          people={people}
+          user={user}
+          handleSavePerson={handleSavePerson}
+          handleDeletePerson={handleDeletePerson}
+          tr={tr}
+          configured={configured}
+        />
 
         {error && <Err msg={error} />}
 
@@ -2494,33 +2557,41 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           })}
         </div>
 
-        {/* Row 2: sub-tabs of active section */}
-        <div className="flex gap-1.5 border-b pb-1.5 overflow-x-auto" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          {activeSectionTabs.map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap transition-all duration-200 ${
-                activeTab === key
-                  ? theme.tabActive
-                  : theme.tabInactive
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{label}</span>
-            </button>
-          ))}
+        {/* Row 2: sub-tabs of active section — with scroll-fade on mobile */}
+        <div className="relative">
+          <div
+            className="flex gap-1.5 border-b pb-1.5 overflow-x-auto scrollbar-none"
+            style={{ borderColor: 'rgba(255,255,255,0.08)', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {activeSectionTabs.map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(prev => (prev === key ? prev : key))}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap transition-all duration-200 ${
+                  activeTab === key
+                    ? theme.tabActive
+                    : theme.tabInactive
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+          {/* Right fade — indicates more tabs on scroll */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/30 to-transparent md:hidden" />
         </div>
 
-        <div key={activeTab}>
+        <div key={activeTab} className="tab-content-enter">
           {activeTab === 'dashboard' && (
             <div id="pdf-section-dashboard">
               {birth.date && birth.time ? (
                 <DashboardView birthData={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для дашборда</p>
+                <div className={`rounded-2xl border ${theme.card} p-14 text-center space-y-3`}>
+                  <Zap className={`h-14 w-14 mx-auto ${theme.symbol} opacity-30`} />
+                  <p className={`text-base font-semibold ${theme.header}`}>Ежедневный дашборд</p>
+                  <p className={`${theme.text} text-sm opacity-60 max-w-xs mx-auto`}>Введите дату, время и место рождения, чтобы увидеть персональный астрологический прогноз на сегодня</p>
                 </div>
               )}
             </div>
@@ -2553,10 +2624,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   )}
                 </>
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
-                </div>
+                <EmptyPlaceholder icon={Star} hint={tr.enterBirthData} theme={theme} />
               )}
             </div>
           )}
@@ -2583,10 +2651,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   <JyotishBlock birthData={birth} />
                 </div>
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>{tr.enterBirthData}</p>
-                </div>
+                <EmptyPlaceholder icon={Star} hint={tr.enterBirthData} theme={theme} />
               )}
             </div>
           )}
@@ -2596,9 +2661,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {user ? (
                 <ClientHistoryPanel uid={user.uid} person={currentPerson} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <p className={`${theme.text} text-sm`}>Войдите в систему для доступа к истории</p>
-                </div>
+                <EmptyPlaceholder hint="Войдите в систему для доступа к истории консультаций" theme={theme} />
               )}
             </div>
           )}
@@ -2608,10 +2671,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <DailyPersonalBlock birthData={birth} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для персонального дня</p>
-                </div>
+                <EmptyPlaceholder icon={Zap} hint="Введите дату и время рождения для персонального дня" theme={theme} />
               )}
             </div>
           )}
@@ -2658,10 +2718,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                 {natalChart?.fixed_stars ? (
                   <FixedStarsBlock stars={natalChart.fixed_stars} />
                 ) : (
-                  <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту для анализа звёзд</p>
-                  </div>
+                  <EmptyPlaceholder icon={Star} hint="Рассчитайте натальную карту для анализа неподвижных звёзд" theme={theme} />
                 )}
               </div>
             </div>
@@ -2698,10 +2755,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date ? (
                 <ForecastAdvisorBlock birth={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Zap className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату рождения для персонального прогноза</p>
-                </div>
+                <EmptyPlaceholder icon={Zap} hint="Введите дату рождения для персонального прогноза" theme={theme} />
               )}
             </div>
           )}
@@ -2711,10 +2765,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <EclipsePersonalBlock birth={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для анализа затмений в натальных домах</p>
-                </div>
+                <EmptyPlaceholder icon={Star} hint="Введите дату и время рождения для анализа затмений в натальных домах" theme={theme} />
               )}
             </div>
           )}
@@ -2724,10 +2775,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <IngressPersonalBlock birth={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для анализа ингрессий</p>
-                </div>
+                <EmptyPlaceholder icon={Globe} hint="Введите дату и время рождения для анализа ингрессий" theme={theme} />
               )}
             </div>
           )}
@@ -2743,10 +2791,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <AnnualProfectionBlock birth={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Calendar className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату и время рождения для расчёта профекций</p>
-                </div>
+                <EmptyPlaceholder icon={Calendar} hint="Введите дату и время рождения для расчёта профекций" theme={theme} />
               )}
             </div>
           )}
@@ -2756,10 +2801,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {natalChart ? (
                 <HolosBlock chart={natalChart} birthDate={birth.date} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Рассчитайте натальную карту чтобы открыть анализ HOLOS</p>
-                </div>
+                <EmptyPlaceholder icon={Sparkles} hint="Рассчитайте натальную карту, чтобы открыть анализ HOLOS" theme={theme} />
               )}
             </div>
           )}
@@ -2773,10 +2815,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   natalChart={natalChart ?? undefined}
                 />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите дату рождения для нумерологического профиля</p>
-                </div>
+                <EmptyPlaceholder icon={Sparkles} hint="Введите дату рождения для нумерологического профиля" theme={theme} />
               )}
             </div>
           )}
@@ -2786,10 +2825,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <AsteroidsLilithBlock birthData={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для расчёта астероидов и Лилит</p>
-                </div>
+                <EmptyPlaceholder icon={Star} hint="Введите данные рождения для расчёта астероидов и Лилит" theme={theme} />
               )}
             </div>
           )}
@@ -2808,10 +2844,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <SiderealBlock birthData={birth} theme={theme} />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Globe className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для сидерической карты</p>
-                </div>
+                <EmptyPlaceholder icon={Globe} hint="Введите данные рождения для сидерической карты" theme={theme} />
               )}
             </div>
           )}
@@ -2827,10 +2860,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   utc={birth.utc ?? 0}
                 />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Clock className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Зодиакального Высвобождения</p>
-                </div>
+                <EmptyPlaceholder icon={Clock} hint="Введите данные рождения для Зодиакального Высвобождения" theme={theme} />
               )}
             </div>
           )}
@@ -2846,10 +2876,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   utc={birth.utc ?? 0}
                 />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Star className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Примарных Дирекций</p>
-                </div>
+                <EmptyPlaceholder icon={Star} hint="Введите данные рождения для Примарных Дирекций" theme={theme} />
               )}
             </div>
           )}
@@ -2865,10 +2892,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   utc={birth.utc ?? 0}
                 />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Матрицы Вероятностей</p>
-                </div>
+                <EmptyPlaceholder icon={Sparkles} hint="Введите данные рождения для Матрицы Вероятностей" theme={theme} />
               )}
             </div>
           )}
@@ -2884,10 +2908,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                   utc={birth.utc ?? 0}
                 />
               ) : (
-                <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                  <Sparkles className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                  <p className={`${theme.text} text-sm`}>Введите данные рождения для Gene Keys профиля</p>
-                </div>
+                <EmptyPlaceholder icon={Sparkles} hint="Введите данные рождения для Gene Keys профиля" theme={theme} />
               )}
             </div>
           )}
@@ -2902,10 +2923,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             <div id="pdf-section-synastry">
               {natalChart
                 ? <SynastryPanel birth={birth} theme={theme} people={people} />
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <Heart className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+                : <EmptyPlaceholder icon={Heart} hint={tr.calcNatalFirst} theme={theme} />
               }
             </div>
           )}
@@ -2929,10 +2947,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
                     />
                   </div>
                 )
-                : <div className={`rounded-xl border ${theme.card} p-12 text-center`}>
-                    <BookOpen className={`h-12 w-12 mx-auto mb-3 ${theme.symbol} opacity-40`} />
-                    <p className={`${theme.text} text-sm`}>{tr.calcNatalFirst}</p>
-                  </div>
+                : <EmptyPlaceholder icon={BookOpen} hint={tr.calcNatalFirst} theme={theme} />
               }
             </div>
           )}

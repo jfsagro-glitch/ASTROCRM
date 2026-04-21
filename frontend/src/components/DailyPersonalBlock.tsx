@@ -203,14 +203,51 @@ export function DailyPersonalBlock({ birthData }: Props) {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-red-300 text-sm">{error}</div>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 flex items-center justify-between gap-3">
+          <span className="text-red-300 text-sm">{error}</span>
+          <button onClick={load} className="shrink-0 px-2.5 py-1 text-xs rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors">
+            Повторить
+          </button>
+        </div>
       )}
 
       {loading && !data && (
-        <div className="space-y-3">
-          {[1,2,3].map(i => (
-            <div key={i} className="h-20 rounded-xl bg-white/5 animate-pulse" />
-          ))}
+        <div className="space-y-3 animate-pulse">
+          {/* Moon card skeleton */}
+          <div className="rounded-xl border border-white/10 bg-indigo-950/30 p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-white/10" />
+                <div className="space-y-1.5">
+                  <div className="h-4 w-36 rounded bg-white/10" />
+                  <div className="h-3 w-48 rounded bg-white/8" />
+                </div>
+              </div>
+              <div className="h-6 w-28 rounded-full bg-white/8" />
+            </div>
+          </div>
+          {/* Profection + Firdaria row */}
+          <div className="grid grid-cols-2 gap-3">
+            {[0, 1].map(i => (
+              <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+                <div className="h-3 w-20 rounded bg-white/10" />
+                <div className="h-4 w-16 rounded bg-white/8" />
+                <div className="h-3 w-24 rounded bg-white/6" />
+              </div>
+            ))}
+          </div>
+          {/* Transit cards */}
+          <div className="space-y-1.5">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} className="rounded-lg border border-white/8 bg-white/3 p-2.5 flex items-center gap-2">
+                <div className="w-4 h-3 rounded bg-white/8" />
+                <div className="h-4 w-20 rounded bg-white/10" />
+                <div className="h-4 w-6 rounded bg-white/8" />
+                <div className="h-3 w-24 rounded bg-white/6" />
+                <div className="ml-auto h-3 w-8 rounded bg-white/6" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
