@@ -284,6 +284,160 @@ function SphereBar({ icon: Icon, label, score, color }: {
 }
 
 // ─── HeroCard ─────────────────────────────────────────────────────────────────
+// ─── Practice shape helper ────────────────────────────────────────────────────
+// Backend may return practices as string[] (per-planet) or object[] (pair).
+// Normalize to {practice, why?, timing?} for uniform rendering.
+type NormPractice = { practice: string; why?: string; timing?: string };
+function normalizePractices(raw: unknown): NormPractice[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((p): NormPractice | null => {
+      if (typeof p === 'string') return p.trim() ? { practice: p.trim() } : null;
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>;
+        const practice = String(o.practice ?? o.action ?? o.title ?? '').trim();
+        if (!practice) return null;
+        return {
+          practice,
+          why: o.why ? String(o.why) : undefined,
+          timing: o.timing ? String(o.timing) : undefined,
+        };
+      }
+      return null;
+    })
+    .filter((p): p is NormPractice => p !== null);
+}
+
+// Timing hint based on orb + applying flag (personalized to the transit)
+function orbTiming(orb: number | undefined, applying: boolean | undefined): string {
+  if (orb === undefined || isNaN(orb)) return '';
+  if (orb <= 0.3) return applying ? 'точный — пик сегодня' : 'точный — уходит сегодня';
+  if (orb <= 1.0) return applying ? 'пик ближайшие 1–3 дня' : 'ослабевает 1–3 дня';
+  if (orb <= 2.0) return applying ? 'нарастает, пик через 3–7 дней' : 'отходит 3–7 дней';
+  return applying ? 'подходит, пик через 7–14 дней' : 'удаляется';
+}
+
+// Small badge for PERSONAL vs GENERAL marker
+function ScopeBadge({ scope }: { scope: 'personal' | 'general' }) {
+  const isP = scope === 'personal';
+  return (
+    <span
+      className={
+        'inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-widest font-semibold border ' +
+        (isP
+          ? 'border-emerald-400/40 text-emerald-300/90 bg-emerald-500/10'
+          : 'border-sky-400/40 text-sky-300/90 bg-sky-500/10')
+      }
+      title={isP ? 'Рассчитано по натальным данным этого клиента' : 'Общий астрофон, одинаковый для всех'}
+    >
+      {isP ? '● персональное' : '○ общее'}
+    </span>
+  );
+}
+
+// ─── ELEMENT_RU / MODALITY_RU for PersonalIdentityCard ───────────────────────
+const ELEMENT_RU: Record<string, string> = {
+  fire: 'огонь', earth: 'земля', air: 'воздух', water: 'вода',
+};
+const ELEMENT_EMOJI: Record<string, string> = {
+  fire: '🔥', earth: '⛰', air: '💨', water: '💧',
+};
+const MODALITY_RU: Record<string, string> = {
+  cardinal: 'кардинальная', fixed: 'фиксированная', mutable: 'мутабельная',
+};
+const SHAPE_RU: Record<string, string> = {
+  bundle: 'узкий фокус (до 120°)',
+  bowl: 'чаша — полусфера',
+  bucket: 'ведро — с «ручкой»',
+  locomotive: 'локомотив — 240° заполнено',
+  seesaw: 'качели — две группы',
+  splash: 'всплеск — равномерно',
+  splay: 'разветвление — несколько групп',
+};
+
+// ─── PersonalIdentityCard ─────────────────────────────────────────────────────
+// Top-of-dashboard personal anchor: who this report is for + natal essence.
+function PersonalIdentityCard({
+  data, birthData, theme,
+}: { data: DashboardData; birthData: BirthInput; theme: ThemeLike }) {
+  const essence = (data.natal_essence ?? {}) as NonNullable<DashboardData['natal_essence']>;
+  const analysis = (data.chart_analysis ?? {}) as Record<string, unknown>;
+  const sun = essence.sun  ?? {};
+  const moon = essence.moon ?? {};
+  const asc = essence.asc  ?? {};
+  const domEl = String(analysis.dominant_element ?? '');
+  const domMod = String(analysis.dominant_modality ?? '');
+  const shape = String(analysis.shape ?? '');
+  const unaspected = (analysis.unaspected_planets ?? []) as string[];
+  const sect = essence.sect;
+  const name = birthData.name?.trim() || 'Персональный профиль';
+  const birthDate = birthData.date
+    ? new Date(birthData.date + 'T00:00:00Z').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
+  return (
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-lg">🧬</span>
+          <div className="min-w-0">
+            <div className={`text-sm font-bold ${theme.header} truncate`}>{name}</div>
+            {birthDate && (
+              <div className={`text-[10px] ${theme.text} opacity-45`}>
+                {birthDate}{birthData.time ? ` · ${birthData.time}` : ''}
+              </div>
+            )}
+          </div>
+        </div>
+        <ScopeBadge scope="personal" />
+      </div>
+
+      <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
+        {sun.sign && (
+          <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2">
+            <div className="text-[9px] text-amber-400 uppercase tracking-wider font-semibold">☉ Солнце</div>
+            <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[sun.sign] ?? sun.sign}</div>
+            {sun.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {sun.house} · {HOUSE_THEME[sun.house] ?? ''}</div> : null}
+          </div>
+        )}
+        {moon.sign && (
+          <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2">
+            <div className="text-[9px] text-blue-400 uppercase tracking-wider font-semibold">☽ Луна</div>
+            <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[moon.sign] ?? moon.sign}</div>
+            {moon.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {moon.house} · {HOUSE_THEME[moon.house] ?? ''}</div> : null}
+          </div>
+        )}
+        {asc.sign && (
+          <div className="rounded-xl bg-violet-500/8 border border-violet-500/20 px-3 py-2">
+            <div className="text-[9px] text-violet-400 uppercase tracking-wider font-semibold">↑ Асцендент</div>
+            <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[asc.sign] ?? asc.sign}</div>
+            <div className={`text-[10px] ${theme.text} opacity-50`}>маска, тело, первая реакция</div>
+          </div>
+        )}
+        {domEl && (
+          <div className="rounded-xl bg-rose-500/8 border border-rose-500/20 px-3 py-2">
+            <div className="text-[9px] text-rose-400 uppercase tracking-wider font-semibold">Стихия</div>
+            <div className={`text-sm font-bold ${theme.header}`}>
+              {ELEMENT_EMOJI[domEl] ?? ''} {ELEMENT_RU[domEl] ?? domEl}
+            </div>
+            {domMod && <div className={`text-[10px] ${theme.text} opacity-50`}>{MODALITY_RU[domMod] ?? domMod}</div>}
+          </div>
+        )}
+        {(shape || sect || unaspected.length > 0) && (
+          <div className="rounded-xl bg-white/3 border border-white/10 px-3 py-2">
+            <div className="text-[9px] text-white/40 uppercase tracking-wider font-semibold">Форма карты</div>
+            {shape && <div className={`text-sm font-bold ${theme.header}`}>{SHAPE_RU[shape] ?? shape}</div>}
+            {sect && <div className={`text-[10px] ${theme.text} opacity-50`}>секта: {sect === 'day' ? 'дневная' : 'ночная'}</div>}
+            {unaspected.length > 0 && (
+              <div className={`text-[10px] ${theme.text} opacity-50`}>без аспектов: {unaspected.map(p => PLANET_RU[p] ?? p).join(', ')}</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
   const score = data.day_score ?? 50;
   const narrative = getDayNarrative(score);
@@ -392,7 +546,7 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
   const isWaxing = ['waxing_crescent','first_quarter','waxing_gibbous','full_moon'].includes(moon.phase);
 
   return (
-    <Card title="Луна сегодня" icon={Moon} theme={theme} accent="text-blue-300">
+    <Card title="Луна сегодня" icon={Moon} theme={theme} accent="text-blue-300" badge={<ScopeBadge scope="general" />}>
       <div className="space-y-3">
         {/* Phase display */}
         <div className="flex items-center gap-4">
@@ -574,6 +728,7 @@ function KeyTransitsCard({ data, theme, isPro }: { data: DashboardData; theme: T
               ▼{maleficCount}
             </span>
           )}
+          <ScopeBadge scope="personal" />
         </div>
       }
     >
@@ -631,7 +786,7 @@ function UpcomingEventsCard({ data, theme }: { data: DashboardData; theme: Theme
   );
 
   return (
-    <Card title="Ближайшие события" icon={Calendar} theme={theme} accent="text-blue-400">
+    <Card title="Ближайшие события" icon={Calendar} theme={theme} accent="text-blue-400" badge={<ScopeBadge scope="general" />}>
       <div className="space-y-2">
         {events.sort((a,b) => b.urgency - a.urgency).map((ev, i) => (
           <div key={i} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${ev.color}`}>
@@ -658,7 +813,7 @@ function PeriodsCard({ data, theme }: { data: DashboardData; theme: ThemeLike })
   const profSign   = profections?.annual_sign as string;
 
   return (
-    <Card title="Периоды · Профекции" icon={TrendingUp} theme={theme} accent="text-violet-400">
+    <Card title="Периоды · Профекции" icon={TrendingUp} theme={theme} accent="text-violet-400" badge={<ScopeBadge scope="personal" />}>
       <div className="space-y-3">
         {firPeriod ? (
           <div className="rounded-xl bg-violet-500/8 border border-violet-500/20 p-3">
@@ -736,25 +891,28 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
     .sort((a, b) => (b.applying ? 1 : 0) - (a.applying ? 1 : 0))
     .slice(0, 3);
 
-  // Compensatory practices from active transits
+  // Compensatory practices from active transits — personalized per transit.
+  // Normalize to handle both string[] and object[] shapes from backend.
   const compItems: Array<{
-    planet: string; sign: string; practice: string; why: string; timing: string;
-    tension: string; nature: string;
+    planet: string; sign: string; actions: string[]; function: string;
+    tension: string; nature: string; natalPlanet: string; aspect: string;
+    applying: boolean; orb: number;
   }> = [];
   active.slice(0, 4).forEach(at => {
-    const pList = (at.practices ?? []) as Array<Record<string, unknown>>;
-    if (!pList.length) return;
-    const top = pList[0];
-    if (!top.practice) return;
+    const actions = normalizePractices(at.practices).slice(0, 3).map(p => p.practice);
+    if (!actions.length) return;
     const matchedTransit = topTransits.find(t => String(t.transit_planet ?? '') === String(at.planet ?? ''));
     compItems.push({
       planet: String(at.planet ?? ''),
       sign: String(at.sign ?? ''),
-      practice: String(top.practice),
-      why: String(top.why ?? ''),
-      timing: String(top.timing ?? ''),
+      actions,
+      function: String(at.function ?? ''),
       tension: String(at.tension_signal ?? ''),
       nature: String(matchedTransit?.nature ?? 'mixed'),
+      natalPlanet: matchedTransit ? String(matchedTransit.natal_planet ?? '') : '',
+      aspect:      matchedTransit ? String(matchedTransit.aspect ?? '')       : '',
+      applying:    matchedTransit ? Boolean(matchedTransit.applying)          : false,
+      orb:         matchedTransit ? Number(matchedTransit.orb ?? 99)          : 99,
     });
   });
 
@@ -765,12 +923,15 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
   return (
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       {/* Header */}
-      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <CheckCircle size={15} className="text-emerald-400" />
           <span className={`text-sm font-bold ${theme.header}`}>Рекомендации на сегодня</span>
         </div>
-        <span className={`text-[10px] ${theme.text} opacity-35 uppercase tracking-wide`}>синтез транзитов</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] ${theme.text} opacity-35 uppercase tracking-wide`}>синтез ваших транзитов</span>
+          <ScopeBadge scope="personal" />
+        </div>
       </div>
 
       {!hasContent && !moonVoid ? (
@@ -830,23 +991,35 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
             ) : compItems.map((item, i) => {
               const isPos = item.nature === 'benefic';
               const accentCls = isPos ? 'text-blue-400' : item.nature === 'malefic' ? 'text-red-300' : 'text-amber-300';
+              const timing = orbTiming(item.orb, item.applying);
               return (
                 <div key={i} className="rounded-xl border border-white/10 bg-white/3 p-3">
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                     <span className={`text-[11px] font-bold ${accentCls}`}>
                       {PLANET_GL[item.planet] ?? ''} {PLANET_RU[item.planet] ?? item.planet}
                     </span>
                     <span className={`text-[10px] ${theme.text} opacity-40`}>в {SIGN_RU[item.sign] ?? item.sign}</span>
+                    {item.natalPlanet && (
+                      <span className={`text-[10px] ${ASPECT_COLOR[item.aspect] ?? 'text-white/40'}`}>
+                        {ASPECT_SYM[item.aspect] ?? ''} натал. {PLANET_RU[item.natalPlanet] ?? item.natalPlanet}
+                      </span>
+                    )}
                   </div>
                   {item.tension && (
-                    <p className={`text-[10px] italic ${accentCls} opacity-70 mb-1.5 leading-snug`}>{item.tension}</p>
+                    <p className={`text-[10px] italic ${accentCls} opacity-75 mb-1.5 leading-snug`}>
+                      Симптом: {item.tension}
+                    </p>
                   )}
-                  <p className={`text-xs font-semibold ${theme.header} leading-snug`}>{item.practice}</p>
-                  {item.why && (
-                    <p className={`text-[10px] ${theme.text} opacity-45 mt-1 leading-snug`}>{item.why}</p>
-                  )}
-                  {item.timing && (
-                    <p className="text-[10px] text-amber-300/55 mt-1">⏰ {item.timing}</p>
+                  <div className="space-y-1 mt-1">
+                    {item.actions.map((a, j) => (
+                      <div key={j} className="flex items-start gap-1.5">
+                        <span className={`${accentCls} text-[10px] font-bold mt-0.5 shrink-0`}>{j + 1}.</span>
+                        <p className={`text-[11px] ${theme.header} leading-snug`}>{a}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {timing && (
+                    <p className="text-[10px] text-amber-300/60 mt-1.5">⏰ {timing}{item.orb < 99 ? ` · орб ${item.orb.toFixed(1)}°` : ''}</p>
                   )}
                 </div>
               );
@@ -925,7 +1098,7 @@ function FortuneLotCard({ data, theme }: { data: DashboardData; theme: ThemeLike
   const { fortune_today } = data;
   if (!fortune_today?.sign) return null;
   return (
-    <Card title="Жребий Фортуны" icon={Star} theme={theme} accent="text-yellow-400">
+    <Card title="Жребий Фортуны" icon={Star} theme={theme} accent="text-yellow-400" badge={<ScopeBadge scope="personal" />}>
       <div className="flex items-start gap-3">
         <span className="text-4xl leading-none" style={{ filter: 'drop-shadow(0 0 8px rgba(253,224,71,0.5))' }}>🎯</span>
         <div className="flex-1">
@@ -963,7 +1136,8 @@ function CompensatoryNow({ comp, theme, topTransits }: {
     const aspect      = match ? String(match.aspect ?? '') : '';
     const nature      = match ? String(match.nature ?? 'mixed') : 'mixed';
     const applying    = match ? Boolean(match.applying) : false;
-    return { raw: at, natalPlanet, aspect, nature, applying, planet, sign };
+    const orb         = match ? Number(match.orb ?? 99) : 99;
+    return { raw: at, natalPlanet, aspect, nature, applying, orb, planet, sign };
   });
 
   if (enriched.length === 0 && pairs.length === 0) {
@@ -1014,35 +1188,50 @@ function CompensatoryNow({ comp, theme, topTransits }: {
             </div>
             {practices.length > 0 && (
               <div className="px-3 pb-2.5 space-y-1.5 border-t border-white/6 pt-2">
-                <div className={`text-[9px] uppercase tracking-wider ${theme.text} opacity-30 mb-1`}>{labelCls}</div>
-                {practices.slice(0, 2).map((pr, j) => (
+                <div className="flex items-center justify-between mb-1">
+                  <div className={`text-[9px] uppercase tracking-wider ${theme.text} opacity-40`}>{labelCls}</div>
+                  {(() => {
+                    const t = orbTiming(at.orb, at.applying);
+                    return t ? <div className="text-[9px] text-amber-300/60">⏰ {t}</div> : null;
+                  })()}
+                </div>
+                {normalizePractices(practices).slice(0, 3).map((pr, j) => (
                   <div key={j} className="flex items-start gap-1.5">
-                    <span className={`text-[10px] mt-0.5 ${accentCls} shrink-0`}>›</span>
+                    <span className={`text-[10px] mt-0.5 ${accentCls} shrink-0 font-bold`}>{j + 1}.</span>
                     <div className="min-w-0">
-                      <div className={`text-[11px] font-medium ${theme.header} leading-tight`}>{Boolean(pr.practice) ? String(pr.practice) : ''}</div>
-                      {Boolean(pr.why) && <div className={`text-[10px] ${theme.text} opacity-45 leading-tight mt-px`}>{String(pr.why)}</div>}
+                      <div className={`text-[11px] font-medium ${theme.header} leading-tight`}>{pr.practice}</div>
+                      {pr.why && <div className={`text-[10px] ${theme.text} opacity-45 leading-tight mt-px`}>{pr.why}</div>}
+                      {pr.timing && <div className="text-[10px] text-amber-300/55 leading-tight mt-px">⏰ {pr.timing}</div>}
                     </div>
                   </div>
                 ))}
+                {Boolean(at.raw.function) && (
+                  <div className={`text-[10px] ${theme.text} opacity-40 italic border-t border-white/5 pt-1.5 mt-1`}>
+                    Функция планеты: {String(at.raw.function)}
+                  </div>
+                )}
               </div>
             )}
           </div>
         );
       })}
-      {pairs.slice(0,1).map((p, i) => (
-        <div key={`pair-${i}`} className="rounded-xl bg-indigo-500/8 border border-indigo-500/20 p-3">
-          <div className="text-[10px] font-semibold text-indigo-300 mb-1 flex items-center gap-1">
-            <span>⚗</span> {String(p.name ?? p.pair ?? '')}
-          </div>
-          {Boolean(p.tension) && <p className={`text-[11px] italic ${theme.text} opacity-55 mb-1.5`}>{String(p.tension)}</p>}
-          {Array.isArray(p.practices) && (p.practices as Array<Record<string,unknown>>).slice(0,2).map((pr, j) => (
-            <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5 mb-0.5`}>
-              <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" />
-              {Boolean(pr.practice) ? String(pr.practice) : String(pr)}
+      {pairs.slice(0,1).map((p, i) => {
+        const pairPractices = normalizePractices(p.practices);
+        return (
+          <div key={`pair-${i}`} className="rounded-xl bg-indigo-500/8 border border-indigo-500/20 p-3">
+            <div className="text-[10px] font-semibold text-indigo-300 mb-1 flex items-center gap-1">
+              <span>⚗</span> {String(p.name ?? p.pair ?? '')}
             </div>
-          ))}
-        </div>
-      ))}
+            {Boolean(p.tension) && <p className={`text-[11px] italic ${theme.text} opacity-55 mb-1.5`}>{String(p.tension)}</p>}
+            {pairPractices.slice(0, 3).map((pr, j) => (
+              <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5 mb-0.5`}>
+                <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" />
+                <span>{pr.practice}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1068,9 +1257,10 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
         onClick={() => setOpen(v => !v)}
         className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <MapPin size={14} className={theme.accent} />
           <span className={`text-sm font-semibold ${theme.header}`}>📍 Локации · Куда ехать в этот период</span>
+          <ScopeBadge scope="personal" />
           {lord && <span className={`text-[10px] ${theme.text} opacity-40`}>Лорд: {PLANET_RU[lord] ?? lord}</span>}
         </div>
         {open ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
@@ -1155,10 +1345,11 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
         onClick={() => { if (!data && !loading) load(); setOpen(o => ({...o, __h: !o.__h})); }}
         className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Shield size={14} className={theme.accent} />
           <span className={`text-sm font-semibold ${theme.header}`}>🛡 Компенсаторный прогноз</span>
-          <span className={`text-[10px] ${theme.text} opacity-40`}>1–6 месяцев</span>
+          <ScopeBadge scope="personal" />
+          <span className={`text-[10px] ${theme.text} opacity-40`}>1–6 месяцев, по вашим транзитам</span>
           {data && <span className={`text-[10px] text-emerald-400`}>· {data.windows.length} окна</span>}
         </div>
         {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
@@ -1290,9 +1481,10 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
         className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
         aria-expanded={open}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Globe size={14} className={theme.accent} />
           <span className={`text-sm font-semibold ${theme.header}`}>🌍 Глобальный астрофон</span>
+          <ScopeBadge scope="general" />
           {data && (
             <span className={`text-[10px] ${theme.text} opacity-35`}>
               {data.planets?.length ?? 0} планет · {data.mutual_aspects?.length ?? 0} аспектов
@@ -1378,7 +1570,7 @@ function PlanetPositionsCard({ data, theme }: { data: DashboardData; theme: Them
   });
   if (transitPlanets.length === 0) return null;
   return (
-    <Card title="Планеты сегодня" icon={Info} theme={theme}>
+    <Card title="Планеты сегодня" icon={Info} theme={theme} badge={<ScopeBadge scope="general" />}>
       <div className="flex flex-wrap gap-1.5">
         {transitPlanets.map(({ planet }) => {
           const retroData = retros.find(r => r.planet === planet);
@@ -1527,6 +1719,11 @@ export default function DashboardView({ birthData, theme }: Props) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
+          УРОВЕНЬ 0 — Личность клиента (натальная суть)
+      ══════════════════════════════════════════════════════════════════ */}
+      <PersonalIdentityCard data={data} birthData={birthData} theme={theme} />
+
+      {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — Статус дня (FULL WIDTH)
       ══════════════════════════════════════════════════════════════════ */}
       <HeroCard data={data} theme={theme} />
@@ -1573,9 +1770,12 @@ export default function DashboardView({ birthData, theme }: Props) {
             theme={theme}
             accent="text-amber-400"
             badge={
-              <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/25 text-amber-300/60">
-                активные транзиты
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/25 text-amber-300/60">
+                  ваши активные транзиты
+                </span>
+                <ScopeBadge scope="personal" />
+              </div>
             }
           >
             <CompensatoryNow

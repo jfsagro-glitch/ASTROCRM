@@ -480,6 +480,16 @@ export interface DashboardData {
   sphere_scores?: { love: number; work: number; finance: number; health: number; creative: number };
   next_lunation?: { full_moon: string; new_moon: string; days_to_full: number; days_to_new: number };
   chart_analysis?: Record<string, unknown>;
+  natal_essence?: {
+    sun?:     { sign?: string; house?: number; deg_min?: string };
+    moon?:    { sign?: string; house?: number; deg_min?: string };
+    mercury?: { sign?: string; house?: number };
+    venus?:   { sign?: string; house?: number };
+    mars?:    { sign?: string; house?: number };
+    asc?:     { sign?: string; lon?: number };
+    mc?:      { sign?: string; lon?: number };
+    sect?:    string | null;
+  };
 }
 
 export async function getDashboard(b: BirthInput, targetDate?: string): Promise<DashboardData> {
