@@ -614,11 +614,13 @@ export async function getNumerologyProfile(
 // ─── Daily Personal ───────────────────────────────────────────────────────────
 
 export interface DailyTransitAspect {
-  transiting_planet: string;
+  transit_planet: string;
   natal_planet: string;
   aspect: string;
   orb: number;
   applying: boolean;
+  transit_sign?: string;
+  natal_sign?: string;
 }
 
 export interface DailyMoonInfo {

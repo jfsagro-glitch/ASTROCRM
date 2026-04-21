@@ -122,9 +122,9 @@ function TransitCard({ t, idx }: { t: DailyTransitAspect; idx: number }) {
                 'border-white/10 bg-white/5'
     }`}>
       <span className="text-white/30 text-xs w-4 text-center">{idx + 1}</span>
-      <span className={`font-medium ${PLANET_GLYPH[t.transiting_planet] ? '' : ''}`}>
-        {PLANET_GLYPH[t.transiting_planet] ?? ''}{' '}
-        <span className="text-white/70 text-xs">{PLANET_RU[t.transiting_planet] ?? t.transiting_planet}</span>
+      <span className={`font-medium ${PLANET_GLYPH[t.transit_planet] ? '' : ''}`}>
+        {PLANET_GLYPH[t.transit_planet] ?? ''}{' '}
+        <span className="text-white/70 text-xs">{PLANET_RU[t.transit_planet] ?? t.transit_planet}</span>
       </span>
       <span className={`font-bold text-base ${ASPECT_COLOR[t.aspect] ?? 'text-white/70'}`}>
         {ASPECT_GLYPH[t.aspect] ?? t.aspect}

@@ -139,7 +139,7 @@ def assembly_point_index(natal_chart: dict, transit_aspects: list) -> dict:
     bridge_score = 0.0
 
     for asp in transit_aspects:
-        tp = asp.get("transiting_planet", asp.get("planet", ""))
+        tp = asp.get("transit_planet", asp.get("transiting_planet", asp.get("planet", "")))
         np = asp.get("natal_planet", asp.get("target", ""))
         asp_name = asp.get("aspect", "conjunction")
         orb  = asp.get("orb", 5.0)
@@ -204,7 +204,7 @@ def _generate_branch(
     Generate a single probability branch for one transit aspect.
     Each branch has: action sphere, probability weight, timeline, compensatory actions.
     """
-    tp = transit_aspect.get("transiting_planet", transit_aspect.get("planet", ""))
+    tp = transit_aspect.get("transit_planet", transit_aspect.get("transiting_planet", transit_aspect.get("planet", "")))
     np = transit_aspect.get("natal_planet", transit_aspect.get("target", ""))
     aspect = transit_aspect.get("aspect", "conjunction")
     orb    = transit_aspect.get("orb", 5.0)
