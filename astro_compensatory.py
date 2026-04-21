@@ -689,8 +689,12 @@ def build_compensatory_report(
     aspect_pairs_out = []
     seen_pairs: set = set()
     for asp in transit_aspects:
-        p1  = asp.get("planet1") or asp.get("p1", "")
-        p2  = asp.get("planet2") or asp.get("p2", "")
+        # Support both naming conventions:
+        # - "planet1"/"planet2" from calc_aspects() transit-to-transit
+        # - "transit_planet"/"natal_planet" from transits() natal aspects
+        p1  = (asp.get("transit_planet") or asp.get("transiting_planet")
+               or asp.get("planet1") or asp.get("p1", ""))
+        p2  = (asp.get("natal_planet") or asp.get("planet2") or asp.get("p2", ""))
         kind = asp.get("aspect", "")
         key = tuple(sorted([p1, p2]) + [kind])
         if key in seen_pairs:
