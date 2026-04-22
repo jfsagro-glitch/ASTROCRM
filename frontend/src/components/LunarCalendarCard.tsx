@@ -72,14 +72,14 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
   useEffect(() => { load(); }, [load]);
 
   if (loading) return (
-    <div className={`rounded-2xl border p-4 ${theme.card} flex items-center gap-2 text-sm ${theme.text}`}>
-      <Moon size={16} className="animate-pulse" /> Загрузка лунного календаря…
+    <div role="status" aria-live="polite" className={`rounded-2xl border p-4 ${theme.card} flex items-center gap-2 text-sm ${theme.text}`}>
+      <Moon size={16} className="animate-pulse" aria-hidden="true" /> Загрузка лунного календаря…
     </div>
   );
 
   if (error) return (
-    <div className={`rounded-2xl border p-4 ${theme.card} text-red-400 text-sm`}>
-      ⚠ {error}
+    <div role="alert" className={`rounded-2xl border p-4 ${theme.card} text-red-300 text-sm`}>
+      <span aria-hidden="true">⚠ </span>{error}
     </div>
   );
 
@@ -89,43 +89,49 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-2 border-b border-white/10">
-        <Moon size={16} className={theme.accent} />
-        <span className={`text-sm font-medium ${theme.header}`}>Лунный календарь</span>
-        <span className={`ml-auto text-xs ${theme.text} opacity-60`}>{days} дней</span>
+        <Moon size={16} className={theme.accent} aria-hidden="true" />
+        <h3 className={`text-sm font-medium ${theme.header} m-0`}>Лунный календарь</h3>
+        <span className={`ml-auto text-xs ${theme.text} opacity-65`}>{days} дней</span>
       </div>
 
       {/* Day grid */}
-      <div className="p-3 grid grid-cols-7 gap-1">
+      <div role="tablist" aria-label="Дни лунного календаря" className="p-3 grid grid-cols-7 gap-1">
         {calendar.slice(0, 7).map(day => {
           const isSelected = selected?.date === day.date;
           const isToday    = day.date === new Date().toISOString().slice(0, 10);
+          const dateLabel  = new Date(day.date + 'T00:00:00Z').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+          const natureLabel = day.mansion.nature === 'benefic' ? 'благоприятная' : day.mansion.nature === 'malefic' ? 'неблагоприятная' : 'смешанная';
           return (
             <button
               key={day.date}
+              role="tab"
+              aria-selected={isSelected}
+              aria-label={`${dateLabel}${isToday ? ' (сегодня)' : ''}, Луна в ${SIGN_RU[day.moon_sign] ?? day.moon_sign}, мансия ${natureLabel}${day.void_of_course ? ', Луна Пустого Хода' : ''}${day.is_critical_degree ? ', критический градус' : ''}`}
               onClick={() => setSelected(day)}
               className={`
-                flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-center transition-all
+                flex flex-col items-center gap-0.5 rounded-xl p-1.5 min-h-[72px] text-center transition-all
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset
                 ${isSelected
                   ? 'bg-amber-400/20 ring-1 ring-amber-400/50'
                   : 'hover:bg-white/5'}
-                ${day.void_of_course ? 'opacity-60' : ''}
+                ${day.void_of_course ? 'opacity-75' : ''}
               `}
             >
-              <span className={`text-[10px] ${theme.text} opacity-50`}>
+              <span className={`text-[10px] ${theme.text} opacity-65`}>
                 {WEEKDAYS_SHORT_RU[day.weekday] ?? day.weekday.slice(0, 2)}
               </span>
-              <span className={`text-[11px] font-medium ${isToday ? theme.accent : theme.text}`}>
+              <span className={`text-[11px] font-semibold ${isToday ? theme.accent : theme.text}`}>
                 {day.date.slice(8)}
               </span>
-              <span className="text-base leading-none">{PHASE_EMOJI[day.phase] ?? '🌙'}</span>
-              <span className={`text-[10px] ${NATURE_COLOR[day.mansion.nature]}`}>
+              <span className="text-base leading-none" aria-hidden="true">{PHASE_EMOJI[day.phase] ?? '🌙'}</span>
+              <span className={`text-[10px] ${NATURE_COLOR[day.mansion.nature]}`} aria-hidden="true">
                 {SIGN_GLYPH[day.moon_sign] ?? '?'}
               </span>
               {day.void_of_course && (
-                <span className="text-[9px] text-amber-400 leading-none">VoC</span>
+                <span className="text-[10px] text-amber-300 font-semibold leading-none" aria-hidden="true">VoC</span>
               )}
               {day.is_critical_degree && (
-                <AlertTriangle size={8} className="text-orange-400" />
+                <AlertTriangle size={8} className="text-orange-400" aria-hidden="true" />
               )}
             </button>
           );
@@ -134,14 +140,14 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
 
       {/* Selected day detail */}
       {selected && (
-        <div className="border-t border-white/10 p-4 space-y-2">
+        <div role="tabpanel" aria-label="Детали выбранного дня" className="border-t border-white/10 p-4 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className={`text-sm font-medium ${theme.header}`}>
-                {PHASE_EMOJI[selected.phase]} Луна в {SIGN_RU[selected.moon_sign] ?? selected.moon_sign}
+                <span aria-hidden="true">{PHASE_EMOJI[selected.phase]} </span>Луна в {SIGN_RU[selected.moon_sign] ?? selected.moon_sign}
                 {' '}— {selected.moon_degree.toFixed(1)}°
               </div>
-              <div className={`text-xs ${theme.text} opacity-70 mt-0.5`}>
+              <div className={`text-xs ${theme.text} opacity-75 mt-0.5`}>
                 Мансия #{selected.mansion.number} — {selected.mansion.name_ru}
                 {' '}· <span className={NATURE_COLOR[selected.mansion.nature]}>
                   {selected.mansion.nature === 'benefic' ? 'благоприятная' :
@@ -151,13 +157,13 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
             </div>
             <div className="flex flex-col items-end gap-1">
               {selected.void_of_course && (
-                <span className="text-[10px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] bg-amber-400/20 text-amber-200 px-2 py-0.5 rounded-full font-semibold">
                   VoC{selected.voc_end_sign ? ` → ${SIGN_RU[selected.voc_end_sign] ?? selected.voc_end_sign}` : ''}
                 </span>
               )}
               {selected.is_critical_degree && (
-                <span className="text-[10px] bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <AlertTriangle size={8} /> Критический °
+                <span className="text-[10px] bg-orange-500/20 text-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
+                  <AlertTriangle size={8} aria-hidden="true" /> Критический °
                 </span>
               )}
             </div>
@@ -171,25 +177,25 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
           {/* Do / Avoid */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="text-[10px] text-emerald-400 font-medium mb-1 flex items-center gap-1">
-                <Info size={9} /> Рекомендуется
+              <div className="text-[10px] text-emerald-300 font-semibold mb-1 flex items-center gap-1 uppercase tracking-wider">
+                <Info size={10} aria-hidden="true" /> Рекомендуется
               </div>
-              <ul className={`text-[11px] ${theme.text} opacity-70 space-y-0.5`}>
+              <ul className={`text-[11px] ${theme.text} opacity-80 space-y-0.5`}>
                 {selected.mansion.do.slice(0, 3).map((item, i) => (
                   <li key={i} className="flex items-start gap-1">
-                    <span className="text-emerald-400 mt-0.5">›</span> {item}
+                    <span className="text-emerald-400 mt-0.5" aria-hidden="true">›</span> {item}
                   </li>
                 ))}
               </ul>
             </div>
             <div>
-              <div className="text-[10px] text-red-400 font-medium mb-1 flex items-center gap-1">
-                <AlertTriangle size={9} /> Избегать
+              <div className="text-[10px] text-red-300 font-semibold mb-1 flex items-center gap-1 uppercase tracking-wider">
+                <AlertTriangle size={10} aria-hidden="true" /> Избегать
               </div>
-              <ul className={`text-[11px] ${theme.text} opacity-70 space-y-0.5`}>
+              <ul className={`text-[11px] ${theme.text} opacity-80 space-y-0.5`}>
                 {selected.mansion.avoid.slice(0, 3).map((item, i) => (
                   <li key={i} className="flex items-start gap-1">
-                    <span className="text-red-400 mt-0.5">›</span> {item}
+                    <span className="text-red-400 mt-0.5" aria-hidden="true">›</span> {item}
                   </li>
                 ))}
               </ul>
