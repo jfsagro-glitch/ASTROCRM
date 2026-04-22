@@ -2052,7 +2052,7 @@ export default function DashboardView({ birthData, theme }: Props) {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return (
-    <div className="space-y-4">
+    <div role="status" aria-live="polite" aria-label="Загрузка дашборда" className="space-y-4">
       {/* Hero skeleton */}
       <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
         <div className="px-5 pt-5 pb-4">
@@ -2116,10 +2116,13 @@ export default function DashboardView({ birthData, theme }: Props) {
   );
 
   if (error) return (
-    <div className={`rounded-2xl border ${theme.card} p-8 text-center`}>
-      <AlertTriangle size={32} className="text-red-400 mx-auto mb-3" />
-      <p className="text-red-400 text-sm mb-4">{error}</p>
-      <button onClick={load} className={`text-xs px-5 py-2 rounded-xl ${theme.btn}`}>
+    <div role="alert" className={`rounded-2xl border ${theme.card} p-8 text-center`}>
+      <AlertTriangle size={32} className="text-red-400 mx-auto mb-3" aria-hidden="true" />
+      <p className="text-red-300 text-sm mb-4">{error}</p>
+      <button
+        onClick={load}
+        className={`text-xs px-5 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
+      >
         Повторить
       </button>
     </div>
