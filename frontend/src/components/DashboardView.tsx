@@ -227,9 +227,9 @@ function Card({ title, icon: Icon, children, className = '', theme, badge, accen
   className?: string; theme: ThemeLike; badge?: React.ReactNode; accent?: string;
 }) {
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden ${className}`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift ${className}`}>
       <div className="px-4 py-3 flex items-center gap-2 border-b border-white/10">
-        <Icon size={14} className={accent ?? theme.accent} aria-hidden="true" />
+        <Icon size={16} className={accent ?? theme.accent} aria-hidden="true" />
         <h3 className={`text-sm font-semibold ${theme.header} m-0`}>{title}</h3>
         {badge && <div className="ml-auto flex items-center gap-1.5">{badge}</div>}
       </div>
@@ -240,15 +240,16 @@ function Card({ title, icon: Icon, children, className = '', theme, badge, accen
 
 // ─── Circular score ring ──────────────────────────────────────────────────────
 function ScoreRing({ score }: { score: number }) {
-  const r = 40, cx = 50, cy = 50;
+  const r = 56, cx = 70, cy = 70;
   const circumference = 2 * Math.PI * r;
   const dash = (score / 100) * circumference;
   const color = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
   const label = score >= 65 ? 'Удача' : score <= 40 ? 'Стой' : 'Нейтр';
   const labelFull = score >= 65 ? 'благоприятно' : score <= 40 ? 'неблагоприятно' : 'нейтрально';
+  const isLucky = score >= 65;
   return (
     <div
-      className="relative w-[100px] h-[100px] shrink-0"
+      className={`relative w-[140px] h-[140px] shrink-0 ${isLucky ? 'score-ring-pulse' : ''}`}
       role="meter"
       aria-valuenow={score}
       aria-valuemin={0}
@@ -256,15 +257,30 @@ function ScoreRing({ score }: { score: number }) {
       aria-valuetext={`${score} из 100 — ${labelFull}`}
       aria-label="Общий астрологический балл дня"
     >
-      <svg width="100" height="100" className="-rotate-90" aria-hidden="true" focusable="false">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="7" />
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="7"
+      <svg width="140" height="140" className="-rotate-90" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id={`ring-grad-${score}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.6" />
+            <stop offset="100%" stopColor={color} stopOpacity="1" />
+          </linearGradient>
+        </defs>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="9" />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={`url(#ring-grad-${score})`} strokeWidth="9"
           strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 6px ${color}80)` }} />
+          style={{ filter: `drop-shadow(0 0 10px ${color}aa)`, transition: 'stroke-dasharray 700ms ease-out' }}>
+          {isLucky && (
+            <animate
+              attributeName="stroke-dashoffset"
+              values={`0;${-circumference * 0.05};0`}
+              dur="3s"
+              repeatCount="indefinite"
+            />
+          )}
+        </circle>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
-        <span className="text-2xl font-bold leading-none" style={{ color }}>{score}</span>
-        <span className="text-[10px] leading-none mt-0.5 font-semibold" style={{ color }}>{label}</span>
+        <span className="text-4xl font-bold leading-none tracking-tight" style={{ color }}>{score}</span>
+        <span className="text-xs leading-none mt-1 font-semibold uppercase tracking-widest" style={{ color }}>{label}</span>
       </div>
     </div>
   );
@@ -278,7 +294,7 @@ function SphereBar({ icon: Icon, label, score, color }: {
   const tone = score >= 65 ? 'благоприятно' : score <= 40 ? 'неблагоприятно' : 'нейтрально';
   return (
     <div className="flex items-center gap-2.5">
-      <Icon size={13} className={color} aria-hidden="true" />
+      <Icon size={16} className={color} aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center mb-1">
           <span className="text-[11px] text-white/70">{label}</span>
@@ -397,7 +413,7 @@ function PersonalIdentityCard({
     : '';
 
   return (
-    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <div className="absolute inset-0 pointer-events-none opacity-65"
         style={{
           backgroundImage: [
@@ -454,7 +470,7 @@ function PersonalIdentityCard({
           </div>
         )}
         {(shape || sect || unaspected.length > 0) && (
-          <div className="rounded-xl bg-white/3 border border-white/10 px-3 py-2">
+          <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 px-3 py-2">
             <div className="text-[10px] text-white/65 uppercase tracking-wider font-semibold">Форма карты</div>
             {shape && <div className={`text-sm font-bold ${theme.header}`}>{SHAPE_RU[shape] ?? shape}</div>}
             {sect && <div className={`text-[10px] ${theme.text} opacity-70`}>секта: {sect === 'day' ? 'дневная' : 'ночная'}</div>}
@@ -587,7 +603,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
   const score = data.day_score ?? 50;
 
   return (
-    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <div className="absolute inset-0 pointer-events-none opacity-70" style={MESH_BG_STYLE} />
       <div className="relative p-5 space-y-4">
         {/* Header */}
@@ -646,7 +662,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/3 p-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-3">
               <div className="text-[10px] uppercase tracking-widest text-white/65 font-bold mb-1">Открытая дверь сегодня</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Попутных транзитов нет — результат только личной волей</div>
             </div>
@@ -671,7 +687,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
               )}
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/3 p-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-3">
               <div className="text-[10px] uppercase tracking-widest text-white/65 font-bold mb-1">Зона осторожности</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Серьёзных напряжений нет</div>
             </div>
@@ -842,11 +858,11 @@ function PersonalActionPlanCard({ data, theme }: { data: DashboardData; theme: T
   const plan = actions.slice(0, 5);
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <div>
         <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <Zap size={15} className="text-amber-400" aria-hidden="true" />
+            <Zap size={16} className="text-amber-400" aria-hidden="true" />
             <h2 className={`text-sm font-bold ${theme.header} m-0`}>Персональный план на ближайшие дни</h2>
           </div>
           <div className="flex items-center gap-2">
@@ -907,7 +923,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
     : 'from-amber-950/40 to-slate-950/0';
 
   return (
-    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       {/* Mesh backdrop */}
       <div className="absolute inset-0 pointer-events-none opacity-60" style={MESH_BG_STYLE} />
       {/* Gradient header strip */}
@@ -931,7 +947,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
               </span>
               {data.moon.is_void && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
-                  <AlertTriangle size={8} aria-hidden="true" />
+                  <AlertTriangle size={12} aria-hidden="true" />
                   ВоК{vocCountdown ? ` ещё ${vocCountdown}` : ' активен'}
                 </span>
               )}
@@ -942,7 +958,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
               ))}
             </div>
 
-            <p className={`text-sm italic ${theme.text} opacity-65 leading-relaxed max-w-md`}>{narrative}</p>
+            <p className={`text-base ${theme.text} opacity-90 leading-relaxed max-w-md font-medium`}>{narrative}</p>
           </div>
 
           {/* Center: ring */}
@@ -1043,7 +1059,7 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
         {/* VoC banner */}
         {moon.is_void && (
           <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
-            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <h4 className="text-xs font-semibold text-amber-300 m-0">Луна Пустого Хода</h4>
               {moon.void_end_sign && (
@@ -1060,7 +1076,7 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
         {mansion && (
           <div className="border-t border-white/10 pt-3">
             <h4 className={`flex items-center gap-1.5 text-xs font-semibold ${theme.accent} mb-1.5 m-0`}>
-              <Star size={11} aria-hidden="true" />
+              <Star size={12} aria-hidden="true" />
               Мансия #{mansion.number} · {mansion.name_ru}
             </h4>
             <div className={`text-xs ${theme.text} opacity-70 italic mb-2.5`}>{mansion.theme}</div>
@@ -1139,7 +1155,7 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
         </div>
         {hint && (
           <span className={`${theme.text} opacity-60 shrink-0 mt-0.5`}>
-            {expanded ? <ChevronUp size={11} aria-hidden="true" /> : <ChevronDown size={11} aria-hidden="true" />}
+            {expanded ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
           </span>
         )}
       </button>
@@ -1148,7 +1164,7 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
         <div className="px-3 pb-3 pt-2 border-t border-white/10">
           {Boolean(hint.top_practice['practice']) && (
             <div className={`text-[11px] font-semibold ${theme.header} flex gap-1.5 mb-1`}>
-              <Sparkles size={9} className={`${cfg.color} mt-0.5 shrink-0`} aria-hidden="true" />
+              <Sparkles size={12} className={`${cfg.color} mt-0.5 shrink-0`} aria-hidden="true" />
               {String(hint.top_practice['practice'])}
             </div>
           )}
@@ -1198,7 +1214,7 @@ function KeyTransitsCard({ data, theme, isPro }: { data: DashboardData; theme: T
     >
       {transits.length === 0 ? (
         <div className="text-center py-4">
-          <CheckCircle size={20} className="text-emerald-400 mx-auto mb-1.5" aria-hidden="true" />
+          <CheckCircle size={16} className="text-emerald-400 mx-auto mb-1.5" aria-hidden="true" />
           <p className={`text-xs ${theme.text} opacity-70`}>Активных транзитов нет — спокойный день</p>
         </div>
       ) : (
@@ -1385,11 +1401,11 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
   const moonVoidSign = data.moon.void_end_sign;
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <CheckCircle size={15} className="text-emerald-400" aria-hidden="true" />
+          <CheckCircle size={16} className="text-emerald-400" aria-hidden="true" />
           <h2 className={`text-sm font-bold ${theme.header} m-0`}>Рекомендации на сегодня</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -1457,7 +1473,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
               const accentCls = isPos ? 'text-blue-400' : item.nature === 'malefic' ? 'text-red-300' : 'text-amber-300';
               const timing = orbTiming(item.orb, item.applying);
               return (
-                <div key={i} className="rounded-xl border border-white/10 bg-white/3 p-3">
+                <div key={i} className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-3">
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                     <span className={`text-[11px] font-bold ${accentCls}`}>
                       {PLANET_GL[item.planet] ?? ''} {PLANET_RU[item.planet] ?? item.planet}
@@ -1501,7 +1517,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
             {moonVoid && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <AlertTriangle size={11} className="text-amber-400 shrink-0" aria-hidden="true" />
+                  <AlertTriangle size={12} className="text-amber-400 shrink-0" aria-hidden="true" />
                   <span className="text-[11px] font-bold text-amber-400">Луна Пустого Хода</span>
                 </div>
                 <p className="text-[11px] text-amber-300/70 leading-snug">
@@ -1539,7 +1555,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                   )}
                   {Boolean(hint?.top_practice) && Boolean((hint!.top_practice as Record<string,unknown>).practice) && (
                     <div className="mt-1.5 flex items-start gap-1">
-                      <Sparkles size={9} className="text-amber-400 mt-0.5 shrink-0" aria-hidden="true" />
+                      <Sparkles size={12} className="text-amber-400 mt-0.5 shrink-0" aria-hidden="true" />
                       <p className="text-[10px] text-amber-300/70">
                         {String((hint?.top_practice as Record<string,unknown>).practice)}
                       </p>
@@ -1689,7 +1705,7 @@ function CompensatoryNow({ comp, theme, topTransits }: {
             {Boolean(p.tension) && <p className={`text-[11px] italic ${theme.text} opacity-55 mb-1.5`}>{String(p.tension)}</p>}
             {pairPractices.slice(0, 3).map((pr, j) => (
               <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5 mb-0.5`}>
-                <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" aria-hidden="true" />
+                <CheckCircle size={12} className="text-indigo-400 mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{pr.practice}</span>
               </div>
             ))}
@@ -1716,7 +1732,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
   if (!dirInfo && !houseAdvice) return null;
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <button
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
@@ -1724,12 +1740,12 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
         className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <MapPin size={14} className={theme.accent} aria-hidden="true" />
+          <MapPin size={16} className={theme.accent} aria-hidden="true" />
           <span className={`text-sm font-semibold ${theme.header}`}><span aria-hidden="true">📍 </span>Локации · Куда ехать в этот период</span>
           <ScopeBadge scope="personal" />
           {lord && <span className={`text-[10px] ${theme.text} opacity-65`}>Лорд: {PLANET_RU[lord] ?? lord}</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
+        {open ? <ChevronUp size={16} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={16} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open && (
@@ -1755,7 +1771,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
               <p className={`text-xs ${theme.text} opacity-65 leading-relaxed`}>{houseAdvice}</p>
             </div>
           )}
-          <div className="rounded-xl border border-white/10 bg-white/3 p-3 space-y-2">
+          <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-3 space-y-2">
             <div className="text-[10px] text-white/60 font-semibold uppercase tracking-wide">⏰ Прямо сейчас</div>
             {beneficJupiter ? (
               <div className="flex items-start gap-2">
@@ -1775,7 +1791,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
             )}
             {cityName && (
               <div className="flex items-center gap-1.5 text-[11px] text-white/65">
-                <MapPin size={10} aria-hidden="true" />
+                <MapPin size={12} aria-hidden="true" />
                 <span>Текущая локация: <span className={theme.header}>{cityName}</span></span>
                 {dirInfo ? <span className="opacity-60">· Направление энергии: {dirInfo.dir}</span> : null}
               </div>
@@ -1806,7 +1822,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
   }, [birthData]);
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <button
         onClick={() => { if (!data && !loading) load(); setOpen(o => ({...o, __h: !o.__h})); }}
         aria-expanded={Boolean(open.__h)}
@@ -1814,26 +1830,26 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
         className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <Shield size={14} className={theme.accent} aria-hidden="true" />
+          <Shield size={16} className={theme.accent} aria-hidden="true" />
           <span className={`text-sm font-semibold ${theme.header}`}>Компенсаторный прогноз</span>
           <ScopeBadge scope="personal" />
           <span className={`text-[10px] ${theme.text} opacity-65`}>1–6 месяцев, по вашим транзитам</span>
           {data && <span className={`text-[10px] text-emerald-400`}>· {data.windows.length} окна</span>}
         </div>
-        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
+        {open.__h ? <ChevronUp size={16} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={16} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open.__h && (
         <div className="border-t border-white/10 px-4 pb-4 space-y-3 pt-3">
           {loading && (
             <div className="py-6 text-center">
-              <RefreshCw size={18} className={`${theme.accent} animate-spin mx-auto mb-2`} aria-hidden="true" />
+              <RefreshCw size={16} className={`${theme.accent} animate-spin mx-auto mb-2`} aria-hidden="true" />
               <p className={`text-xs ${theme.text} opacity-70`}>Анализирую транзиты ближайших месяцев…</p>
             </div>
           )}
           {error && (
             <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 flex gap-2">
-              <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs text-red-300">{error}</p>
             </div>
           )}
@@ -1945,7 +1961,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
   }, [open, data, loading, load]);
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
       <button
         onClick={handleToggle}
         className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
@@ -1953,7 +1969,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
         aria-label={open ? 'Свернуть глобальный астрофон' : 'Развернуть глобальный астрофон'}
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <Globe size={14} className={theme.accent} aria-hidden="true" />
+          <Globe size={16} className={theme.accent} aria-hidden="true" />
           <span className={`text-sm font-semibold ${theme.header}`}>Глобальный астрофон</span>
           <ScopeBadge scope="general" />
           {data && (
@@ -1963,7 +1979,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
           )}
           {!data && !loading && <span className={`text-[10px] ${theme.text} opacity-60`}>нажмите чтобы загрузить</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
+        {open ? <ChevronUp size={16} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={16} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open && (
@@ -1979,7 +1995,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                 <div className="text-[10px] text-white/55 uppercase tracking-wider mb-2">Позиции планет</div>
                 <div className="flex flex-wrap gap-1.5">
                   {(data.planets ?? []).map(p => (
-                    <div key={p.planet} className="flex items-center gap-1 text-[11px] border border-white/10 rounded-full px-2.5 py-0.5 bg-white/3">
+                    <div key={p.planet} className="flex items-center gap-1 text-[11px] border border-white/10 rounded-full px-2.5 py-0.5 bg-white/5 backdrop-blur-sm">
                       <span className="text-white/65">{PLANET_GLYPH_G[p.planet] ?? ''}</span>
                       <span className="text-white/65">{SIGN_RU_G[p.sign] ?? p.sign}</span>
                       <span className="text-white/55">{p.degree.toFixed(1)}°</span>
@@ -1992,7 +2008,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                   <div className="text-[10px] text-white/55 uppercase tracking-wider mb-2">Транзитные аспекты (орб ≤ 5°)</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {(data.mutual_aspects ?? []).slice(0, 8).map((a, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px] border border-white/10 rounded-xl px-2.5 py-1.5 bg-white/3">
+                      <div key={i} className="flex items-center gap-2 text-[11px] border border-white/10 rounded-xl px-2.5 py-1.5 bg-white/5 backdrop-blur-sm">
                         <span className={`font-bold text-base leading-none ${ASP_COLOR_G[a.aspect] ?? 'text-white/70'}`}>{ASP_RU_G[a.aspect] ?? a.aspect}</span>
                         <span className="text-white/55">{PLANET_RU_G[a.planet1] ?? a.planet1} – {PLANET_RU_G[a.planet2] ?? a.planet2}</span>
                         <span className="text-white/55 ml-auto">{a.orb.toFixed(1)}°</span>
@@ -2047,7 +2063,7 @@ function PlanetPositionsCard({ data, theme }: { data: DashboardData; theme: Them
           const retroData = retros.find(r => r.planet === planet);
           const isRetro = retroSet.has(planet);
           return (
-            <div key={planet} className={`flex items-center gap-1 text-[11px] rounded-full px-2.5 py-0.5 border ${isRetro ? 'bg-violet-500/10 border-violet-500/30 text-violet-300' : 'bg-white/3 border-white/10 text-white/65'}`}>
+            <div key={planet} className={`flex items-center gap-1 text-[11px] rounded-full px-2.5 py-0.5 border ${isRetro ? 'bg-violet-500/10 border-violet-500/30 text-violet-300' : 'bg-white/5 backdrop-blur-sm border-white/10 text-white/65'}`}>
               <span className={isRetro ? 'text-violet-400' : 'text-white/65'}>{PLANET_GL[planet] ?? ''}</span>
               <span>{PLANET_RU[planet] ?? planet}</span>
               {retroData && <span className="text-[10px] opacity-55">{SIGN_RU[retroData.sign] ?? retroData.sign} {retroData.degree}°</span>}
@@ -2084,7 +2100,7 @@ export default function DashboardView({ birthData, theme }: Props) {
   if (loading) return (
     <div role="status" aria-live="polite" aria-label="Загрузка дашборда" className="space-y-4">
       {/* Hero skeleton */}
-      <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
         <div className="px-5 pt-5 pb-4">
           <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
             <div className="flex-1 space-y-3">
@@ -2129,7 +2145,7 @@ export default function DashboardView({ birthData, theme }: Props) {
       {/* Grid skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+          <div key={i} className={`rounded-2xl border ${theme.card} overflow-hidden card-lift`}>
             <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
               <div className="w-3.5 h-3.5 rounded bg-white/15" />
               <div className="h-3 w-24 rounded bg-white/10" />
@@ -2168,7 +2184,7 @@ export default function DashboardView({ birthData, theme }: Props) {
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Clock size={14} className={`${theme.accent} opacity-60`} aria-hidden="true" />
+          <Clock size={16} className={`${theme.accent} opacity-60`} aria-hidden="true" />
           <h1 className={`text-sm font-semibold ${theme.header} opacity-80 m-0`}>Ежедневный дашборд</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -2199,28 +2215,24 @@ export default function DashboardView({ birthData, theme }: Props) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 0 — Личность клиента (натальная суть)
-      ══════════════════════════════════════════════════════════════════ */}
-      <PersonalIdentityCard data={data} birthData={birthData} theme={theme} />
-
-      {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 1 — Стратегический фокус (тема года × день × риск)
-      ══════════════════════════════════════════════════════════════════ */}
-      <StrategicFocusCard data={data} theme={theme} />
-
-      {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 2 — Статус дня (FULL WIDTH)
+          УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
       ══════════════════════════════════════════════════════════════════ */}
       <HeroCard data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 3 — Персональный план действий (5 конкретных ходов)
+          УРОВЕНЬ 2 — Личность клиента (натальная суть)
       ══════════════════════════════════════════════════════════════════ */}
-      <PersonalActionPlanCard data={data} theme={theme} />
+      <PersonalIdentityCard data={data} birthData={birthData} theme={theme} />
+
+      {/* ══════════════════════════════════════════════════════════════════
+          УРОВЕНЬ 3 — Стратегический фокус (тема года × день × риск)
+      ══════════════════════════════════════════════════════════════════ */}
+      <StrategicFocusCard data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 4 — Тактические рекомендации (FULL WIDTH, 3 колонки)
           Используйте | Компенсируйте | Осторожно
+          (PersonalActionPlan удалён — дублировал этот блок)
       ══════════════════════════════════════════════════════════════════ */}
       <TodayCommandCard data={data} theme={theme} />
 
