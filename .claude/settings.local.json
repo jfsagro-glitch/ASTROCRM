@@ -83,7 +83,13 @@
       "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM''; git add frontend/src/components/PAReportBlock.tsx frontend/src/components/ClientPortal.tsx; git commit -m ''Add PAReportBlock: unified Interpretation+Spheres+Compensatory Practices with animations, merge into single Analysis tab''; git push\")",
       "Bash(powershell.exe -Command \"Set-Location ''C:\\\\Users\\\\jfsag\\\\Documents\\\\GitHub\\\\ASTROCRM''; git push\")",
       "Bash(ls /mnt/)",
-      "Read(//c//**)"
+      "Read(//c//**)",
+      "Bash(npm install *)",
+      "Bash(grep -n \"^\\\\s*<\\\\|^\\\\s*return\\\\|^\\\\s*}\\\\s*$\" /c/Users/jfsag/Documents/GitHub/ASTROCRM/.claude/worktrees/focused-matsumoto-ac20da/frontend/src/components/DashboardView.tsx)",
+      "Bash(xargs grep *)",
+      "Bash(grep -n \"def calc_chart_analysis\\\\|return.*{$\\\\|\\\\\"dominants\\\\\"\\\\|\\\\\"element\\\\|\\\\\"sun_sign\\\\|\\\\\"asc_sign\\\\|\\\\\"moon_sign\\\\|\\\\\"essence\\\\|\\\\\"strengths\\\\|\\\\\"challenges\" astro_engine.py)",
+      "Bash(wc -l ../../../astro_api_v2.py)",
+      "Read(//c/Users/jfsag/Documents/GitHub/ASTROCRM/**)"
     ]
   }
 }
