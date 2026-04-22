@@ -376,12 +376,21 @@ function PersonalIdentityCard({
     : '';
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
-      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className="absolute inset-0 pointer-events-none opacity-40"
+        style={{
+          backgroundImage: [
+            'radial-gradient(circle at 0% 0%, rgba(251,191,36,0.12) 0%, transparent 35%)',
+            'radial-gradient(circle at 100% 0%, rgba(59,130,246,0.14) 0%, transparent 40%)',
+            'radial-gradient(circle at 50% 100%, rgba(168,85,247,0.12) 0%, transparent 50%)',
+          ].join(', '),
+        }}
+      />
+      <div className="relative px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-lg">🧬</span>
           <div className="min-w-0">
-            <div className={`text-sm font-bold ${theme.header} truncate`}>{name}</div>
+            <div className={`text-sm font-bold bg-gradient-to-r from-amber-200 via-fuchsia-200 to-sky-200 bg-clip-text text-transparent truncate`}>{name}</div>
             {birthDate && (
               <div className={`text-[10px] ${theme.text} opacity-45`}>
                 {birthDate}{birthData.time ? ` · ${birthData.time}` : ''}
@@ -392,7 +401,7 @@ function PersonalIdentityCard({
         <ScopeBadge scope="personal" />
       </div>
 
-      <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
+      <div className="relative px-5 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
         {sun.sign && (
           <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2">
             <div className="text-[9px] text-amber-400 uppercase tracking-wider font-semibold">☉ Солнце</div>
@@ -438,6 +447,425 @@ function PersonalIdentityCard({
   );
 }
 
+// ─── STRATEGIC DICTIONARIES ───────────────────────────────────────────────────
+// Что делать / не делать в профекционном доме года (персональная стратегия)
+const HOUSE_YEAR_STRATEGY: Record<number, { theme: string; do: string[]; avoid: string[] }> = {
+  1:  { theme: 'Пересборка себя', do: ['заявить о себе публично','переделать имидж, тело, имя','начать проект от своего имени'], avoid: ['прятаться за других','откладывать личную инициативу'] },
+  2:  { theme: 'Деньги и ресурсы', do: ['навести порядок в финансах','освоить новый навык-кормилец','поднять цену на свою работу'], avoid: ['импульсивные крупные траты','жить за чужой счёт'] },
+  3:  { theme: 'Связи и информация', do: ['написать/записать/опубликовать','восстановить контакт с братьями, сёстрами, соседями','пройти короткий курс'], avoid: ['молчать о проектах','терять нужные связи'] },
+  4:  { theme: 'Дом и семья', do: ['переехать или обустроить текущее жильё','разобраться с семейными узлами','инвестировать в недвижимость'], avoid: ['масштабных перемен вне дома','конфликтов с родителями'] },
+  5:  { theme: 'Творчество и дети', do: ['запустить творческий проект','быть на виду','разрешить себе радость, романы, игру'], avoid: ['формализма','подавления желаний'] },
+  6:  { theme: 'Здоровье и рутина', do: ['наладить режим сна, питания, тренировок','оптимизировать рабочий процесс','сменить подчинённую роль'], avoid: ['перегрузок','игнорирования симптомов'] },
+  7:  { theme: 'Партнёрство', do: ['заключить ключевой союз (брак/бизнес)','проговорить условия отношений','работать с партнёром, а не против'], avoid: ['одиноких решений с большой ценой','скрытых договорённостей'] },
+  8:  { theme: 'Трансформация и чужой ресурс', do: ['закрыть долги или перекредитоваться','проработать глубокие страхи','получить инвестиции, наследство, доход партнёра'], avoid: ['тайных обязательств','контроля над другими'] },
+  9:  { theme: 'Горизонты', do: ['дальнее путешествие','образование, второе высшее, сертификация','выйти в публичное пространство идей'], avoid: ['местечковости','догматизма'] },
+  10: { theme: 'Карьера и статус', do: ['идти на повышение / публичность','взять на себя ответственность','показаться тем, кто решает'], avoid: ['невидимой работы','конфликтов с начальством'] },
+  11: { theme: 'Круг и большие цели', do: ['войти в сильный круг','поставить цель на 3–5 лет','масштабировать через команду'], avoid: ['одиночки-героя','токсичных групп'] },
+  12: { theme: 'Внутренняя работа и завершения', do: ['закрыть незакрытое','пройти терапию/ретрит','освободить энергию для нового цикла'], avoid: ['крупных публичных стартов','самообмана'] },
+};
+// Область жизни, за которую отвечает планета — для «открытой двери» / «зоны риска»
+const PLANET_LIFE_AREA: Record<string, string> = {
+  sun: 'самовыражение, статус, витальность',
+  moon: 'семья, дом, эмоциональная база',
+  mercury: 'обучение, переговоры, связи, слово',
+  venus: 'отношения, деньги, красота, удовольствие',
+  mars: 'энергия, действие, спорт, конкуренция',
+  jupiter: 'рост, путешествия, образование, удача',
+  saturn: 'структура, карьера, дисциплина, время',
+  uranus: 'перемены, технологии, свобода',
+  neptune: 'творчество, духовность, сны',
+  pluto: 'глубина, власть, трансформация',
+  node: 'судьба, направление роста',
+  lilith: 'тень, запретное желание',
+  chiron: 'рана и мастерство',
+};
+// Конкретные ходы под бенефик-транзит планеты
+const PLANET_PLAY_MOVES: Record<string, string[]> = {
+  sun:     ['Выйти публично: презентация, пост, выступление','Попросить то, что нужно — у руководителя, клиента, близких','Сделать фото-контент о своей работе'],
+  moon:    ['Укрепить семейные связи — ужин, звонок родителям','Навести порядок дома, перестановка','Вести дневник эмоций 3 дня'],
+  mercury: ['Провести важный разговор, подписать договор','Опубликовать текст, записать короткое видео','Начать учиться чему-то новому сегодня'],
+  venus:   ['Назначить свидание / роскошный ужин','Вложиться в визуал — гардероб, дом, портфолио','Попросить прибавку, поднять цену'],
+  mars:    ['Закрыть задачу, требующую напора','Тренировка высокой интенсивности','Поставить границу там, где её размывали'],
+  jupiter: ['Сделать большой шаг — подать документы, выйти на новый рынок','Купить билет в дальнее путешествие','Пойти учиться у лучшего, даже дорого'],
+  saturn:  ['Зафиксировать структуру — план, контракт, roadmap','Закрыть долг или обязательство','Пойти к эксперту / ментору'],
+  uranus:  ['Сделать резкий шаг, который давно откладывали','Попробовать новый формат, канал, инструмент','Освободиться от устаревшего'],
+  neptune: ['Творческая сессия без плана','Медитация / ретрит / тишина','Работа с образами, музыкой, водой'],
+  pluto:   ['Провести глубокий разговор с собой или партнёром','Закрыть один старый паттерн осознанно','Войти в процесс, который давно пугает'],
+};
+// Проявления малефиков (что ждать и откуда)
+const MALEFIC_MANIFEST: Record<string, string> = {
+  mars:    'раздражительность, конфликты на пустом месте, риск травмы и ошибки от спешки',
+  saturn:  'ощущение блокировки, формальные отказы, апатия, «тяжёлая» атмосфера',
+  pluto:   'давление, манипуляции, ощущение «меня используют», скрытый контроль',
+  neptune: 'туман, обман, потеря ориентиров, иллюзии и разочарования',
+  uranus:  'резкий сбой, неожиданный поворот, нестабильность',
+  sun:     'давление авторитетов, потребность в признании',
+  moon:    'эмоциональные качели, перегруз',
+};
+// Митигация под малефик-транзит — конкретное действие
+const MALEFIC_MITIGATE: Record<string, string> = {
+  mars:    'Сбросить Марс: 40-минутная тренировка до пота, холодный душ, не садиться за руль уставшим',
+  saturn:  'Принять ограничение как вызов: выбрать 1 задачу, доделать до конца, не перескакивая',
+  pluto:   'Не входить сегодня в разговоры о власти и контроле. Отложить выяснения на 48 часов',
+  neptune: 'Не подписывать договоры, не давать обещаний. Оставить день для сна, воды, прогулки',
+  uranus:  'Освободить 2 часа буфера в расписании. Не держаться за «как обычно» — будет сбой',
+  sun:     'Не доказывать значимость. Делать свою работу — её заметят потом',
+  moon:    'Дать эмоциям 24 часа прежде чем реагировать. Не принимать решений на пике',
+};
+// Жребий Фортуны — конкретный ход дня
+const FORTUNE_SIGN_ACTION: Record<string, string> = {
+  aries:       'Сделать первый шаг в том, что давно откладывали — сегодня он окупится',
+  taurus:      'Вложиться в то, что даст стабильный ручеёк — а не во вспышку',
+  gemini:      'Написать/позвонить тому, с кем давно собирались — нужный человек откроется сам',
+  cancer:      'Навести тепло в кругу близких — именно оттуда придёт опора',
+  leo:         'Выйти на сцену — реальную или виртуальную. Быть ярким',
+  virgo:       'Довести до идеала одну деталь — именно её заметят',
+  libra:       'Найти союзника в текущей задаче — в паре это решится',
+  scorpio:     'Посмотреть туда, куда избегали смотреть — там ресурс',
+  sagittarius: 'Расширить горизонт — записаться на курс, купить билет, открыть карту',
+  capricorn:   'Поработать на 1 час дольше других — это конвертируется',
+  aquarius:    'Предложить нестандартное — именно это сработает',
+  pisces:      'Прислушаться к первой интуитивной реакции и следовать ей',
+};
+
+// Category styling for action plan cards
+const CAT_CONFIG: Record<'leverage'|'mitigate'|'strategic', {
+  label: string; border: string; bg: string; numBg: string; numText: string; chipBorder: string; chipText: string;
+}> = {
+  leverage:  { label: 'Использовать',  border: 'border-emerald-500/25', bg: 'bg-emerald-500/5',  numBg: 'bg-emerald-500/20 border border-emerald-500/40', numText: 'text-emerald-300', chipBorder: 'border-emerald-500/30', chipText: 'text-emerald-300' },
+  mitigate:  { label: 'Нейтрализовать', border: 'border-red-500/25',     bg: 'bg-red-500/5',      numBg: 'bg-red-500/20 border border-red-500/40',         numText: 'text-red-300',     chipBorder: 'border-red-500/30',     chipText: 'text-red-300' },
+  strategic: { label: 'Стратегия',      border: 'border-violet-500/25',  bg: 'bg-violet-500/5',   numBg: 'bg-violet-500/20 border border-violet-500/40',   numText: 'text-violet-300',  chipBorder: 'border-violet-500/30',  chipText: 'text-violet-300' },
+};
+
+// Shared mesh-gradient backdrop (inline, no tailwind config changes needed)
+const MESH_BG_STYLE: React.CSSProperties = {
+  backgroundImage: [
+    'radial-gradient(circle at 15% 20%, rgba(168,85,247,0.18) 0%, transparent 45%)',
+    'radial-gradient(circle at 85% 10%, rgba(251,191,36,0.12) 0%, transparent 40%)',
+    'radial-gradient(circle at 60% 90%, rgba(59,130,246,0.16) 0%, transparent 50%)',
+    'radial-gradient(circle at 10% 95%, rgba(16,185,129,0.10) 0%, transparent 45%)',
+  ].join(', '),
+};
+
+// ─── StrategicFocusCard ───────────────────────────────────────────────────────
+// Верхне-уровневый персональный синтез: тема года × приоритет дня × зона риска
+function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
+  const prof = data.profections as Record<string, unknown>;
+  const fir  = data.firdaria   as Record<string, Record<string, string>>;
+  const profHouse = Number(prof?.annual_house ?? prof?.profected_house ?? 0);
+  const profLord  = String(prof?.annual_lord ?? prof?.lord_of_year ?? '');
+  const firLord   = String(fir?.main_period?.planet ?? '');
+  const firSub    = String(fir?.sub_period?.planet ?? '');
+  const strategy  = profHouse ? HOUSE_YEAR_STRATEGY[profHouse] : null;
+
+  const transits = data.top_transits as Array<Record<string, unknown>>;
+  const topBenefic = transits.find(t => t.nature === 'benefic' && t.applying)
+                  ?? transits.find(t => t.nature === 'benefic');
+  const topMalefic = transits.find(t => t.nature === 'malefic' && t.applying)
+                  ?? transits.find(t => t.nature === 'malefic');
+  const score = data.day_score ?? 50;
+
+  return (
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className="absolute inset-0 pointer-events-none opacity-70" style={MESH_BG_STYLE} />
+      <div className="relative p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xl leading-none">🎯</span>
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-amber-300 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent">
+              Стратегический фокус
+            </div>
+          </div>
+          <ScopeBadge scope="personal" />
+        </div>
+
+        {/* 3-column synthesis */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Year theme */}
+          <div className="relative rounded-xl border border-violet-500/25 bg-violet-500/6 p-3 overflow-hidden">
+            <div className="text-[9px] uppercase tracking-widest text-violet-300 font-bold mb-1">Тема года</div>
+            {profHouse ? (
+              <>
+                <div className={`text-sm font-bold ${theme.header}`}>
+                  Дом {profHouse} · {strategy?.theme ?? HOUSE_THEME[profHouse] ?? ''}
+                </div>
+                {profLord && (
+                  <div className={`text-[10px] ${theme.text} opacity-55 mt-1`}>
+                    Лорд года: <span className="text-violet-300 font-semibold">{PLANET_GL[profLord] ?? ''} {PLANET_RU[profLord] ?? profLord}</span>
+                    <span className="opacity-70"> — {PLANET_LIFE_AREA[profLord] ?? ''}</span>
+                  </div>
+                )}
+                {firLord && (
+                  <div className={`text-[10px] ${theme.text} opacity-55`}>
+                    Фирдарий: <span className="text-violet-300 font-semibold">{PLANET_RU[firLord] ?? firLord}</span>
+                    {firSub && <> → <span className="opacity-80">{PLANET_RU[firSub] ?? firSub}</span></>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={`text-xs ${theme.text} opacity-50 italic`}>Профекция не определена</div>
+            )}
+          </div>
+
+          {/* Today's priority */}
+          {topBenefic ? (
+            <div className="relative rounded-xl border border-emerald-500/25 bg-emerald-500/6 p-3 overflow-hidden">
+              <div className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold mb-1">Открытая дверь сегодня</div>
+              <div className={`text-sm font-bold ${theme.header}`}>
+                {PLANET_GL[String(topBenefic.transit_planet)] ?? ''} {PLANET_RU[String(topBenefic.transit_planet)] ?? ''}
+                <span className="text-emerald-300 mx-1">{ASPECT_SYM[String(topBenefic.aspect)] ?? ''}</span>
+                {PLANET_RU[String(topBenefic.natal_planet)] ?? ''}
+              </div>
+              <div className={`text-[10px] ${theme.text} opacity-55 mt-1`}>
+                Канал в: <span className="text-emerald-300">{PLANET_LIFE_AREA[String(topBenefic.natal_planet)] ?? ''}</span>
+              </div>
+              <div className="text-[10px] text-amber-300/70 mt-0.5">
+                ⏰ {orbTiming(Number(topBenefic.orb), Boolean(topBenefic.applying)) || 'активно'}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/3 p-3">
+              <div className="text-[9px] uppercase tracking-widest text-white/45 font-bold mb-1">Открытая дверь сегодня</div>
+              <div className={`text-xs ${theme.text} opacity-55 italic`}>Попутных транзитов нет — результат только личной волей</div>
+            </div>
+          )}
+
+          {/* Risk zone */}
+          {topMalefic ? (
+            <div className="relative rounded-xl border border-red-500/25 bg-red-500/6 p-3 overflow-hidden">
+              <div className="text-[9px] uppercase tracking-widest text-red-300 font-bold mb-1">Зона осторожности</div>
+              <div className={`text-sm font-bold ${theme.header}`}>
+                {PLANET_GL[String(topMalefic.transit_planet)] ?? ''} {PLANET_RU[String(topMalefic.transit_planet)] ?? ''}
+                <span className="text-red-300 mx-1">{ASPECT_SYM[String(topMalefic.aspect)] ?? ''}</span>
+                {PLANET_RU[String(topMalefic.natal_planet)] ?? ''}
+              </div>
+              <div className={`text-[10px] ${theme.text} opacity-55 mt-1`}>
+                Давление на: <span className="text-red-300">{PLANET_LIFE_AREA[String(topMalefic.natal_planet)] ?? ''}</span>
+              </div>
+              {MALEFIC_MANIFEST[String(topMalefic.transit_planet)] && (
+                <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5 italic`}>
+                  {MALEFIC_MANIFEST[String(topMalefic.transit_planet)]}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/3 p-3">
+              <div className="text-[9px] uppercase tracking-widest text-white/45 font-bold mb-1">Зона осторожности</div>
+              <div className={`text-xs ${theme.text} opacity-55 italic`}>Серьёзных напряжений нет</div>
+            </div>
+          )}
+        </div>
+
+        {/* Year do / avoid strip */}
+        {strategy && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/8">
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-emerald-400 font-bold mb-1.5">◢ Делать в этом году</div>
+              <ul className="space-y-1">
+                {strategy.do.slice(0, 3).map((a, i) => (
+                  <li key={i} className={`text-[11px] ${theme.header} flex gap-1.5 leading-snug`}>
+                    <span className="text-emerald-400 shrink-0">›</span><span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="text-[9px] uppercase tracking-widest text-rose-400 font-bold mb-1.5">◣ Не тратить год на</div>
+              <ul className="space-y-1">
+                {strategy.avoid.slice(0, 2).map((a, i) => (
+                  <li key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1.5 leading-snug`}>
+                    <span className="text-rose-400 shrink-0">×</span><span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* Energy meta-bar */}
+        <div className="flex items-center gap-3 pt-3 border-t border-white/8">
+          <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Энергия дня</div>
+          <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${score}%`,
+                background: score >= 65
+                  ? 'linear-gradient(90deg, #34d399, #10b981)'
+                  : score <= 40
+                  ? 'linear-gradient(90deg, #fb7185, #ef4444)'
+                  : 'linear-gradient(90deg, #fbbf24, #f59e0b)',
+                boxShadow: score >= 65 ? '0 0 10px rgba(16,185,129,0.5)' : score <= 40 ? '0 0 10px rgba(239,68,68,0.5)' : '0 0 10px rgba(245,158,11,0.5)',
+              }}
+            />
+          </div>
+          <div className={`text-xs font-black bg-gradient-to-r ${score >= 65 ? 'from-emerald-300 to-emerald-500' : score <= 40 ? 'from-rose-300 to-red-500' : 'from-amber-300 to-orange-500'} bg-clip-text text-transparent`}>
+            {score}/100
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PersonalActionPlanCard ───────────────────────────────────────────────────
+// 3–5 персональных действий, собранных из: топ-транзит × лорд года × фирдарий × жребий × фаза Луны
+function PersonalActionPlanCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
+  type Action = { num: number; title: string; why: string; when: string; category: 'leverage'|'mitigate'|'strategic' };
+  const actions: Action[] = [];
+
+  const prof = data.profections as Record<string, unknown>;
+  const profLord  = String(prof?.annual_lord ?? prof?.lord_of_year ?? '');
+  const profHouse = Number(prof?.annual_house ?? prof?.profected_house ?? 0);
+  const transits  = data.top_transits as Array<Record<string, unknown>>;
+  const topBenefic = transits.find(t => t.nature === 'benefic' && t.applying)
+                  ?? transits.find(t => t.nature === 'benefic');
+  const topMalefic = transits.find(t => t.nature === 'malefic' && t.applying)
+                  ?? transits.find(t => t.nature === 'malefic');
+  const fortuneSign = data.fortune_today?.sign;
+  const moonPhase   = data.moon.phase;
+  const fir = data.firdaria as Record<string, Record<string, string>>;
+  const firSub = String(fir?.sub_period?.planet ?? '');
+
+  // 1. Леверидж топ-бенефика
+  if (topBenefic) {
+    const tp = String(topBenefic.transit_planet);
+    const moves = PLANET_PLAY_MOVES[tp];
+    if (moves?.length) {
+      actions.push({
+        num: actions.length + 1,
+        title: moves[0],
+        why: `${PLANET_RU[tp] ?? tp} ${ASPECT_NAME[String(topBenefic.aspect)] ?? ''} ${PLANET_RU[String(topBenefic.natal_planet)] ?? ''} — открывает канал в «${PLANET_LIFE_AREA[String(topBenefic.natal_planet)] ?? 'ключевую область'}»`,
+        when: orbTiming(Number(topBenefic.orb), Boolean(topBenefic.applying)) || 'сегодня',
+        category: 'leverage',
+      });
+    }
+  }
+
+  // 2. Митигация топ-малефика
+  if (topMalefic) {
+    const tp = String(topMalefic.transit_planet);
+    const mit = MALEFIC_MITIGATE[tp];
+    if (mit) {
+      actions.push({
+        num: actions.length + 1,
+        title: mit,
+        why: `${PLANET_RU[tp] ?? tp} ${ASPECT_NAME[String(topMalefic.aspect)] ?? ''} ${PLANET_RU[String(topMalefic.natal_planet)] ?? ''} — ${MALEFIC_MANIFEST[tp] ?? 'напряжение'}`,
+        when: orbTiming(Number(topMalefic.orb), Boolean(topMalefic.applying)) || 'сегодня',
+        category: 'mitigate',
+      });
+    }
+  }
+
+  // 3. Стратегический ход лорда года
+  if (profLord && PLANET_PLAY_MOVES[profLord]?.length) {
+    const moves = PLANET_PLAY_MOVES[profLord];
+    const move = topBenefic && String(topBenefic.transit_planet) === profLord ? moves[1] ?? moves[0] : moves[0];
+    // избегаем полного дубля title
+    if (!actions.some(a => a.title === move)) {
+      actions.push({
+        num: actions.length + 1,
+        title: move,
+        why: `Лорд года — ${PLANET_RU[profLord] ?? profLord}${profHouse ? `. Дом ${profHouse} (${HOUSE_THEME[profHouse] ?? ''})` : ''} — куда направлен год`,
+        when: 'весь год; усиливается в месяцы активации лорда',
+        category: 'strategic',
+      });
+    }
+  }
+
+  // 4. Суб-период фирдария (если отличается от лорда года)
+  if (firSub && firSub !== profLord && PLANET_PLAY_MOVES[firSub]?.length) {
+    const moves = PLANET_PLAY_MOVES[firSub];
+    actions.push({
+      num: actions.length + 1,
+      title: moves[moves.length - 1],
+      why: `Суб-период фирдария: ${PLANET_RU[firSub] ?? firSub} — краска ближайших месяцев`,
+      when: 'ближайшие недели–месяцы',
+      category: 'strategic',
+    });
+  }
+
+  // 5. Жребий Фортуны
+  if (fortuneSign && FORTUNE_SIGN_ACTION[fortuneSign]) {
+    actions.push({
+      num: actions.length + 1,
+      title: FORTUNE_SIGN_ACTION[fortuneSign],
+      why: `Жребий Фортуны сегодня — ${SIGN_RU[fortuneSign] ?? fortuneSign}`,
+      when: 'сегодня',
+      category: 'leverage',
+    });
+  }
+
+  // 6. Фаза Луны (дополнение)
+  if (actions.length < 5) {
+    if (['new_moon','waxing_crescent'].includes(moonPhase)) {
+      actions.push({
+        num: actions.length + 1,
+        title: 'Задать одно чёткое намерение на ближайшие 2 недели и сделать к нему первый шаг',
+        why: `Растущая Луна в ${SIGN_RU[data.moon.sign] ?? data.moon.sign} — фаза посева`,
+        when: 'сегодня–завтра',
+        category: 'strategic',
+      });
+    } else if (['full_moon','waning_gibbous'].includes(moonPhase)) {
+      actions.push({
+        num: actions.length + 1,
+        title: 'Закрыть одну затянувшуюся задачу, вывести текущий проект к кульминации',
+        why: `${PHASE_RU[moonPhase] ?? moonPhase} — фаза сбора и результата`,
+        when: 'ближайшие 2–3 дня',
+        category: 'strategic',
+      });
+    }
+  }
+
+  const plan = actions.slice(0, 5);
+
+  return (
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div className="absolute inset-0 pointer-events-none opacity-50" style={MESH_BG_STYLE} />
+      <div className="relative">
+        <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚡</span>
+            <span className={`text-sm font-bold ${theme.header}`}>Персональный план на ближайшие дни</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] ${theme.text} opacity-35 uppercase tracking-wide`}>{plan.length} конкретных ходов</span>
+            <ScopeBadge scope="personal" />
+          </div>
+        </div>
+
+        <div className="p-5 space-y-2.5">
+          {plan.length === 0 ? (
+            <p className={`text-xs ${theme.text} opacity-45 italic text-center py-4`}>
+              Ярких стратегических рычагов нет — фокус на рутине и восстановлении.
+            </p>
+          ) : plan.map(a => {
+            const cfg = CAT_CONFIG[a.category];
+            return (
+              <div key={a.num} className={`rounded-xl border ${cfg.border} ${cfg.bg} p-3 flex items-start gap-3 transition-all hover:border-white/30`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${cfg.numBg} ${cfg.numText} font-black text-sm`}>
+                  {a.num}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-bold ${theme.header} leading-snug`}>{a.title}</div>
+                  <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5 italic leading-snug`}>— {a.why}</div>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded border ${cfg.chipBorder} ${cfg.chipText} uppercase tracking-wider font-bold`}>
+                      {cfg.label}
+                    </span>
+                    {a.when && <span className="text-[10px] text-amber-300/60">⏰ {a.when}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
   const score = data.day_score ?? 50;
   const narrative = getDayNarrative(score);
@@ -459,9 +887,11 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
     : 'from-amber-950/40 to-slate-950/0';
 
   return (
-    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
+      {/* Mesh backdrop */}
+      <div className="absolute inset-0 pointer-events-none opacity-60" style={MESH_BG_STYLE} />
       {/* Gradient header strip */}
-      <div className={`bg-gradient-to-r ${scoreBg} px-5 pt-5 pb-4`}>
+      <div className={`relative bg-gradient-to-r ${scoreBg} px-5 pt-5 pb-4`}>
         <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
           {/* Left: greeting + date + narrative */}
           <div className="flex-1 min-w-0">
@@ -516,7 +946,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
 
       {/* Retrogrades strip */}
       {retros.length > 0 && (
-        <div className="px-5 pb-4 pt-3 border-t border-white/8">
+        <div className="relative px-5 pb-4 pt-3 border-t border-white/8">
           <div className="text-[10px] uppercase tracking-wider text-white/25 mb-2">Ретроградные планеты</div>
           <div className="flex flex-wrap gap-2">
             {retros.map(r => (
@@ -1724,12 +2154,22 @@ export default function DashboardView({ birthData, theme }: Props) {
       <PersonalIdentityCard data={data} birthData={birthData} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 1 — Статус дня (FULL WIDTH)
+          УРОВЕНЬ 1 — Стратегический фокус (тема года × день × риск)
+      ══════════════════════════════════════════════════════════════════ */}
+      <StrategicFocusCard data={data} theme={theme} />
+
+      {/* ══════════════════════════════════════════════════════════════════
+          УРОВЕНЬ 2 — Статус дня (FULL WIDTH)
       ══════════════════════════════════════════════════════════════════ */}
       <HeroCard data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
-          УРОВЕНЬ 2 — Рекомендации (FULL WIDTH, 3 колонки)
+          УРОВЕНЬ 3 — Персональный план действий (5 конкретных ходов)
+      ══════════════════════════════════════════════════════════════════ */}
+      <PersonalActionPlanCard data={data} theme={theme} />
+
+      {/* ══════════════════════════════════════════════════════════════════
+          УРОВЕНЬ 4 — Тактические рекомендации (FULL WIDTH, 3 колонки)
           Используйте | Компенсируйте | Осторожно
       ══════════════════════════════════════════════════════════════════ */}
       <TodayCommandCard data={data} theme={theme} />
