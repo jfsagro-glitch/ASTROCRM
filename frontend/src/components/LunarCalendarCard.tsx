@@ -131,7 +131,7 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
                 <span className="text-[10px] text-amber-300 font-semibold leading-none" aria-hidden="true">VoC</span>
               )}
               {day.is_critical_degree && (
-                <AlertTriangle size={8} className="text-orange-400" aria-hidden="true" />
+                <AlertTriangle size={12} className="text-orange-400" aria-hidden="true" />
               )}
             </button>
           );
@@ -163,7 +163,7 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
               )}
               {selected.is_critical_degree && (
                 <span className="text-[10px] bg-orange-500/20 text-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
-                  <AlertTriangle size={8} aria-hidden="true" /> Критический °
+                  <AlertTriangle size={12} aria-hidden="true" /> Критический °
                 </span>
               )}
             </div>
@@ -178,7 +178,7 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
           <div className="grid grid-cols-2 gap-2">
             <div>
               <div className="text-[10px] text-emerald-300 font-semibold mb-1 flex items-center gap-1 uppercase tracking-wider">
-                <Info size={10} aria-hidden="true" /> Рекомендуется
+                <Info size={12} aria-hidden="true" /> Рекомендуется
               </div>
               <ul className={`text-[11px] ${theme.text} opacity-80 space-y-0.5`}>
                 {selected.mansion.do.slice(0, 3).map((item, i) => (
@@ -190,7 +190,7 @@ export default function LunarCalendarCard({ theme, utc = 0, lat = 0, lon = 0, da
             </div>
             <div>
               <div className="text-[10px] text-red-300 font-semibold mb-1 flex items-center gap-1 uppercase tracking-wider">
-                <AlertTriangle size={10} aria-hidden="true" /> Избегать
+                <AlertTriangle size={12} aria-hidden="true" /> Избегать
               </div>
               <ul className={`text-[11px] ${theme.text} opacity-80 space-y-0.5`}>
                 {selected.mansion.avoid.slice(0, 3).map((item, i) => (
