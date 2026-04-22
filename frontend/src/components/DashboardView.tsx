@@ -2202,30 +2202,6 @@ export default function DashboardView({ birthData, theme }: Props) {
           </div>
         )}
 
-        {/* Компенсаторика — детальный разбор (Pro) */}
-        {isPro && (
-          <Card
-            title="Компенсаторика · детали"
-            icon={Sparkles}
-            theme={theme}
-            accent="text-amber-400"
-            badge={
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/25 text-amber-300/60">
-                  ваши активные транзиты
-                </span>
-                <ScopeBadge scope="personal" />
-              </div>
-            }
-          >
-            <CompensatoryNow
-              comp={compensatory as unknown as Record<string,unknown>}
-              theme={theme}
-              topTransits={top_transits as unknown as Array<Record<string, unknown>>}
-            />
-          </Card>
-        )}
-
         {/* Planet Positions (Pro) */}
         {isPro && <PlanetPositionsCard data={data} theme={theme} />}
 
