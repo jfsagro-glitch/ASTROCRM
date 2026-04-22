@@ -245,17 +245,26 @@ function ScoreRing({ score }: { score: number }) {
   const dash = (score / 100) * circumference;
   const color = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
   const label = score >= 65 ? 'Удача' : score <= 40 ? 'Стой' : 'Нейтр';
+  const labelFull = score >= 65 ? 'благоприятно' : score <= 40 ? 'неблагоприятно' : 'нейтрально';
   return (
-    <div className="relative w-[100px] h-[100px] shrink-0">
-      <svg width="100" height="100" className="-rotate-90">
+    <div
+      className="relative w-[100px] h-[100px] shrink-0"
+      role="meter"
+      aria-valuenow={score}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={`${score} из 100 — ${labelFull}`}
+      aria-label="Общий астрологический балл дня"
+    >
+      <svg width="100" height="100" className="-rotate-90" aria-hidden="true" focusable="false">
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="7" />
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="7"
           strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round"
           style={{ filter: `drop-shadow(0 0 6px ${color}80)` }} />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
         <span className="text-2xl font-bold leading-none" style={{ color }}>{score}</span>
-        <span className="text-[10px] leading-none mt-0.5 font-medium" style={{ color: `${color}80` }}>{label}</span>
+        <span className="text-[10px] leading-none mt-0.5 font-semibold" style={{ color }}>{label}</span>
       </div>
     </div>
   );
@@ -266,15 +275,24 @@ function SphereBar({ icon: Icon, label, score, color }: {
   icon: React.ElementType; label: string; score: number; color: string;
 }) {
   const barColor = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
+  const tone = score >= 65 ? 'благоприятно' : score <= 40 ? 'неблагоприятно' : 'нейтрально';
   return (
     <div className="flex items-center gap-2.5">
-      <Icon size={13} className={color} />
+      <Icon size={13} className={color} aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-[11px] text-white/60">{label}</span>
-          <span className="text-[11px] font-bold" style={{ color: barColor }}>{score}</span>
+          <span className="text-[11px] text-white/70">{label}</span>
+          <span className="text-[11px] font-bold" style={{ color: barColor }} aria-hidden="true">{score}</span>
         </div>
-        <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className="h-1.5 rounded-full bg-white/10 overflow-hidden"
+          role="progressbar"
+          aria-valuenow={score}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuetext={`${score} из 100 — ${tone}`}
+          aria-label={`${label}: прогноз дня`}
+        >
           <div className="h-full rounded-full transition-all duration-700"
             style={{ width: `${score}%`, backgroundColor: barColor, boxShadow: `0 0 6px ${barColor}60` }} />
         </div>
