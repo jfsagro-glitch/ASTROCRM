@@ -1045,13 +1045,13 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
           <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
             <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
-              <div className="text-xs font-semibold text-amber-300">Луна Пустого Хода</div>
+              <h4 className="text-xs font-semibold text-amber-300 m-0">Луна Пустого Хода</h4>
               {moon.void_end_sign && (
-                <div className="text-[10px] text-amber-300/60 mt-0.5">
+                <div className="text-[10px] text-amber-300/80 mt-0.5">
                   Закончится при входе Луны в {SIGN_RU[moon.void_end_sign] ?? moon.void_end_sign}
                 </div>
               )}
-              <div className="text-[10px] text-amber-300/50 mt-0.5">Новые начинания не рекомендуются</div>
+              <div className="text-[10px] text-amber-300/70 mt-0.5">Новые начинания не рекомендуются</div>
             </div>
           </div>
         )}
@@ -1059,11 +1059,11 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
         {/* Mansion */}
         {mansion && (
           <div className="border-t border-white/10 pt-3">
-            <div className={`flex items-center gap-1.5 text-xs font-semibold ${theme.accent} mb-1.5`}>
+            <h4 className={`flex items-center gap-1.5 text-xs font-semibold ${theme.accent} mb-1.5 m-0`}>
               <Star size={11} aria-hidden="true" />
               Мансия #{mansion.number} · {mansion.name_ru}
-            </div>
-            <div className={`text-xs ${theme.text} opacity-55 italic mb-2.5`}>{mansion.theme}</div>
+            </h4>
+            <div className={`text-xs ${theme.text} opacity-70 italic mb-2.5`}>{mansion.theme}</div>
             <div className="grid grid-cols-2 gap-2.5">
               <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 p-2">
                 <div className="text-[10px] text-emerald-400 font-semibold mb-1">✓ Сегодня хорошо</div>
@@ -1410,7 +1410,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#4ade80]" />
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Используйте</span>
+              <h3 className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest m-0">Используйте</h3>
             </div>
             {benefics.length === 0 ? (
               <p className={`text-xs ${theme.text} opacity-60 italic`}>Благоприятных транзитов нет — чистая воля</p>
@@ -1448,7 +1448,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]" />
-              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Компенсируйте</span>
+              <h3 className="text-[11px] font-bold text-amber-400 uppercase tracking-widest m-0">Компенсируйте</h3>
             </div>
             {compItems.length === 0 ? (
               <p className={`text-xs ${theme.text} opacity-60 italic`}>Компенсирующих практик нет</p>
@@ -1494,7 +1494,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_6px_#f87171]" />
-              <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest">Осторожно</span>
+              <h3 className="text-[11px] font-bold text-red-400 uppercase tracking-widest m-0">Осторожно</h3>
             </div>
 
             {/* VoC warning at top of this column */}
