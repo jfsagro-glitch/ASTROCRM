@@ -89,7 +89,8 @@
       "Bash(xargs grep *)",
       "Bash(grep -n \"def calc_chart_analysis\\\\|return.*{$\\\\|\\\\\"dominants\\\\\"\\\\|\\\\\"element\\\\|\\\\\"sun_sign\\\\|\\\\\"asc_sign\\\\|\\\\\"moon_sign\\\\|\\\\\"essence\\\\|\\\\\"strengths\\\\|\\\\\"challenges\" astro_engine.py)",
       "Bash(wc -l ../../../astro_api_v2.py)",
-      "Read(//c/Users/jfsag/Documents/GitHub/ASTROCRM/**)"
+      "Read(//c/Users/jfsag/Documents/GitHub/ASTROCRM/**)",
+      "Bash(python -c ' *)"
     ]
   }
 }

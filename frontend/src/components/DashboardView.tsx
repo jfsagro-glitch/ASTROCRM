@@ -427,21 +427,21 @@ function PersonalIdentityCard({
           <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2">
             <div className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">☉ Солнце</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[sun.sign] ?? sun.sign}</div>
-            {sun.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {sun.house} · {HOUSE_THEME[sun.house] ?? ''}</div> : null}
+            {sun.house ? <div className={`text-[10px] ${theme.text} opacity-70`}>Дом {sun.house} · {HOUSE_THEME[sun.house] ?? ''}</div> : null}
           </div>
         )}
         {moon.sign && (
           <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2">
             <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">☽ Луна</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[moon.sign] ?? moon.sign}</div>
-            {moon.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {moon.house} · {HOUSE_THEME[moon.house] ?? ''}</div> : null}
+            {moon.house ? <div className={`text-[10px] ${theme.text} opacity-70`}>Дом {moon.house} · {HOUSE_THEME[moon.house] ?? ''}</div> : null}
           </div>
         )}
         {asc.sign && (
           <div className="rounded-xl bg-violet-500/8 border border-violet-500/20 px-3 py-2">
             <div className="text-[10px] text-violet-400 uppercase tracking-wider font-semibold">↑ Асцендент</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[asc.sign] ?? asc.sign}</div>
-            <div className={`text-[10px] ${theme.text} opacity-50`}>маска, тело, первая реакция</div>
+            <div className={`text-[10px] ${theme.text} opacity-70`}>маска, тело, первая реакция</div>
           </div>
         )}
         {domEl && (
@@ -450,16 +450,16 @@ function PersonalIdentityCard({
             <div className={`text-sm font-bold ${theme.header}`}>
               {ELEMENT_EMOJI[domEl] ?? ''} {ELEMENT_RU[domEl] ?? domEl}
             </div>
-            {domMod && <div className={`text-[10px] ${theme.text} opacity-50`}>{MODALITY_RU[domMod] ?? domMod}</div>}
+            {domMod && <div className={`text-[10px] ${theme.text} opacity-70`}>{MODALITY_RU[domMod] ?? domMod}</div>}
           </div>
         )}
         {(shape || sect || unaspected.length > 0) && (
           <div className="rounded-xl bg-white/3 border border-white/10 px-3 py-2">
-            <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Форма карты</div>
+            <div className="text-[10px] text-white/65 uppercase tracking-wider font-semibold">Форма карты</div>
             {shape && <div className={`text-sm font-bold ${theme.header}`}>{SHAPE_RU[shape] ?? shape}</div>}
-            {sect && <div className={`text-[10px] ${theme.text} opacity-50`}>секта: {sect === 'day' ? 'дневная' : 'ночная'}</div>}
+            {sect && <div className={`text-[10px] ${theme.text} opacity-70`}>секта: {sect === 'day' ? 'дневная' : 'ночная'}</div>}
             {unaspected.length > 0 && (
-              <div className={`text-[10px] ${theme.text} opacity-50`}>без аспектов: {unaspected.map(p => PLANET_RU[p] ?? p).join(', ')}</div>
+              <div className={`text-[10px] ${theme.text} opacity-70`}>без аспектов: {unaspected.map(p => PLANET_RU[p] ?? p).join(', ')}</div>
             )}
           </div>
         )}
@@ -625,7 +625,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
                 )}
               </>
             ) : (
-              <div className={`text-xs ${theme.text} opacity-50 italic`}>Профекция не определена</div>
+              <div className={`text-xs ${theme.text} opacity-70 italic`}>Профекция не определена</div>
             )}
           </div>
 
@@ -647,7 +647,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold mb-1">Открытая дверь сегодня</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/65 font-bold mb-1">Открытая дверь сегодня</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Попутных транзитов нет — результат только личной волей</div>
             </div>
           )}
@@ -672,7 +672,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold mb-1">Зона осторожности</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/65 font-bold mb-1">Зона осторожности</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Серьёзных напряжений нет</div>
             </div>
           )}
@@ -706,7 +706,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
 
         {/* Energy meta-bar */}
         <div className="flex items-center gap-3 pt-3 border-t border-white/10">
-          <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Энергия дня</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/65 font-bold">Энергия дня</div>
           <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
@@ -916,7 +916,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
           {/* Left: greeting + date + narrative */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className={`text-xs font-medium ${theme.text} opacity-50`}>{greeting} ·</span>
+              <span className={`text-xs font-medium ${theme.text} opacity-70`}>{greeting} ·</span>
               <span className={`text-base font-bold ${theme.header} capitalize`}>{weekday},</span>
               <span className={`text-base font-bold ${theme.header}`}>{dateStr}</span>
             </div>
@@ -931,7 +931,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
               </span>
               {data.moon.is_void && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
-                  <AlertTriangle size={8} />
+                  <AlertTriangle size={8} aria-hidden="true" />
                   ВоК{vocCountdown ? ` ещё ${vocCountdown}` : ' активен'}
                 </span>
               )}
@@ -975,7 +975,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
                 <span className={`text-xs font-semibold ${theme.header}`}>
                   {PLANET_GL[r.planet] ?? ''} {PLANET_RU[r.planet] ?? r.planet}
                 </span>
-                <span className={`text-[10px] ${theme.text} opacity-50`}>{SIGN_RU[r.sign] ?? r.sign} {r.degree}°</span>
+                <span className={`text-[10px] ${theme.text} opacity-70`}>{SIGN_RU[r.sign] ?? r.sign} {r.degree}°</span>
                 {RETRO_MEANING[r.planet] && (
                   <span className={`text-[10px] italic ${theme.text} opacity-65`}>— {RETRO_MEANING[r.planet]}</span>
                 )}
@@ -1016,7 +1016,15 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
               {PHASE_RU[moon.phase] ?? moon.phase}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"
+                role="progressbar"
+                aria-valuenow={illumination}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuetext={`Освещённость Луны ${illumination}%, ${isWaxing ? 'растёт' : 'убывает'}`}
+                aria-label="Освещённость Луны"
+              >
                 <div
                   className="h-full rounded-full"
                   style={{
@@ -1035,7 +1043,7 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
         {/* VoC banner */}
         {moon.is_void && (
           <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
-            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <div className="text-xs font-semibold text-amber-300">Луна Пустого Хода</div>
               {moon.void_end_sign && (
@@ -1052,26 +1060,30 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
         {mansion && (
           <div className="border-t border-white/10 pt-3">
             <div className={`flex items-center gap-1.5 text-xs font-semibold ${theme.accent} mb-1.5`}>
-              <Star size={11} />
+              <Star size={11} aria-hidden="true" />
               Мансия #{mansion.number} · {mansion.name_ru}
             </div>
             <div className={`text-xs ${theme.text} opacity-55 italic mb-2.5`}>{mansion.theme}</div>
             <div className="grid grid-cols-2 gap-2.5">
               <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 p-2">
                 <div className="text-[10px] text-emerald-400 font-semibold mb-1">✓ Сегодня хорошо</div>
-                {mansion.do.slice(0, 2).map((a, i) => (
-                  <div key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1 mb-0.5`}>
-                    <span className="text-emerald-400 shrink-0">›</span>{a}
-                  </div>
-                ))}
+                <ul className="space-y-0.5 m-0 p-0 list-none">
+                  {mansion.do.slice(0, 2).map((a, i) => (
+                    <li key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1`}>
+                      <span className="text-emerald-400 shrink-0" aria-hidden="true">›</span>{a}
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div className="rounded-lg bg-red-500/8 border border-red-500/20 p-2">
                 <div className="text-[10px] text-red-400 font-semibold mb-1">✗ Избегать</div>
-                {mansion.avoid.slice(0, 2).map((a, i) => (
-                  <div key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1 mb-0.5`}>
-                    <span className="text-red-400 shrink-0">›</span>{a}
-                  </div>
-                ))}
+                <ul className="space-y-0.5 m-0 p-0 list-none">
+                  {mansion.avoid.slice(0, 2).map((a, i) => (
+                    <li key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1`}>
+                      <span className="text-red-400 shrink-0" aria-hidden="true">›</span>{a}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
@@ -1100,7 +1112,7 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
         onClick={() => hint && setExpanded(e => !e)}
         aria-expanded={hint ? expanded : undefined}
         aria-label={hint ? `${PLANET_RU[tp] ?? tp} ${ASPECT_NAME[asp] ?? asp} ${PLANET_RU[np] ?? np} — ${expanded ? 'свернуть' : 'развернуть'} детали` : undefined}
-        className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${hint ? 'cursor-pointer hover:bg-white/3' : 'cursor-default'} transition-colors`}
+        className={`w-full flex items-start gap-2.5 px-3 py-2.5 min-h-[44px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${hint ? 'cursor-pointer hover:bg-white/10' : 'cursor-default'} transition-colors`}
       >
         {/* Nature dot */}
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} mt-1.5 shrink-0`} />
@@ -1127,7 +1139,7 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
         </div>
         {hint && (
           <span className={`${theme.text} opacity-60 shrink-0 mt-0.5`}>
-            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {expanded ? <ChevronUp size={11} aria-hidden="true" /> : <ChevronDown size={11} aria-hidden="true" />}
           </span>
         )}
       </button>
@@ -1136,12 +1148,12 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
         <div className="px-3 pb-3 pt-2 border-t border-white/10">
           {Boolean(hint.top_practice['practice']) && (
             <div className={`text-[11px] font-semibold ${theme.header} flex gap-1.5 mb-1`}>
-              <Sparkles size={9} className={`${cfg.color} mt-0.5 shrink-0`} />
+              <Sparkles size={9} className={`${cfg.color} mt-0.5 shrink-0`} aria-hidden="true" />
               {String(hint.top_practice['practice'])}
             </div>
           )}
           {Boolean(hint.top_practice['why']) && (
-            <div className={`text-[10px] ${theme.text} opacity-50 pl-3.5 leading-relaxed`}>
+            <div className={`text-[10px] ${theme.text} opacity-70 pl-3.5 leading-relaxed`}>
               {String(hint.top_practice['why'])}
             </div>
           )}
@@ -1186,8 +1198,8 @@ function KeyTransitsCard({ data, theme, isPro }: { data: DashboardData; theme: T
     >
       {transits.length === 0 ? (
         <div className="text-center py-4">
-          <CheckCircle size={20} className="text-emerald-400 mx-auto mb-1.5" />
-          <p className={`text-xs ${theme.text} opacity-50`}>Активных транзитов нет — спокойный день</p>
+          <CheckCircle size={20} className="text-emerald-400 mx-auto mb-1.5" aria-hidden="true" />
+          <p className={`text-xs ${theme.text} opacity-70`}>Активных транзитов нет — спокойный день</p>
         </div>
       ) : (
         <div>
@@ -1389,7 +1401,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
       {!hasContent && !moonVoid ? (
         <div className="px-5 py-8 text-center">
           <span className="text-3xl block mb-2">✨</span>
-          <p className={`text-sm ${theme.text} opacity-50`}>День без активных транзитов — действуйте свободно</p>
+          <p className={`text-sm ${theme.text} opacity-70`}>День без активных транзитов — действуйте свободно</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/8">
@@ -1452,7 +1464,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                     </span>
                     <span className={`text-[10px] ${theme.text} opacity-65`}>в {SIGN_RU[item.sign] ?? item.sign}</span>
                     {item.natalPlanet && (
-                      <span className={`text-[10px] ${ASPECT_COLOR[item.aspect] ?? 'text-white/40'}`}>
+                      <span className={`text-[10px] ${ASPECT_COLOR[item.aspect] ?? 'text-white/65'}`}>
                         {ASPECT_SYM[item.aspect] ?? ''} натал. {PLANET_RU[item.natalPlanet] ?? item.natalPlanet}
                       </span>
                     )}
@@ -1489,7 +1501,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
             {moonVoid && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <AlertTriangle size={11} className="text-amber-400 shrink-0" />
+                  <AlertTriangle size={11} className="text-amber-400 shrink-0" aria-hidden="true" />
                   <span className="text-[11px] font-bold text-amber-400">Луна Пустого Хода</span>
                 </div>
                 <p className="text-[11px] text-amber-300/70 leading-snug">
@@ -1527,7 +1539,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                   )}
                   {Boolean(hint?.top_practice) && Boolean((hint!.top_practice as Record<string,unknown>).practice) && (
                     <div className="mt-1.5 flex items-start gap-1">
-                      <Sparkles size={9} className="text-amber-400 mt-0.5 shrink-0" />
+                      <Sparkles size={9} className="text-amber-400 mt-0.5 shrink-0" aria-hidden="true" />
                       <p className="text-[10px] text-amber-300/70">
                         {String((hint?.top_practice as Record<string,unknown>).practice)}
                       </p>
@@ -1558,7 +1570,7 @@ function FortuneLotCard({ data, theme }: { data: DashboardData; theme: ThemeLike
             {SIGN_RU[fortune_today.sign] ?? fortune_today.sign}
             {fortune_today.deg_min ? ` · ${fortune_today.deg_min}` : ''}
           </div>
-          <div className={`text-xs ${theme.text} opacity-50 mb-2`}>Фокус удачи на сегодня</div>
+          <div className={`text-xs ${theme.text} opacity-70 mb-2`}>Фокус удачи на сегодня</div>
           {FORTUNE_SIGN_INTERP[fortune_today.sign] && (
             <p className={`text-[11px] italic ${theme.text} opacity-65 leading-relaxed border-l-2 border-yellow-500/30 pl-2.5`}>
               {FORTUNE_SIGN_INTERP[fortune_today.sign]}
@@ -1596,7 +1608,7 @@ function CompensatoryNow({ comp, theme, topTransits }: {
     return (
       <div className="text-center py-4">
         <span className="text-3xl block mb-2">✨</span>
-        <p className={`text-xs ${theme.text} opacity-50`}>Активных напряжений нет — хороший день для действий</p>
+        <p className={`text-xs ${theme.text} opacity-70`}>Активных напряжений нет — хороший день для действий</p>
       </div>
     );
   }
@@ -1624,7 +1636,7 @@ function CompensatoryNow({ comp, theme, topTransits }: {
                   {PLANET_GL[at.planet] ?? ''} {PLANET_RU[at.planet] ?? at.planet} в {SIGN_RU[at.sign] ?? at.sign}
                 </span>
                 {at.natalPlanet && (
-                  <span className={`text-[10px] ${theme.text} opacity-50`}>
+                  <span className={`text-[10px] ${theme.text} opacity-70`}>
                     {ASPECT_SYM[at.aspect] ?? ''} {PLANET_GL[at.natalPlanet] ?? ''} {PLANET_RU[at.natalPlanet] ?? at.natalPlanet}
                   </span>
                 )}
@@ -1677,7 +1689,7 @@ function CompensatoryNow({ comp, theme, topTransits }: {
             {Boolean(p.tension) && <p className={`text-[11px] italic ${theme.text} opacity-55 mb-1.5`}>{String(p.tension)}</p>}
             {pairPractices.slice(0, 3).map((pr, j) => (
               <div key={j} className={`text-[11px] ${theme.header} flex gap-1.5 mb-0.5`}>
-                <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" />
+                <CheckCircle size={9} className="text-indigo-400 mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{pr.practice}</span>
               </div>
             ))}
@@ -1709,7 +1721,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-label={open ? 'Свернуть блок локаций' : 'Развернуть блок локаций'}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
+        className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
           <MapPin size={14} className={theme.accent} aria-hidden="true" />
@@ -1717,7 +1729,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
           <ScopeBadge scope="personal" />
           {lord && <span className={`text-[10px] ${theme.text} opacity-65`}>Лорд: {PLANET_RU[lord] ?? lord}</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open && (
@@ -1762,8 +1774,8 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
               </div>
             )}
             {cityName && (
-              <div className="flex items-center gap-1.5 text-[11px] text-white/40">
-                <MapPin size={10} />
+              <div className="flex items-center gap-1.5 text-[11px] text-white/65">
+                <MapPin size={10} aria-hidden="true" />
                 <span>Текущая локация: <span className={theme.header}>{cityName}</span></span>
                 {dirInfo ? <span className="opacity-60">· Направление энергии: {dirInfo.dir}</span> : null}
               </div>
@@ -1799,7 +1811,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
         onClick={() => { if (!data && !loading) load(); setOpen(o => ({...o, __h: !o.__h})); }}
         aria-expanded={Boolean(open.__h)}
         aria-label={open.__h ? 'Свернуть компенсаторный прогноз' : 'Развернуть компенсаторный прогноз'}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
+        className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
           <Shield size={14} className={theme.accent} aria-hidden="true" />
@@ -1808,20 +1820,20 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
           <span className={`text-[10px] ${theme.text} opacity-65`}>1–6 месяцев, по вашим транзитам</span>
           {data && <span className={`text-[10px] text-emerald-400`}>· {data.windows.length} окна</span>}
         </div>
-        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
+        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open.__h && (
         <div className="border-t border-white/10 px-4 pb-4 space-y-3 pt-3">
           {loading && (
             <div className="py-6 text-center">
-              <RefreshCw size={18} className={`${theme.accent} animate-spin mx-auto mb-2`} />
-              <p className={`text-xs ${theme.text} opacity-50`}>Анализирую транзиты ближайших месяцев…</p>
+              <RefreshCw size={18} className={`${theme.accent} animate-spin mx-auto mb-2`} aria-hidden="true" />
+              <p className={`text-xs ${theme.text} opacity-70`}>Анализирую транзиты ближайших месяцев…</p>
             </div>
           )}
           {error && (
             <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 flex gap-2">
-              <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+              <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs text-red-300">{error}</p>
             </div>
           )}
@@ -1831,13 +1843,13 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
                 onClick={() => setOpen(o => ({...o, [win.window]: !o[win.window]}))}
                 aria-expanded={Boolean(open[win.window])}
                 aria-label={`${win.label} — ${open[win.window] ? 'свернуть' : 'развернуть'}`}
-                className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
+                className="w-full px-3 py-2.5 min-h-[44px] flex items-center justify-between hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
               >
                 <div className="flex items-center gap-2">
                   <span className={`font-bold text-sm ${WINDOW_ACCENT[win.window]}`}>{win.label}</span>
                   <span className={`text-[10px] ${theme.text} opacity-60`}>{win.key_transits.length} транзитов</span>
                 </div>
-                {open[win.window] ? <ChevronUp size={12} className={`${theme.text} opacity-65`} /> : <ChevronDown size={12} className={`${theme.text} opacity-65`} />}
+                {open[win.window] ? <ChevronUp size={12} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={12} className={`${theme.text} opacity-65`} aria-hidden="true" />}
               </button>
               {open[win.window] && (
                 <div className="px-3 pb-3 space-y-2 border-t border-white/10">
@@ -1869,7 +1881,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
                           {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet)} · {at.tension_signal as string}
                         </div>
                         <div className={`text-[11px] font-semibold ${theme.header}`}>{Boolean(top.practice) && String(top.practice)}</div>
-                        {Boolean(top.why) && <div className={`text-[10px] ${theme.text} opacity-50 mt-0.5`}>{String(top.why)}</div>}
+                        {Boolean(top.why) && <div className={`text-[10px] ${theme.text} opacity-70 mt-0.5`}>{String(top.why)}</div>}
                         {Boolean(top.timing) && <div className="text-[10px] text-amber-300/60 mt-0.5">⏰ {String(top.timing)}</div>}
                       </div>
                     );
@@ -1936,7 +1948,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       <button
         onClick={handleToggle}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
+        className="w-full px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
         aria-expanded={open}
         aria-label={open ? 'Свернуть глобальный астрофон' : 'Развернуть глобальный астрофон'}
       >
@@ -1951,14 +1963,14 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
           )}
           {!data && !loading && <span className={`text-[10px] ${theme.text} opacity-60`}>нажмите чтобы загрузить</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} aria-hidden="true" /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} aria-hidden="true" />}
       </button>
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-white/10">
           {loading && (
             <div className="py-4 text-center">
-              <RefreshCw size={16} className={`${theme.accent} animate-spin mx-auto`} />
+              <RefreshCw size={16} className={`${theme.accent} animate-spin mx-auto`} aria-hidden="true" />
             </div>
           )}
           {data && (
@@ -1968,7 +1980,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                 <div className="flex flex-wrap gap-1.5">
                   {(data.planets ?? []).map(p => (
                     <div key={p.planet} className="flex items-center gap-1 text-[11px] border border-white/10 rounded-full px-2.5 py-0.5 bg-white/3">
-                      <span className="text-white/45">{PLANET_GLYPH_G[p.planet] ?? ''}</span>
+                      <span className="text-white/65">{PLANET_GLYPH_G[p.planet] ?? ''}</span>
                       <span className="text-white/65">{SIGN_RU_G[p.sign] ?? p.sign}</span>
                       <span className="text-white/55">{p.degree.toFixed(1)}°</span>
                     </div>
@@ -1981,7 +1993,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {(data.mutual_aspects ?? []).slice(0, 8).map((a, i) => (
                       <div key={i} className="flex items-center gap-2 text-[11px] border border-white/10 rounded-xl px-2.5 py-1.5 bg-white/3">
-                        <span className={`font-bold text-base leading-none ${ASP_COLOR_G[a.aspect] ?? 'text-white/50'}`}>{ASP_RU_G[a.aspect] ?? a.aspect}</span>
+                        <span className={`font-bold text-base leading-none ${ASP_COLOR_G[a.aspect] ?? 'text-white/70'}`}>{ASP_RU_G[a.aspect] ?? a.aspect}</span>
                         <span className="text-white/55">{PLANET_RU_G[a.planet1] ?? a.planet1} – {PLANET_RU_G[a.planet2] ?? a.planet2}</span>
                         <span className="text-white/55 ml-auto">{a.orb.toFixed(1)}°</span>
                       </div>
@@ -2036,7 +2048,7 @@ function PlanetPositionsCard({ data, theme }: { data: DashboardData; theme: Them
           const isRetro = retroSet.has(planet);
           return (
             <div key={planet} className={`flex items-center gap-1 text-[11px] rounded-full px-2.5 py-0.5 border ${isRetro ? 'bg-violet-500/10 border-violet-500/30 text-violet-300' : 'bg-white/3 border-white/10 text-white/65'}`}>
-              <span className={isRetro ? 'text-violet-400' : 'text-white/45'}>{PLANET_GL[planet] ?? ''}</span>
+              <span className={isRetro ? 'text-violet-400' : 'text-white/65'}>{PLANET_GL[planet] ?? ''}</span>
               <span>{PLANET_RU[planet] ?? planet}</span>
               {retroData && <span className="text-[10px] opacity-55">{SIGN_RU[retroData.sign] ?? retroData.sign} {retroData.degree}°</span>}
               {isRetro && <span className="text-violet-400 font-bold">⟲</span>}
@@ -2156,8 +2168,8 @@ export default function DashboardView({ birthData, theme }: Props) {
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Clock size={14} className={`${theme.accent} opacity-60`} />
-          <h2 className={`text-sm font-semibold ${theme.header} opacity-70`}>Ежедневный дашборд</h2>
+          <Clock size={14} className={`${theme.accent} opacity-60`} aria-hidden="true" />
+          <h1 className={`text-sm font-semibold ${theme.header} opacity-80 m-0`}>Ежедневный дашборд</h1>
         </div>
         <div className="flex items-center gap-2">
           <div role="group" aria-label="Режим отображения" className="flex rounded-xl overflow-hidden border border-white/10 text-xs">
