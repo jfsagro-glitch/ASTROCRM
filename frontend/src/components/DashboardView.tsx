@@ -229,8 +229,8 @@ function Card({ title, icon: Icon, children, className = '', theme, badge, accen
   return (
     <div className={`rounded-2xl border ${theme.card} overflow-hidden ${className}`}>
       <div className="px-4 py-3 flex items-center gap-2 border-b border-white/10">
-        <Icon size={14} className={accent ?? theme.accent} />
-        <span className={`text-sm font-semibold ${theme.header}`}>{title}</span>
+        <Icon size={14} className={accent ?? theme.accent} aria-hidden="true" />
+        <h3 className={`text-sm font-semibold ${theme.header} m-0`}>{title}</h3>
         {badge && <div className="ml-auto flex items-center gap-1.5">{badge}</div>}
       </div>
       <div className="p-4">{children}</div>
@@ -255,7 +255,7 @@ function ScoreRing({ score }: { score: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-bold leading-none" style={{ color }}>{score}</span>
-        <span className="text-[9px] leading-none mt-0.5 font-medium" style={{ color: `${color}80` }}>{label}</span>
+        <span className="text-[10px] leading-none mt-0.5 font-medium" style={{ color: `${color}80` }}>{label}</span>
       </div>
     </div>
   );
@@ -320,17 +320,20 @@ function orbTiming(orb: number | undefined, applying: boolean | undefined): stri
 // Small badge for PERSONAL vs GENERAL marker
 function ScopeBadge({ scope }: { scope: 'personal' | 'general' }) {
   const isP = scope === 'personal';
+  const label = isP ? 'Рассчитано по натальным данным этого клиента' : 'Общий астрофон, одинаковый для всех';
   return (
     <span
+      role="img"
+      aria-label={label}
+      title={label}
       className={
-        'inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-widest font-semibold border ' +
+        'inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-widest font-semibold border ' +
         (isP
-          ? 'border-emerald-400/40 text-emerald-300/90 bg-emerald-500/10'
-          : 'border-sky-400/40 text-sky-300/90 bg-sky-500/10')
+          ? 'border-emerald-400/40 text-emerald-200 bg-emerald-500/15'
+          : 'border-sky-400/40 text-sky-200 bg-sky-500/15')
       }
-      title={isP ? 'Рассчитано по натальным данным этого клиента' : 'Общий астрофон, одинаковый для всех'}
     >
-      {isP ? '● персональное' : '○ общее'}
+      <span aria-hidden="true">{isP ? '● персональное' : '○ общее'}</span>
     </span>
   );
 }
@@ -377,7 +380,7 @@ function PersonalIdentityCard({
 
   return (
     <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
-      <div className="absolute inset-0 pointer-events-none opacity-40"
+      <div className="absolute inset-0 pointer-events-none opacity-65"
         style={{
           backgroundImage: [
             'radial-gradient(circle at 0% 0%, rgba(251,191,36,0.12) 0%, transparent 35%)',
@@ -388,11 +391,11 @@ function PersonalIdentityCard({
       />
       <div className="relative px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg">🧬</span>
+          <span className="text-lg" aria-hidden="true">🧬</span>
           <div className="min-w-0">
             <div className={`text-sm font-bold bg-gradient-to-r from-amber-200 via-fuchsia-200 to-sky-200 bg-clip-text text-transparent truncate`}>{name}</div>
             {birthDate && (
-              <div className={`text-[10px] ${theme.text} opacity-45`}>
+              <div className={`text-[10px] ${theme.text} opacity-65`}>
                 {birthDate}{birthData.time ? ` · ${birthData.time}` : ''}
               </div>
             )}
@@ -404,28 +407,28 @@ function PersonalIdentityCard({
       <div className="relative px-5 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-xs">
         {sun.sign && (
           <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2">
-            <div className="text-[9px] text-amber-400 uppercase tracking-wider font-semibold">☉ Солнце</div>
+            <div className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">☉ Солнце</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[sun.sign] ?? sun.sign}</div>
             {sun.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {sun.house} · {HOUSE_THEME[sun.house] ?? ''}</div> : null}
           </div>
         )}
         {moon.sign && (
           <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2">
-            <div className="text-[9px] text-blue-400 uppercase tracking-wider font-semibold">☽ Луна</div>
+            <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">☽ Луна</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[moon.sign] ?? moon.sign}</div>
             {moon.house ? <div className={`text-[10px] ${theme.text} opacity-50`}>Дом {moon.house} · {HOUSE_THEME[moon.house] ?? ''}</div> : null}
           </div>
         )}
         {asc.sign && (
           <div className="rounded-xl bg-violet-500/8 border border-violet-500/20 px-3 py-2">
-            <div className="text-[9px] text-violet-400 uppercase tracking-wider font-semibold">↑ Асцендент</div>
+            <div className="text-[10px] text-violet-400 uppercase tracking-wider font-semibold">↑ Асцендент</div>
             <div className={`text-sm font-bold ${theme.header}`}>{SIGN_RU[asc.sign] ?? asc.sign}</div>
             <div className={`text-[10px] ${theme.text} opacity-50`}>маска, тело, первая реакция</div>
           </div>
         )}
         {domEl && (
           <div className="rounded-xl bg-rose-500/8 border border-rose-500/20 px-3 py-2">
-            <div className="text-[9px] text-rose-400 uppercase tracking-wider font-semibold">Стихия</div>
+            <div className="text-[10px] text-rose-400 uppercase tracking-wider font-semibold">Стихия</div>
             <div className={`text-sm font-bold ${theme.header}`}>
               {ELEMENT_EMOJI[domEl] ?? ''} {ELEMENT_RU[domEl] ?? domEl}
             </div>
@@ -434,7 +437,7 @@ function PersonalIdentityCard({
         )}
         {(shape || sect || unaspected.length > 0) && (
           <div className="rounded-xl bg-white/3 border border-white/10 px-3 py-2">
-            <div className="text-[9px] text-white/40 uppercase tracking-wider font-semibold">Форма карты</div>
+            <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Форма карты</div>
             {shape && <div className={`text-sm font-bold ${theme.header}`}>{SHAPE_RU[shape] ?? shape}</div>}
             {sect && <div className={`text-[10px] ${theme.text} opacity-50`}>секта: {sect === 'day' ? 'дневная' : 'ночная'}</div>}
             {unaspected.length > 0 && (
@@ -572,10 +575,10 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
         {/* Header */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-xl leading-none">🎯</span>
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-amber-300 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent">
+            <span className="text-xl leading-none" aria-hidden="true">🎯</span>
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-amber-300 via-fuchsia-300 to-sky-300 bg-clip-text text-transparent m-0">
               Стратегический фокус
-            </div>
+            </h2>
           </div>
           <ScopeBadge scope="personal" />
         </div>
@@ -584,7 +587,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Year theme */}
           <div className="relative rounded-xl border border-violet-500/25 bg-violet-500/6 p-3 overflow-hidden">
-            <div className="text-[9px] uppercase tracking-widest text-violet-300 font-bold mb-1">Тема года</div>
+            <div className="text-[10px] uppercase tracking-widest text-violet-300 font-bold mb-1">Тема года</div>
             {profHouse ? (
               <>
                 <div className={`text-sm font-bold ${theme.header}`}>
@@ -611,7 +614,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
           {/* Today's priority */}
           {topBenefic ? (
             <div className="relative rounded-xl border border-emerald-500/25 bg-emerald-500/6 p-3 overflow-hidden">
-              <div className="text-[9px] uppercase tracking-widest text-emerald-300 font-bold mb-1">Открытая дверь сегодня</div>
+              <div className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold mb-1">Открытая дверь сегодня</div>
               <div className={`text-sm font-bold ${theme.header}`}>
                 {PLANET_GL[String(topBenefic.transit_planet)] ?? ''} {PLANET_RU[String(topBenefic.transit_planet)] ?? ''}
                 <span className="text-emerald-300 mx-1">{ASPECT_SYM[String(topBenefic.aspect)] ?? ''}</span>
@@ -626,7 +629,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-              <div className="text-[9px] uppercase tracking-widest text-white/45 font-bold mb-1">Открытая дверь сегодня</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold mb-1">Открытая дверь сегодня</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Попутных транзитов нет — результат только личной волей</div>
             </div>
           )}
@@ -634,7 +637,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
           {/* Risk zone */}
           {topMalefic ? (
             <div className="relative rounded-xl border border-red-500/25 bg-red-500/6 p-3 overflow-hidden">
-              <div className="text-[9px] uppercase tracking-widest text-red-300 font-bold mb-1">Зона осторожности</div>
+              <div className="text-[10px] uppercase tracking-widest text-red-300 font-bold mb-1">Зона осторожности</div>
               <div className={`text-sm font-bold ${theme.header}`}>
                 {PLANET_GL[String(topMalefic.transit_planet)] ?? ''} {PLANET_RU[String(topMalefic.transit_planet)] ?? ''}
                 <span className="text-red-300 mx-1">{ASPECT_SYM[String(topMalefic.aspect)] ?? ''}</span>
@@ -651,7 +654,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/3 p-3">
-              <div className="text-[9px] uppercase tracking-widest text-white/45 font-bold mb-1">Зона осторожности</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold mb-1">Зона осторожности</div>
               <div className={`text-xs ${theme.text} opacity-55 italic`}>Серьёзных напряжений нет</div>
             </div>
           )}
@@ -659,9 +662,9 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
 
         {/* Year do / avoid strip */}
         {strategy && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10">
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-emerald-400 font-bold mb-1.5">◢ Делать в этом году</div>
+              <div className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold mb-1.5">◢ Делать в этом году</div>
               <ul className="space-y-1">
                 {strategy.do.slice(0, 3).map((a, i) => (
                   <li key={i} className={`text-[11px] ${theme.header} flex gap-1.5 leading-snug`}>
@@ -671,7 +674,7 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
               </ul>
             </div>
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-rose-400 font-bold mb-1.5">◣ Не тратить год на</div>
+              <div className="text-[10px] uppercase tracking-widest text-rose-400 font-bold mb-1.5">◣ Не тратить год на</div>
               <ul className="space-y-1">
                 {strategy.avoid.slice(0, 2).map((a, i) => (
                   <li key={i} className={`text-[11px] ${theme.text} opacity-70 flex gap-1.5 leading-snug`}>
@@ -684,8 +687,8 @@ function StrategicFocusCard({ data, theme }: { data: DashboardData; theme: Theme
         )}
 
         {/* Energy meta-bar */}
-        <div className="flex items-center gap-3 pt-3 border-t border-white/8">
-          <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Энергия дня</div>
+        <div className="flex items-center gap-3 pt-3 border-t border-white/10">
+          <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Энергия дня</div>
           <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
@@ -821,23 +824,22 @@ function PersonalActionPlanCard({ data, theme }: { data: DashboardData; theme: T
   const plan = actions.slice(0, 5);
 
   return (
-    <div className={`relative rounded-2xl border ${theme.card} overflow-hidden`}>
-      <div className="absolute inset-0 pointer-events-none opacity-50" style={MESH_BG_STYLE} />
-      <div className="relative">
+    <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
+      <div>
         <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-lg">⚡</span>
-            <span className={`text-sm font-bold ${theme.header}`}>Персональный план на ближайшие дни</span>
+            <Zap size={15} className="text-amber-400" aria-hidden="true" />
+            <h2 className={`text-sm font-bold ${theme.header} m-0`}>Персональный план на ближайшие дни</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] ${theme.text} opacity-35 uppercase tracking-wide`}>{plan.length} конкретных ходов</span>
+            <span className={`text-[10px] ${theme.text} opacity-60 uppercase tracking-wide`}>{plan.length} конкретных ходов</span>
             <ScopeBadge scope="personal" />
           </div>
         </div>
 
         <div className="p-5 space-y-2.5">
           {plan.length === 0 ? (
-            <p className={`text-xs ${theme.text} opacity-45 italic text-center py-4`}>
+            <p className={`text-xs ${theme.text} opacity-65 italic text-center py-4`}>
               Ярких стратегических рычагов нет — фокус на рутине и восстановлении.
             </p>
           ) : plan.map(a => {
@@ -851,7 +853,7 @@ function PersonalActionPlanCard({ data, theme }: { data: DashboardData; theme: T
                   <div className={`text-xs font-bold ${theme.header} leading-snug`}>{a.title}</div>
                   <div className={`text-[10px] ${theme.text} opacity-55 mt-0.5 italic leading-snug`}>— {a.why}</div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded border ${cfg.chipBorder} ${cfg.chipText} uppercase tracking-wider font-bold`}>
+                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded border ${cfg.chipBorder} ${cfg.chipText} uppercase tracking-wider font-bold`}>
                       {cfg.label}
                     </span>
                     {a.when && <span className="text-[10px] text-amber-300/60">⏰ {a.when}</span>}
@@ -928,7 +930,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
           {/* Center: ring */}
           <div className="flex flex-col items-center gap-1 shrink-0">
             <ScoreRing score={score} />
-            <span className="text-[9px] text-white/30 uppercase tracking-wider">энергия дня</span>
+            <span className="text-[10px] text-white/55 uppercase tracking-wider">энергия дня</span>
           </div>
 
           {/* Right: sphere scores */}
@@ -946,8 +948,8 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
 
       {/* Retrogrades strip */}
       {retros.length > 0 && (
-        <div className="relative px-5 pb-4 pt-3 border-t border-white/8">
-          <div className="text-[10px] uppercase tracking-wider text-white/25 mb-2">Ретроградные планеты</div>
+        <div className="relative px-5 pb-4 pt-3 border-t border-white/10">
+          <div className="text-[10px] uppercase tracking-wider text-white/55 mb-2">Ретроградные планеты</div>
           <div className="flex flex-wrap gap-2">
             {retros.map(r => (
               <div key={r.planet} className="flex items-center gap-1.5 rounded-lg bg-violet-500/8 border border-violet-500/20 px-2.5 py-1.5">
@@ -957,7 +959,7 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
                 </span>
                 <span className={`text-[10px] ${theme.text} opacity-50`}>{SIGN_RU[r.sign] ?? r.sign} {r.degree}°</span>
                 {RETRO_MEANING[r.planet] && (
-                  <span className={`text-[10px] italic ${theme.text} opacity-40`}>— {RETRO_MEANING[r.planet]}</span>
+                  <span className={`text-[10px] italic ${theme.text} opacity-65`}>— {RETRO_MEANING[r.planet]}</span>
                 )}
               </div>
             ))}
@@ -1007,7 +1009,7 @@ function MoonCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
                 />
               </div>
               <span className={`text-[11px] font-bold ${theme.accent}`}>{illumination}%</span>
-              <span className={`text-[10px] ${theme.text} opacity-40`}>{isWaxing ? '↑ растёт' : '↓ убывает'}</span>
+              <span className={`text-[10px] ${theme.text} opacity-65`}>{isWaxing ? '↑ растёт' : '↓ убывает'}</span>
             </div>
           </div>
         </div>
@@ -1078,7 +1080,9 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
     <div className={`rounded-xl border mb-2 last:mb-0 ${cfg.bg} overflow-hidden`}>
       <button
         onClick={() => hint && setExpanded(e => !e)}
-        className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left ${hint ? 'cursor-pointer hover:bg-white/3' : 'cursor-default'} transition-colors`}
+        aria-expanded={hint ? expanded : undefined}
+        aria-label={hint ? `${PLANET_RU[tp] ?? tp} ${ASPECT_NAME[asp] ?? asp} ${PLANET_RU[np] ?? np} — ${expanded ? 'свернуть' : 'развернуть'} детали` : undefined}
+        className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${hint ? 'cursor-pointer hover:bg-white/3' : 'cursor-default'} transition-colors`}
       >
         {/* Nature dot */}
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} mt-1.5 shrink-0`} />
@@ -1104,14 +1108,14 @@ function TransitRow({ transit, theme }: { transit: Record<string, unknown>; them
           )}
         </div>
         {hint && (
-          <span className={`${theme.text} opacity-30 shrink-0 mt-0.5`}>
+          <span className={`${theme.text} opacity-60 shrink-0 mt-0.5`}>
             {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </span>
         )}
       </button>
 
       {expanded && hint?.top_practice && (
-        <div className="px-3 pb-3 pt-2 border-t border-white/8">
+        <div className="px-3 pb-3 pt-2 border-t border-white/10">
           {Boolean(hint.top_practice['practice']) && (
             <div className={`text-[11px] font-semibold ${theme.header} flex gap-1.5 mb-1`}>
               <Sparkles size={9} className={`${cfg.color} mt-0.5 shrink-0`} />
@@ -1173,7 +1177,7 @@ function KeyTransitsCard({ data, theme, isPro }: { data: DashboardData; theme: T
             <TransitRow key={i} transit={t as unknown as Record<string, unknown>} theme={theme} />
           ))}
           {!isPro && transits.length > 4 && (
-            <div className={`text-[10px] ${theme.text} opacity-30 text-center mt-1`}>
+            <div className={`text-[10px] ${theme.text} opacity-60 text-center mt-1`}>
               + ещё {transits.length - 4} в режиме Профи
             </div>
           )}
@@ -1210,7 +1214,7 @@ function UpcomingEventsCard({ data, theme }: { data: DashboardData; theme: Theme
     <Card title="Ближайшие события" icon={Calendar} theme={theme}>
       <div className="text-center py-4">
         <span className="text-2xl block mb-1">📅</span>
-        <p className={`text-xs ${theme.text} opacity-40`}>Особых событий в ближайшие 2 недели нет</p>
+        <p className={`text-xs ${theme.text} opacity-65`}>Особых событий в ближайшие 2 недели нет</p>
       </div>
     </Card>
   );
@@ -1257,7 +1261,7 @@ function PeriodsCard({ data, theme }: { data: DashboardData; theme: ThemeLike })
                   {PLANET_RU[firPeriod.planet ?? ''] ?? firPeriod.planet ?? '—'}
                 </div>
                 {firPeriod.start && firPeriod.end && (
-                  <div className={`text-[10px] ${theme.text} opacity-40`}>{firPeriod.start} – {firPeriod.end}</div>
+                  <div className={`text-[10px] ${theme.text} opacity-65`}>{firPeriod.start} – {firPeriod.end}</div>
                 )}
               </div>
             </div>
@@ -1273,7 +1277,7 @@ function PeriodsCard({ data, theme }: { data: DashboardData; theme: ThemeLike })
             )}
           </div>
         ) : (
-          <p className={`text-xs ${theme.text} opacity-30 italic`}>Фирдарий не определён</p>
+          <p className={`text-xs ${theme.text} opacity-60 italic`}>Фирдарий не определён</p>
         )}
 
         {profYear ? (
@@ -1355,11 +1359,11 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <CheckCircle size={15} className="text-emerald-400" />
-          <span className={`text-sm font-bold ${theme.header}`}>Рекомендации на сегодня</span>
+          <CheckCircle size={15} className="text-emerald-400" aria-hidden="true" />
+          <h2 className={`text-sm font-bold ${theme.header} m-0`}>Рекомендации на сегодня</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] ${theme.text} opacity-35 uppercase tracking-wide`}>синтез ваших транзитов</span>
+          <span className={`text-[10px] ${theme.text} opacity-60 uppercase tracking-wide`}>синтез ваших транзитов</span>
           <ScopeBadge scope="personal" />
         </div>
       </div>
@@ -1379,7 +1383,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
               <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Используйте</span>
             </div>
             {benefics.length === 0 ? (
-              <p className={`text-xs ${theme.text} opacity-35 italic`}>Благоприятных транзитов нет — чистая воля</p>
+              <p className={`text-xs ${theme.text} opacity-60 italic`}>Благоприятных транзитов нет — чистая воля</p>
             ) : benefics.map((t, i) => {
               const tp = String(t.transit_planet ?? '');
               const np = String(t.natal_planet ?? '');
@@ -1394,7 +1398,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                       {ASPECT_SYM[asp] ?? ''} {PLANET_RU[np] ?? np}
                     </span>
                     {Boolean(t.applying) && (
-                      <span className="ml-auto text-[9px] text-amber-300/80 font-medium">→ нарастает</span>
+                      <span className="ml-auto text-[10px] text-amber-300/80 font-medium">→ нарастает</span>
                     )}
                   </div>
                   {quick && (
@@ -1417,7 +1421,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
               <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Компенсируйте</span>
             </div>
             {compItems.length === 0 ? (
-              <p className={`text-xs ${theme.text} opacity-35 italic`}>Компенсирующих практик нет</p>
+              <p className={`text-xs ${theme.text} opacity-60 italic`}>Компенсирующих практик нет</p>
             ) : compItems.map((item, i) => {
               const isPos = item.nature === 'benefic';
               const accentCls = isPos ? 'text-blue-400' : item.nature === 'malefic' ? 'text-red-300' : 'text-amber-300';
@@ -1428,7 +1432,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                     <span className={`text-[11px] font-bold ${accentCls}`}>
                       {PLANET_GL[item.planet] ?? ''} {PLANET_RU[item.planet] ?? item.planet}
                     </span>
-                    <span className={`text-[10px] ${theme.text} opacity-40`}>в {SIGN_RU[item.sign] ?? item.sign}</span>
+                    <span className={`text-[10px] ${theme.text} opacity-65`}>в {SIGN_RU[item.sign] ?? item.sign}</span>
                     {item.natalPlanet && (
                       <span className={`text-[10px] ${ASPECT_COLOR[item.aspect] ?? 'text-white/40'}`}>
                         {ASPECT_SYM[item.aspect] ?? ''} натал. {PLANET_RU[item.natalPlanet] ?? item.natalPlanet}
@@ -1478,7 +1482,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
             )}
 
             {malefics.length === 0 && !moonVoid ? (
-              <p className={`text-xs ${theme.text} opacity-35 italic`}>Серьёзных напряжений нет</p>
+              <p className={`text-xs ${theme.text} opacity-60 italic`}>Серьёзных напряжений нет</p>
             ) : malefics.map((t, i) => {
               const tp = String(t.transit_planet ?? '');
               const np = String(t.natal_planet ?? '');
@@ -1494,7 +1498,7 @@ function TodayCommandCard({ data, theme }: { data: DashboardData; theme: ThemeLi
                       {ASPECT_SYM[asp] ?? ''} {PLANET_RU[np] ?? np}
                     </span>
                     {Boolean(t.applying) && (
-                      <span className="ml-auto text-[9px] text-red-400/70 font-medium">→ нарастает</span>
+                      <span className="ml-auto text-[10px] text-red-400/70 font-medium">→ нарастает</span>
                     )}
                   </div>
                   {quick && (
@@ -1606,7 +1610,7 @@ function CompensatoryNow({ comp, theme, topTransits }: {
                     {ASPECT_SYM[at.aspect] ?? ''} {PLANET_GL[at.natalPlanet] ?? ''} {PLANET_RU[at.natalPlanet] ?? at.natalPlanet}
                   </span>
                 )}
-                <span className={`text-[9px] ml-auto px-1.5 py-px rounded-full border ${at.applying ? 'border-amber-500/30 text-amber-400' : 'border-white/15 text-white/30'}`}>
+                <span className={`text-[10px] ml-auto px-1.5 py-px rounded-full border ${at.applying ? 'border-amber-500/30 text-amber-400' : 'border-white/15 text-white/55'}`}>
                   {at.applying ? '→ нарастает' : '↘ слабеет'}
                 </span>
               </div>
@@ -1619,10 +1623,10 @@ function CompensatoryNow({ comp, theme, topTransits }: {
             {practices.length > 0 && (
               <div className="px-3 pb-2.5 space-y-1.5 border-t border-white/6 pt-2">
                 <div className="flex items-center justify-between mb-1">
-                  <div className={`text-[9px] uppercase tracking-wider ${theme.text} opacity-40`}>{labelCls}</div>
+                  <div className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-65`}>{labelCls}</div>
                   {(() => {
                     const t = orbTiming(at.orb, at.applying);
-                    return t ? <div className="text-[9px] text-amber-300/60">⏰ {t}</div> : null;
+                    return t ? <div className="text-[10px] text-amber-300/60">⏰ {t}</div> : null;
                   })()}
                 </div>
                 {normalizePractices(practices).slice(0, 3).map((pr, j) => (
@@ -1630,13 +1634,13 @@ function CompensatoryNow({ comp, theme, topTransits }: {
                     <span className={`text-[10px] mt-0.5 ${accentCls} shrink-0 font-bold`}>{j + 1}.</span>
                     <div className="min-w-0">
                       <div className={`text-[11px] font-medium ${theme.header} leading-tight`}>{pr.practice}</div>
-                      {pr.why && <div className={`text-[10px] ${theme.text} opacity-45 leading-tight mt-px`}>{pr.why}</div>}
+                      {pr.why && <div className={`text-[10px] ${theme.text} opacity-65 leading-tight mt-px`}>{pr.why}</div>}
                       {pr.timing && <div className="text-[10px] text-amber-300/55 leading-tight mt-px">⏰ {pr.timing}</div>}
                     </div>
                   </div>
                 ))}
                 {Boolean(at.raw.function) && (
-                  <div className={`text-[10px] ${theme.text} opacity-40 italic border-t border-white/5 pt-1.5 mt-1`}>
+                  <div className={`text-[10px] ${theme.text} opacity-65 italic border-t border-white/5 pt-1.5 mt-1`}>
                     Функция планеты: {String(at.raw.function)}
                   </div>
                 )}
@@ -1685,19 +1689,21 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+        aria-expanded={open}
+        aria-label={open ? 'Свернуть блок локаций' : 'Развернуть блок локаций'}
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <MapPin size={14} className={theme.accent} />
-          <span className={`text-sm font-semibold ${theme.header}`}>📍 Локации · Куда ехать в этот период</span>
+          <MapPin size={14} className={theme.accent} aria-hidden="true" />
+          <span className={`text-sm font-semibold ${theme.header}`}><span aria-hidden="true">📍 </span>Локации · Куда ехать в этот период</span>
           <ScopeBadge scope="personal" />
-          {lord && <span className={`text-[10px] ${theme.text} opacity-40`}>Лорд: {PLANET_RU[lord] ?? lord}</span>}
+          {lord && <span className={`text-[10px] ${theme.text} opacity-65`}>Лорд: {PLANET_RU[lord] ?? lord}</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
       </button>
 
       {open && (
-        <div className="border-t border-white/8 px-4 pb-4 pt-3 space-y-3">
+        <div className="border-t border-white/10 px-4 pb-4 pt-3 space-y-3">
           {dirInfo && lord && (
             <div className="rounded-xl border border-violet-500/25 bg-violet-500/8 p-3">
               <div className="text-[10px] text-violet-400 font-semibold uppercase tracking-wide mb-1.5">
@@ -1720,7 +1726,7 @@ function LocationAdviceCard({ data, birthData, theme }: { data: DashboardData; b
             </div>
           )}
           <div className="rounded-xl border border-white/10 bg-white/3 p-3 space-y-2">
-            <div className="text-[10px] text-white/35 font-semibold uppercase tracking-wide">⏰ Прямо сейчас</div>
+            <div className="text-[10px] text-white/60 font-semibold uppercase tracking-wide">⏰ Прямо сейчас</div>
             {beneficJupiter ? (
               <div className="flex items-start gap-2">
                 <span className="text-base">✈️</span>
@@ -1773,20 +1779,22 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       <button
         onClick={() => { if (!data && !loading) load(); setOpen(o => ({...o, __h: !o.__h})); }}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+        aria-expanded={Boolean(open.__h)}
+        aria-label={open.__h ? 'Свернуть компенсаторный прогноз' : 'Развернуть компенсаторный прогноз'}
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <Shield size={14} className={theme.accent} />
-          <span className={`text-sm font-semibold ${theme.header}`}>🛡 Компенсаторный прогноз</span>
+          <Shield size={14} className={theme.accent} aria-hidden="true" />
+          <span className={`text-sm font-semibold ${theme.header}`}>Компенсаторный прогноз</span>
           <ScopeBadge scope="personal" />
-          <span className={`text-[10px] ${theme.text} opacity-40`}>1–6 месяцев, по вашим транзитам</span>
+          <span className={`text-[10px] ${theme.text} opacity-65`}>1–6 месяцев, по вашим транзитам</span>
           {data && <span className={`text-[10px] text-emerald-400`}>· {data.windows.length} окна</span>}
         </div>
-        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+        {open.__h ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
       </button>
 
       {open.__h && (
-        <div className="border-t border-white/8 px-4 pb-4 space-y-3 pt-3">
+        <div className="border-t border-white/10 px-4 pb-4 space-y-3 pt-3">
           {loading && (
             <div className="py-6 text-center">
               <RefreshCw size={18} className={`${theme.accent} animate-spin mx-auto mb-2`} />
@@ -1803,19 +1811,21 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
             <div key={win.window} className={`rounded-xl border ${WINDOW_BORDER[win.window] ?? theme.card} overflow-hidden`}>
               <button
                 onClick={() => setOpen(o => ({...o, [win.window]: !o[win.window]}))}
-                className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-white/3 transition-colors"
+                aria-expanded={Boolean(open[win.window])}
+                aria-label={`${win.label} — ${open[win.window] ? 'свернуть' : 'развернуть'}`}
+                className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
               >
                 <div className="flex items-center gap-2">
                   <span className={`font-bold text-sm ${WINDOW_ACCENT[win.window]}`}>{win.label}</span>
-                  <span className={`text-[10px] ${theme.text} opacity-35`}>{win.key_transits.length} транзитов</span>
+                  <span className={`text-[10px] ${theme.text} opacity-60`}>{win.key_transits.length} транзитов</span>
                 </div>
-                {open[win.window] ? <ChevronUp size={12} className={`${theme.text} opacity-40`} /> : <ChevronDown size={12} className={`${theme.text} opacity-40`} />}
+                {open[win.window] ? <ChevronUp size={12} className={`${theme.text} opacity-65`} /> : <ChevronDown size={12} className={`${theme.text} opacity-65`} />}
               </button>
               {open[win.window] && (
-                <div className="px-3 pb-3 space-y-2 border-t border-white/8">
+                <div className="px-3 pb-3 space-y-2 border-t border-white/10">
                   {win.key_transits.length > 0 && (
                     <div className="pt-2">
-                      <p className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-35 mb-1.5`}>Ключевые транзиты</p>
+                      <p className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-60 mb-1.5`}>Ключевые транзиты</p>
                       {win.key_transits.map((kt, i) => {
                         const nc = NATURE_CONFIG[kt.nature] ?? NATURE_CONFIG.mixed;
                         return (
@@ -1836,7 +1846,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
                     if (!pList?.length) return null;
                     const top = pList[0];
                     return (
-                      <div key={i} className="rounded-lg bg-white/5 border border-white/8 p-2.5">
+                      <div key={i} className="rounded-lg bg-white/5 border border-white/10 p-2.5">
                         <div className={`text-[10px] font-semibold ${theme.accent} mb-1`}>
                           {PLANET_GL[String(at.planet ?? '')] ?? ''} {PLANET_RU[String(at.planet ?? '')] ?? String(at.planet)} · {at.tension_signal as string}
                         </div>
@@ -1851,7 +1861,7 @@ function CompensatoryForecast({ birthData, theme }: { birthData: BirthInput; the
             </div>
           ))}
           {data && data.windows.length === 0 && (
-            <p className={`text-sm ${theme.text} opacity-35 text-center py-3`}>Значимых транзитов в ближайшие 6 месяцев не обнаружено</p>
+            <p className={`text-sm ${theme.text} opacity-60 text-center py-3`}>Значимых транзитов в ближайшие 6 месяцев не обнаружено</p>
           )}
         </div>
       )}
@@ -1908,25 +1918,26 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
     <div className={`rounded-2xl border ${theme.card} overflow-hidden`}>
       <button
         onClick={handleToggle}
-        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-white/3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset"
         aria-expanded={open}
+        aria-label={open ? 'Свернуть глобальный астрофон' : 'Развернуть глобальный астрофон'}
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <Globe size={14} className={theme.accent} />
-          <span className={`text-sm font-semibold ${theme.header}`}>🌍 Глобальный астрофон</span>
+          <Globe size={14} className={theme.accent} aria-hidden="true" />
+          <span className={`text-sm font-semibold ${theme.header}`}>Глобальный астрофон</span>
           <ScopeBadge scope="general" />
           {data && (
-            <span className={`text-[10px] ${theme.text} opacity-35`}>
+            <span className={`text-[10px] ${theme.text} opacity-60`}>
               {data.planets?.length ?? 0} планет · {data.mutual_aspects?.length ?? 0} аспектов
             </span>
           )}
-          {!data && !loading && <span className={`text-[10px] ${theme.text} opacity-30`}>нажмите чтобы загрузить</span>}
+          {!data && !loading && <span className={`text-[10px] ${theme.text} opacity-60`}>нажмите чтобы загрузить</span>}
         </div>
-        {open ? <ChevronUp size={14} className={`${theme.text} opacity-40`} /> : <ChevronDown size={14} className={`${theme.text} opacity-40`} />}
+        {open ? <ChevronUp size={14} className={`${theme.text} opacity-65`} /> : <ChevronDown size={14} className={`${theme.text} opacity-65`} />}
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-white/8">
+        <div className="px-4 pb-4 space-y-3 border-t border-white/10">
           {loading && (
             <div className="py-4 text-center">
               <RefreshCw size={16} className={`${theme.accent} animate-spin mx-auto`} />
@@ -1935,26 +1946,26 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
           {data && (
             <div className="space-y-3 pt-3">
               <div>
-                <div className="text-[10px] text-white/25 uppercase tracking-wider mb-2">Позиции планет</div>
+                <div className="text-[10px] text-white/55 uppercase tracking-wider mb-2">Позиции планет</div>
                 <div className="flex flex-wrap gap-1.5">
                   {(data.planets ?? []).map(p => (
                     <div key={p.planet} className="flex items-center gap-1 text-[11px] border border-white/10 rounded-full px-2.5 py-0.5 bg-white/3">
                       <span className="text-white/45">{PLANET_GLYPH_G[p.planet] ?? ''}</span>
                       <span className="text-white/65">{SIGN_RU_G[p.sign] ?? p.sign}</span>
-                      <span className="text-white/25">{p.degree.toFixed(1)}°</span>
+                      <span className="text-white/55">{p.degree.toFixed(1)}°</span>
                     </div>
                   ))}
                 </div>
               </div>
               {(data.mutual_aspects ?? []).length > 0 && (
                 <div>
-                  <div className="text-[10px] text-white/25 uppercase tracking-wider mb-2">Транзитные аспекты (орб ≤ 5°)</div>
+                  <div className="text-[10px] text-white/55 uppercase tracking-wider mb-2">Транзитные аспекты (орб ≤ 5°)</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {(data.mutual_aspects ?? []).slice(0, 8).map((a, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px] border border-white/8 rounded-xl px-2.5 py-1.5 bg-white/3">
+                      <div key={i} className="flex items-center gap-2 text-[11px] border border-white/10 rounded-xl px-2.5 py-1.5 bg-white/3">
                         <span className={`font-bold text-base leading-none ${ASP_COLOR_G[a.aspect] ?? 'text-white/50'}`}>{ASP_RU_G[a.aspect] ?? a.aspect}</span>
                         <span className="text-white/55">{PLANET_RU_G[a.planet1] ?? a.planet1} – {PLANET_RU_G[a.planet2] ?? a.planet2}</span>
-                        <span className="text-white/20 ml-auto">{a.orb.toFixed(1)}°</span>
+                        <span className="text-white/55 ml-auto">{a.orb.toFixed(1)}°</span>
                       </div>
                     ))}
                   </div>
@@ -1970,7 +1981,7 @@ function GlobalAstroPanel({ theme }: { theme: ThemeLike }) {
                 interp = interp.trim();
                 if (!interp) return null;
                 return (
-                  <div className="border-t border-white/8 pt-3">
+                  <div className="border-t border-white/10 pt-3">
                     <p className={`text-xs ${theme.text} opacity-60 leading-relaxed`}>{interp}</p>
                   </div>
                 );
@@ -2128,22 +2139,28 @@ export default function DashboardView({ birthData, theme }: Props) {
           <h2 className={`text-sm font-semibold ${theme.header} opacity-70`}>Ежедневный дашборд</h2>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-xl overflow-hidden border border-white/10 text-xs">
+          <div role="group" aria-label="Режим отображения" className="flex rounded-xl overflow-hidden border border-white/10 text-xs">
             <button
               onClick={() => mode !== 'simple' && toggleMode()}
-              className={`px-3 py-1.5 transition-all ${mode === 'simple' ? 'bg-white/15 text-white font-semibold' : 'text-white/35 hover:text-white/60'}`}
+              aria-pressed={mode === 'simple'}
+              className={`px-3 py-2 min-h-[40px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${mode === 'simple' ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white'}`}
             >
               Простой
             </button>
             <button
               onClick={() => mode !== 'pro' && toggleMode()}
-              className={`px-3 py-1.5 transition-all ${mode === 'pro' ? 'bg-white/15 text-white font-semibold' : 'text-white/35 hover:text-white/60'}`}
+              aria-pressed={mode === 'pro'}
+              className={`px-3 py-2 min-h-[40px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${mode === 'pro' ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white'}`}
             >
-              Профи ✦
+              Профи <span aria-hidden="true">✦</span>
             </button>
           </div>
-          <button onClick={load} className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl ${theme.btn}`}>
-            <RefreshCw size={11} /> Обновить
+          <button
+            onClick={load}
+            aria-label="Обновить дашборд"
+            className={`flex items-center gap-1.5 text-xs px-3 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
+          >
+            <RefreshCw size={12} aria-hidden="true" /> Обновить
           </button>
         </div>
       </div>
