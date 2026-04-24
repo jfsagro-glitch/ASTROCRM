@@ -2202,6 +2202,125 @@ def calc_profections(req: PredictiveRequest):
         raise HTTPException(500, str(e))
 
 
+@app.post("/predictive/annual-profection")
+def annual_profection(req: PredictiveRequest):
+    """Annual profection — full 12-year cycle table + activated natal planets.
+
+    Extends /predictive/profections with:
+    - cycle_12: list of all 12 years ahead (house, sign, lord, age)
+    - activated_natal_planets: natal planets inside the current profected house
+    - house_theme: Russian theme text for the active house
+    - interpretation: narrative text
+    """
+    try:
+        from astro_predictive import TRADITIONAL_LORD as _TL
+        from astro_engine import calc_houses as _ch, planet_in_house as _pih
+
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
+        base = profections(natal_jd, req.target_date,
+                           houses_system=req.houses, lat=req.lat, lon=req.lon)
+
+        # Raw float house cusps for planet_in_house
+        raw_houses = _ch(natal_jd, req.lat, req.lon, req.houses)
+
+        # Natal planet lons from calc_chart (need lon floats)
+        yr, mo, dy = _parse_date(req.date)
+        h, mi, sc  = _parse_time(req.time)
+        natal = calc_chart(yr, mo, dy, h, mi, sc, req.lat, req.lon, effective_utc,
+                           houses_system=req.houses,
+                           include_aspects=False, include_dignities=False,
+                           include_arabic=False)
+        natal_planets_fmt = natal.get("planets", {})
+
+        current_house = base["annual_house"]
+        age           = base["age"]
+
+        # Full 12-year cycle
+        cycle = []
+        for offset in range(12):
+            hnum    = ((current_house - 1 + offset) % 12) + 1
+            h_lon   = raw_houses.get(f"h{hnum}", 0)
+            h_sign  = sign_name(h_lon)
+            cycle.append({
+                "year_offset": offset,
+                "age":         age + offset,
+                "house":       hnum,
+                "house_lon":   round(h_lon, 4),
+                "sign":        h_sign,
+                "lord":        _TL.get(h_sign, "sun"),
+                "is_current":  offset == 0,
+            })
+
+        # Natal planets in the current profected house
+        ann_h_lon  = raw_houses.get(f"h{current_house}", 0)
+        next_h     = (current_house % 12) + 1
+        next_h_lon = raw_houses.get(f"h{next_h}", 0)
+
+        def _n360(x): return x % 360
+
+        house_span = _n360(next_h_lon - ann_h_lon)
+        activated = []
+        for pname, pdata in natal_planets_fmt.items():
+            if not isinstance(pdata, dict):
+                continue
+            plon = pdata.get("lon")
+            if plon is None:
+                continue
+            diff = _n360(plon - ann_h_lon)
+            if diff < house_span:
+                activated.append({
+                    "planet": pname,
+                    "lon":    round(plon, 4),
+                    "sign":   pdata.get("sign", sign_name(plon)),
+                })
+
+        _HOUSE_THEMES_RU = {
+            1:  "идентичность, тело, новые начинания",
+            2:  "деньги, ресурсы, ценности",
+            3:  "коммуникации, братья/сёстры, обучение",
+            4:  "дом, семья, корни",
+            5:  "творчество, дети, романтика, риск",
+            6:  "работа, здоровье, рутина",
+            7:  "партнёрство, отношения, договоры",
+            8:  "трансформация, наследство, кризис",
+            9:  "путешествия, философия, высшее образование",
+            10: "карьера, статус, публичность",
+            11: "друзья, цели, социальные связи",
+            12: "уединение, тайны, духовная работа",
+        }
+        theme     = _HOUSE_THEMES_RU.get(current_house, "")
+        lord_name = base.get("annual_lord", "")
+
+        interp = (
+            f"Год профекций: дом {current_house} — «{theme}». "
+            f"Лорд года: {lord_name.capitalize() if lord_name else '—'}. "
+            "Состояние лорда в натальной карте определяет качество года. "
+        )
+        if activated:
+            planets_str = ", ".join(p["planet"].capitalize() for p in activated)
+            interp += (
+                f"В активированном доме натально стоят: {planets_str} — "
+                "эти планеты усиленно задействованы в текущем году."
+            )
+        else:
+            interp += (
+                "В активированном доме натально нет планет — "
+                "тема дома раскрывается прежде всего через лорда года."
+            )
+
+        base["cycle_12"]                = cycle
+        base["activated_natal_planets"] = activated
+        base["house_theme"]             = theme
+        base["interpretation"]          = interp
+        base["type"]                    = "annual_profection"
+        return _present(base)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/predictive/firdaria")
 def calc_firdaria(req: PredictiveRequest):
     """Firdaria (Firdariyyat) — Hellenistic unequal planetary periods.
@@ -4950,7 +5069,13 @@ def eclipse_personal(req: EclipsePersonalRequest):
                            houses_system=req.houses,
                            include_aspects=False, include_dignities=False,
                            include_arabic=False)
-        houses_dict = natal.get("houses", {})
+        # planet_in_house expects {h1: float_lon, ...}
+        raw_houses = natal.get("houses", {})
+        houses_dict = {
+            k: (v["lon"] if isinstance(v, dict) else v)
+            for k, v in raw_houses.items()
+            if k.startswith("h") and k[1:].isdigit()
+        }
 
         enriched = []
         for ecl in eclipses:
@@ -5074,7 +5199,12 @@ def ingress_personal(req: IngressPersonalRequest):
                            houses_system=req.houses,
                            include_aspects=False, include_dignities=False,
                            include_arabic=False)
-        houses_dict = natal.get("houses", {})
+        raw_houses = natal.get("houses", {})
+        houses_dict = {
+            k: (v["lon"] if isinstance(v, dict) else v)
+            for k, v in raw_houses.items()
+            if k.startswith("h") and k[1:].isdigit()
+        }
 
         results = []
         for sign in _ALL_SIGNS_12:
