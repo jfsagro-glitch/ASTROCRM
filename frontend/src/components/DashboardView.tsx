@@ -15,6 +15,7 @@ import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
 import { useAppMode } from '../hooks/useAppMode';
+import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
 // ─── Theme type ───────────────────────────────────────────────────────────────
 interface ThemeLike {
@@ -1314,6 +1315,9 @@ function PeriodsCard({ data, theme }: { data: DashboardData; theme: ThemeLike })
             {firSub && (
               <div className={`text-[11px] ${theme.accent} mb-1.5`}>
                 Суб-период: {PLANET_GL[firSub.planet ?? ''] ?? ''} {PLANET_RU[firSub.planet ?? ''] ?? firSub.planet}
+                {firSub.start && firSub.end && (
+                  <span className={`${theme.text} opacity-60 ml-2`}>· {firSub.start} – {firSub.end}</span>
+                )}
               </div>
             )}
             {firPeriod.planet && FIRDARIA_NARRATIVE[firPeriod.planet] && (
@@ -1321,6 +1325,21 @@ function PeriodsCard({ data, theme }: { data: DashboardData; theme: ThemeLike })
                 {FIRDARIA_NARRATIVE[firPeriod.planet]}
               </p>
             )}
+            {(() => {
+              const sub = getFirdariaSubInterpretation(firPeriod.planet, firSub?.planet);
+              if (!sub) return null;
+              return (
+                <div className={`mt-2 pt-2 border-t border-violet-500/20 space-y-1`}>
+                  <div className={`text-[11px] font-semibold ${theme.header}`}>{sub.tone}</div>
+                  <p className={`text-[11px] ${theme.text} opacity-70 leading-relaxed m-0`}>
+                    {sub.sub_mode}
+                  </p>
+                  <p className={`text-[11px] ${theme.accent} leading-relaxed m-0`}>
+                    → {sub.practice}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <p className={`text-xs ${theme.text} opacity-60 italic`}>Фирдарий не определён</p>

@@ -22,6 +22,7 @@ import ChartWheel, { ChartWheelResponsive } from './ChartWheel';
 import DashboardView from './DashboardView';
 import OnboardingFlow from './OnboardingFlow';
 import DailyJournalCard from './DailyJournalCard';
+import ReturnsTimeline from './ReturnsTimeline';
 import DateSegmentInput from './DateSegmentInput';
 import DailyPersonalBlock from './DailyPersonalBlock';
 import { ChartAnalysisSection } from './ChartAnalysisSection';
@@ -2628,6 +2629,7 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
               {birth.date && birth.time ? (
                 <>
                   <DashboardView birthData={birth} theme={theme} />
+                  <ReturnsTimeline birth={birth} />
                   <DailyJournalCard userId={user?.uid} />
                 </>
               ) : (
