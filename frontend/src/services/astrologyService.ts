@@ -139,6 +139,54 @@ export async function getSolarReturn(b: BirthInput, year: number, obsLat?: numbe
   });
 }
 
+export async function getSolarReturnDeep(
+  b: BirthInput,
+  srYear: number,
+  obsLat?: number,
+  obsLon?: number,
+  includeLunars = false,
+) {
+  return post('/predictive/solar-return/deep', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    sr_year: srYear,
+    obs_lat: obsLat ?? b.lat,
+    obs_lon: obsLon ?? b.lon,
+    include_lunars: includeLunars,
+  });
+}
+
+export async function getSolarReturnCities(
+  b: BirthInput,
+  srYear: number,
+  cities: { name: string; lat: number; lon: number }[],
+  targetNatalHouse?: number,
+  targetSphere?: string,
+) {
+  return post('/predictive/solar-return/cities', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    sr_year: srYear,
+    cities,
+    target_natal_house: targetNatalHouse,
+    target_sphere: targetSphere,
+  });
+}
+
+export async function getSolarReturnSphereSearch(
+  b: BirthInput,
+  srYear: number,
+  cities: { name: string; lat: number; lon: number }[],
+  targetNatalHouse?: number,
+  targetSphere?: string,
+) {
+  return post('/predictive/solar-return/sphere-search', {
+    date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
+    sr_year: srYear,
+    cities,
+    target_natal_house: targetNatalHouse,
+    target_sphere: targetSphere,
+  });
+}
+
 export async function getLunarReturn(b: BirthInput, nearDate: string, obsLat?: number, obsLon?: number) {
   return post('/predictive/lunar-return', {
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,

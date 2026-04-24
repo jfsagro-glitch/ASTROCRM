@@ -21,6 +21,7 @@ import type { BirthInput } from '../types/astro';
 import { PLANET_SYMBOLS, ASPECT_SYMBOLS, SIGN_COLORS } from '../types/astro';
 import DateSegmentInput from './DateSegmentInput';
 import DailyForecastView from './DailyForecastView';
+import SolarReturnBlock from './SolarReturnBlock';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -1041,7 +1042,9 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
     }
     if (['secondary_progressions','solar_arc','tertiary_progressions','converse_progressions'].includes(type))
       return <ProgressionView result={result} theme={theme} />;
-    if (['solar_return','lunar_return'].includes(type))
+    if (type === 'solar_return')
+      return <ReturnView result={result} theme={theme} />;
+    if (type === 'lunar_return')
       return <ReturnView result={result} theme={theme} />;
     if (type === 'profections')
       return <ProfectionView result={result} theme={theme} />;
@@ -1147,7 +1150,13 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
       {/* Technique description */}
       <TechniqueHeader tabKey={tab} theme={theme} />
 
-      {/* Date selector */}
+      {/* ── Solar Return — full dedicated service ── */}
+      {tab === 'solar-return' && (
+        <SolarReturnBlock birth={birth} theme={theme} />
+      )}
+
+      {/* Date selector — all other tabs */}
+      {tab !== 'solar-return' && (<>
       <div className={`rounded-xl border ${theme.card} p-4 space-y-3`}>
         <h4 className={`text-sm font-semibold ${theme.header}`}>📅 Выбор даты</h4>
 
@@ -1220,25 +1229,6 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
               </div>
             </div>
           </div>
-        ) : tab === 'solar-return' ? (
-          <div className="flex items-end gap-3">
-            <div>
-              <label className={`text-xs ${theme.text} mb-1 block`}>Год возврата</label>
-              <input type="number" value={returnYear}
-                onChange={e => setReturnYear(parseInt(e.target.value))}
-                className={`px-3 py-2 rounded-lg border text-sm w-28 ${theme.card}`} />
-            </div>
-            <div className="flex gap-1">
-              {[0,1,2,3].map(offset => (
-                <button key={offset}
-                  onClick={() => setReturnYear(new Date().getFullYear() + offset)}
-                  className={`px-2 py-1.5 text-xs rounded-lg border transition-colors ${returnYear === new Date().getFullYear() + offset ? theme.tabActive : theme.tabInactive}`}
-                >
-                  {new Date().getFullYear() + offset}
-                </button>
-              ))}
-            </div>
-          </div>
         ) : (
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2 items-end">
@@ -1303,6 +1293,7 @@ export default function PredictiveExpanded({ birth, theme }: Props) {
 
       {error && <Err msg={error} />}
       {renderResult()}
+      </>)}
       </>)}
     </div>
   );
