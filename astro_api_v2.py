@@ -124,6 +124,13 @@ try:
 except Exception as _push_err:  # pragma: no cover
     print(f"[astro_api_v2] push_notifications disabled: {_push_err}")
 
+# ─── Daily journal router ────────────────────────────────────────────────────
+try:
+    from day_entries import router as _journal_router  # type: ignore
+    app.include_router(_journal_router)
+except Exception as _journal_err:  # pragma: no cover
+    print(f"[astro_api_v2] day_entries disabled: {_journal_err}")
+
 
 def _feature_unavailable(name: str, reason: str = "") -> HTTPException:
     detail = f"{name} engine not available"

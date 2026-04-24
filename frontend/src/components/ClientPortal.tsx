@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import ChartWheel, { ChartWheelResponsive } from './ChartWheel';
 import DashboardView from './DashboardView';
 import OnboardingFlow from './OnboardingFlow';
+import DailyJournalCard from './DailyJournalCard';
 import DateSegmentInput from './DateSegmentInput';
 import DailyPersonalBlock from './DailyPersonalBlock';
 import { ChartAnalysisSection } from './ChartAnalysisSection';
@@ -2623,9 +2624,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
         }>
         <div key={activeTab} className="tab-content-enter">
           {activeTab === 'dashboard' && (
-            <div id="pdf-section-dashboard">
+            <div id="pdf-section-dashboard" className="space-y-4">
               {birth.date && birth.time ? (
-                <DashboardView birthData={birth} theme={theme} />
+                <>
+                  <DashboardView birthData={birth} theme={theme} />
+                  <DailyJournalCard userId={user?.uid} />
+                </>
               ) : (
                 <div className={`rounded-2xl border ${theme.card} p-14 text-center space-y-3`}>
                   <Zap className={`h-14 w-14 mx-auto ${theme.symbol} opacity-30`} />
