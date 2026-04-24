@@ -334,15 +334,23 @@ function BirthForm({
                 onChange={e => { onChange({ ...value, name: e.target.value }); setSelectedPersonId(''); }}
                 className={`flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm ${theme.card} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
               />
-              {hasPeople && (
+              {hasPeople ? (
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(o => !o)}
                   title="Выбрать сохранённый профиль"
-                  className={`px-2 py-2 rounded-lg border text-xs transition-colors ${theme.tabInactive}`}
+                  className={`shrink-0 flex items-center justify-center w-8 h-[38px] rounded-lg border transition-colors ${
+                    dropdownOpen
+                      ? 'bg-indigo-500/20 border-indigo-400/50 text-indigo-300'
+                      : 'border-white/25 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/40'
+                  }`}
                 >
-                  <ChevronDown className="h-3.5 w-3.5" />
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
+              ) : (
+                <div className="shrink-0 flex items-center justify-center w-8 h-[38px] rounded-lg border border-white/10 text-white/25" title="Нет сохранённых профилей">
+                  <ChevronDown className="h-4 w-4" />
+                </div>
               )}
             </div>
             {dropdownOpen && hasPeople && (
@@ -2151,8 +2159,15 @@ function BirthFormPanel({
   calcNatal, handleExportAll, handleFullReport, handleExportHumanDesign,
   activeTab, theme, people, user, handleSavePerson, handleDeletePerson, tr, configured,
 }: BirthFormPanelProps) {
-  const [formOpen, setFormOpen] = useState(!natalChart);
-  useEffect(() => { if (natalChart) setFormOpen(false); }, [natalChart]);
+  const [formOpen, setFormOpen] = useState(true);
+  // Auto-collapse only when chart is first calculated (not on re-renders)
+  const prevNatalRef = React.useRef<NatalChart | null>(null);
+  useEffect(() => {
+    if (natalChart && !prevNatalRef.current) {
+      // First successful calculation — do NOT auto-collapse so user keeps their data visible
+    }
+    prevNatalRef.current = natalChart;
+  }, [natalChart]);
 
   return (
     <div className={`rounded-2xl border ${theme.card} px-4 py-3`}>
@@ -2281,6 +2296,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
+  // Ref always holds latest birth — prevents stale closure in calcNatal
+  const birthRef = React.useRef(birth);
+  birthRef.current = birth;
 
   // ─── Entitlement + paywall state ───────────────────────────────────────────
   const { isPro } = useEntitlement(user?.uid);
@@ -2342,12 +2360,13 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
   }, [activeTab, humanDesignMode, loading, isExporting, natalChart, error]);
 
   const calcNatal = useCallback(async () => {
-    if (!birth.date || !birth.time) { setError(tr.dateTimeRequired); return; }
+    const b = birthRef.current;          // always fresh — no stale-closure risk
+    if (!b.date || !b.time) { setError(tr.dateTimeRequired); return; }
     setLoading(true); setError(null);
-    try { setNatalChart(await getNatalChart(birth)); }
+    try { setNatalChart(await getNatalChart(b)); }
     catch (e: unknown) { setError((e as Error).message); }
     finally { setLoading(false); }
-  }, [birth, tr]);
+  }, [tr]); // birthRef is stable ref, no need in deps
 
   const { exporting: reportExporting, exportFullReport } = usePdfExport();
 
