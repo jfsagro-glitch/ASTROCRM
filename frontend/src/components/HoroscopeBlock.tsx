@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AstroSummaryBlock from './AstroSummaryBlock';
 import PredictiveExpanded from './PredictiveExpanded';
+import SolarReturnBlock from './SolarReturnBlock';
 import type { BirthInput } from '../types/astro';
 import { getAstroSummary } from '../services/astrologyService';
 import DateSegmentInput from './DateSegmentInput';
@@ -27,7 +28,7 @@ interface HoroProps {
   birth: BirthInput;
 }
 
-type HoroTab = 'overview' | 'transits' | 'compensatorics' | 'subscription';
+type HoroTab = 'overview' | 'transits' | 'solar-return' | 'compensatorics' | 'subscription';
 
 type CompCategory = 'fire' | 'water' | 'earth' | 'air' | 'physical' | 'ritual' | 'social' | 'mental' | 'creative';
 
@@ -1175,6 +1176,7 @@ function SubscriptionPanel({ isDark, theme }: { isDark: boolean; theme: ThemeLik
 const TABS: { key: HoroTab; icon: string; label: string }[] = [
   { key: 'overview',       icon: '🧭', label: 'Обзор' },
   { key: 'transits',       icon: '🌀', label: 'Транзиты' },
+  { key: 'solar-return',   icon: '🌞', label: 'Соляр' },
   { key: 'compensatorics', icon: '⚗️', label: 'Компенсаторика' },
   { key: 'subscription',   icon: '🔔', label: 'Подписка' },
 ];
@@ -1247,6 +1249,20 @@ export default function HoroscopeBlock({ theme, birth }: HoroProps) {
               <Star className={`h-10 w-10 mx-auto mb-3 ${theme.symbol} opacity-30`} />
               <p className={`${theme.text} text-sm`}>
                 Для транзитов и прогрессий нужны данные рождения.<br />
+                Заполните форму выше и пересчитайте натальную карту.
+              </p>
+            </div>
+          )
+      )}
+
+      {tab === 'solar-return' && (
+        hasBirth
+          ? <SolarReturnBlock birth={birth} theme={theme} />
+          : (
+            <div className={`rounded-2xl border p-12 text-center ${theme.card}`}>
+              <Star className={`h-10 w-10 mx-auto mb-3 ${theme.symbol} opacity-30`} />
+              <p className={`${theme.text} text-sm`}>
+                Для Соляра нужны данные рождения.<br />
                 Заполните форму выше и пересчитайте натальную карту.
               </p>
             </div>
