@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 
 import ChartWheel, { ChartWheelResponsive } from './ChartWheel';
 import DashboardView from './DashboardView';
+import OnboardingFlow from './OnboardingFlow';
 import DateSegmentInput from './DateSegmentInput';
 import DailyPersonalBlock from './DailyPersonalBlock';
 import { ChartAnalysisSection } from './ChartAnalysisSection';
@@ -2276,6 +2277,15 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     lon:   parseFloat(initialParams?.get('lon') || '0'),
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
+
+  // ─── Onboarding: show on first visit when no birth data yet ────────────────
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      const done = localStorage.getItem('holo_onboarding_done') === '1';
+      const hasData = !!(initialParams?.get('date'));
+      return !done && !hasData;
+    } catch { return false; }
+  });
   // Match birth form name to a saved person for the History tab
   const currentPerson = useMemo(
     () => people.find(p => p.name === birth.name) ?? null,
@@ -2475,6 +2485,12 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
 
   return (
     <div className={`relative min-h-screen ${theme.container} transition-all duration-500`}>
+      {showOnboarding && (
+        <OnboardingFlow
+          onComplete={(b) => { setBirth(b); setShowOnboarding(false); }}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
       {/* Navbar */}
       <nav className={`sticky top-0 z-10 border-b backdrop-blur-md ${theme.container}`}
         style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
