@@ -44,6 +44,28 @@ from astro_relocation import (
     relocated_chart, acg_lines, local_space, parans,
 )
 try:
+    from astro_solar_return import (
+        solar_return_deep_analysis,
+        city_asc_comparison,
+        sr_sphere_city_search,
+        generate_sr_hypotheses,
+        solar_holos_intersection,
+        lunar_return_calendar,
+        SPHERE_LABELS as _SR_SPHERE_LABELS,
+        SPHERE_KEYWORDS_EN as _SR_SPHERE_KW,
+    )
+    _SR_DEEP_OK = True
+except Exception as _sr_err:
+    _SR_DEEP_OK = False
+    solar_return_deep_analysis = None   # type: ignore
+    city_asc_comparison = None          # type: ignore
+    sr_sphere_city_search = None        # type: ignore
+    generate_sr_hypotheses = None       # type: ignore
+    solar_holos_intersection = None     # type: ignore
+    lunar_return_calendar = None        # type: ignore
+    _SR_SPHERE_LABELS = {}              # type: ignore
+    _SR_SPHERE_KW = {}                  # type: ignore
+try:
     from human_design_engine import (
         calc_human_design,
         present_cross_catalog,
@@ -1908,6 +1930,230 @@ def calc_solar_return(req: PredictiveRequest):
             result["effective_utc"] = round(effective_utc, 2)
         result["interpretation"] = _gen_solar_return_interp(result)
         return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── SOLAR RETURN — DEEP ANALYSIS (Pavel Andreev method) ──────────────────────
+
+class SolarReturnDeepRequest(BaseModel):
+    """Birth data + observation city for deep solar return analysis."""
+    # Natal birth data
+    date:  str            # YYYY-MM-DD
+    time:  str            # HH:MM or HH:MM:SS
+    lat:   float          # natal latitude
+    lon:   float          # natal longitude
+    utc:   float          # UTC offset at birth
+    timezone_name: Optional[str] = None
+    # Solar return year
+    sr_year: int
+    # Observation location (city where you celebrate birthday)
+    obs_lat: Optional[float] = None   # defaults to natal lat
+    obs_lon: Optional[float] = None   # defaults to natal lon
+    houses: str = "placidus"
+    # Optional modules
+    include_holos:  bool = False      # HOLOS α/φ intersection
+    include_lunars: bool = False      # lunar return calendar + hot months within SR year
+
+
+class SolarReturnCitiesRequest(BaseModel):
+    """Birth data + list of candidate cities for SR ASC comparison."""
+    date:  str
+    time:  str
+    lat:   float
+    lon:   float
+    utc:   float
+    timezone_name: Optional[str] = None
+    sr_year: int
+    cities: List[Dict[str, Any]]  # [{"name": "City", "lat": 45.0, "lon": 38.0}]
+    houses: str = "placidus"
+    # Optional sphere targeting
+    target_natal_house: Optional[int] = None  # 1-12: rank cities by SR ASC in this natal house
+    target_sphere: Optional[str] = None       # keyword: "career", "money", "love", etc.
+
+
+class SolarReturnSphereCitiesRequest(BaseModel):
+    """Find cities that activate a specific natal house / life sphere."""
+    date:  str
+    time:  str
+    lat:   float
+    lon:   float
+    utc:   float
+    timezone_name: Optional[str] = None
+    sr_year: int
+    cities: List[Dict[str, Any]]
+    houses: str = "placidus"
+    target_natal_house: Optional[int] = None  # 1-12
+    target_sphere: Optional[str] = None       # keyword alias for house
+
+
+def _require_sr_deep() -> None:
+    if not _SR_DEEP_OK:
+        raise _feature_unavailable("Solar Return Deep Analysis",
+                                   "astro_solar_return module not available")
+
+
+@app.post("/predictive/solar-return/deep")
+def calc_solar_return_deep(req: SolarReturnDeepRequest):
+    """
+    Deep solar return analysis by Pavel Andreev method.
+
+    Priority system:
+      1. SR ASC in natal house (main sphere of the year)
+      2. Planets in angular SR houses (1,4,7,10)
+      3. SR MC in natal house (career vector)
+      4. SR Sun in SR house (self-expression theme)
+      5. SR Moon (emotional tone)
+      6. SR ASC ruler (how the theme manifests)
+      7. SR-to-natal aspects (activations)
+      8. SR planets in natal houses (activity zones)
+
+    Extensions:
+      - include_holos: HOLOS α-address / φ-node intersection (hypothesis SR-8)
+      - include_lunars: full lunar return calendar within the solar year
+    """
+    _require_sr_deep()
+    try:
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
+        obs_lat = req.obs_lat if req.obs_lat is not None else req.lat
+        obs_lon = req.obs_lon if req.obs_lon is not None else req.lon
+        result = solar_return_deep_analysis(
+            natal_jd, req.sr_year,
+            obs_lat, obs_lon,
+            req.lat, req.lon,
+            req.houses,
+            include_holos=req.include_holos,
+            include_lunars=req.include_lunars,
+        )
+        if req.timezone_name:
+            result["timezone_name"] = req.timezone_name
+            result["effective_utc"] = round(effective_utc, 2)
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/predictive/solar-return/cities")
+def calc_solar_return_cities(req: SolarReturnCitiesRequest):
+    """
+    Compare SR ASC across multiple observation cities.
+
+    Default mode: ranks cities by proximity of SR ASC to natal ASC (resonance).
+
+    Sphere-targeting mode (optional):
+      - target_natal_house (1-12): rank by whether SR ASC falls in that natal house
+      - target_sphere ("career", "money", "love", "partnership", etc.): same via keyword
+
+    Each city result includes a full sphere_map (what natal houses SR ASC, MC, Sun, Moon activate),
+    angular planet archetypes for all 4 angular houses, and sphere_recommendations dict.
+
+    Each city entry: {"name": "City", "lat": 45.04, "lon": 38.98}
+    """
+    _require_sr_deep()
+    if not req.cities:
+        raise HTTPException(400, "Provide at least one city in 'cities' list")
+    if len(req.cities) > 30:
+        raise HTTPException(400, "Maximum 30 cities per request")
+    try:
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
+        result = city_asc_comparison(
+            natal_jd, req.sr_year,
+            req.cities,
+            req.lat, req.lon,
+            req.houses,
+            target_natal_house=req.target_natal_house,
+            target_sphere=req.target_sphere,
+        )
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/predictive/solar-return/sphere-search")
+def calc_solar_return_sphere_search(req: SolarReturnSphereCitiesRequest):
+    """
+    Find cities where the SR ASC falls in a specific natal house (life sphere).
+
+    AstroCRM client flow:
+      "I want a career year" → target_natal_house=10 or target_sphere="career"
+      Returns: exact matches (SR ASC in target house), near-matches (within 5° of cusp),
+      and all cities ranked by distance to target house cusp.
+
+    Supported target_sphere keywords:
+      career, money, love, partnership, home, family, creativity, communication,
+      travel, education, spirituality, transformation, community, health, work, etc.
+    """
+    _require_sr_deep()
+    if not req.cities:
+        raise HTTPException(400, "Provide at least one city in 'cities' list")
+    if len(req.cities) > 50:
+        raise HTTPException(400, "Maximum 50 cities per sphere search")
+
+    # Resolve target
+    target_house = req.target_natal_house
+    if req.target_sphere and not target_house:
+        target_house = _SR_SPHERE_KW.get(req.target_sphere.lower())
+    if not target_house or not (1 <= target_house <= 12):
+        raise HTTPException(
+            400,
+            f"Provide target_natal_house (1-12) or target_sphere keyword. "
+            f"Valid keywords: {', '.join(sorted(_SR_SPHERE_KW.keys())[:20])}..."
+        )
+    try:
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        natal_jd = _to_jd(req.date, req.time, effective_utc)
+        result = sr_sphere_city_search(
+            natal_jd, req.sr_year,
+            target_house,
+            req.cities,
+            req.lat, req.lon,
+            req.houses,
+        )
+        return _present(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/predictive/solar-return/spheres")
+def get_solar_return_spheres():
+    """
+    Reference: list of all 12 natal house spheres and their keyword aliases.
+    Useful for populating UI dropdowns or sphere-selection widgets.
+    """
+    _require_sr_deep()
+    spheres = []
+    # Build reverse map: house → keywords
+    kw_by_house: dict = {}
+    for kw, h in _SR_SPHERE_KW.items():
+        kw_by_house.setdefault(h, []).append(kw)
+    for h in range(1, 13):
+        spheres.append({
+            "natal_house": h,
+            "label":       _SR_SPHERE_LABELS.get(h, ""),
+            "keywords":    kw_by_house.get(h, []),
+        })
+    return _safe(spheres)
+
+
+@app.get("/predictive/solar-return/hypotheses")
+def get_solar_return_hypotheses():
+    """
+    12 statistical hypotheses about solar returns for database validation.
+    Each hypothesis is testable on astrodatabank or holos_analytics.db.
+    """
+    _require_sr_deep()
+    try:
+        return _safe(generate_sr_hypotheses())
     except HTTPException:
         raise
     except Exception as e:
