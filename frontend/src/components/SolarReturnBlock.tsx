@@ -261,6 +261,15 @@ function YearCard({ card, isDark }: { card: any; isDark: boolean }) {
 function InterpBlock({ interp, isDark }: { interp: any; isDark: boolean }) {
   if (!interp) return null;
 
+  // Backend returns a plain string — just render it verbatim
+  if (typeof interp === 'string') {
+    return (
+      <div className={`rounded-xl border p-4 ${isDark ? 'border-slate-600/30 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
+        <p className="text-sm leading-relaxed whitespace-pre-line font-mono">{interp}</p>
+      </div>
+    );
+  }
+
   const PRIORITY_META: Record<string, { icon: string; color: string }> = {
     priority_1: { icon: '🏠', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50' },
     priority_2: { icon: '⚡', color: isDark ? 'border-orange-600/40 bg-orange-900/20' : 'border-orange-200 bg-orange-50' },
@@ -634,7 +643,17 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
               {deepResult.sr_asc_ruler && (
                 <div className={`rounded-xl border p-3 ${isDark ? 'border-purple-600/30 bg-purple-900/15' : 'border-purple-200 bg-purple-50'}`}>
                   <div className="text-xs font-bold opacity-60 uppercase mb-1">Управитель АСЦ соляра</div>
-                  <p className="text-sm">{deepResult.sr_asc_ruler.interpretation ?? JSON.stringify(deepResult.sr_asc_ruler)}</p>
+                  {deepResult.sr_asc_ruler.interpretation
+                    ? <p className="text-sm">{deepResult.sr_asc_ruler.interpretation}</p>
+                    : (
+                      <p className="text-sm">
+                        {deepResult.sr_asc_ruler.formatted ?? deepResult.sr_asc_ruler.planet}
+                        {deepResult.sr_asc_ruler.in_sr_house != null && ` — дом ${deepResult.sr_asc_ruler.in_sr_house} соляра`}
+                        {deepResult.sr_asc_ruler.in_natal_house != null && `, дом ${deepResult.sr_asc_ruler.in_natal_house} натала`}
+                        {deepResult.sr_asc_ruler.sphere_label && ` · ${deepResult.sr_asc_ruler.sphere_label}`}
+                      </p>
+                    )
+                  }
                 </div>
               )}
 
