@@ -90,18 +90,21 @@ function CitySearch({
   const [suggestions, setSuggestions] = useState<{ name: string; display_name: string; lat: number; lon: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [searchErr, setSearchErr] = useState('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const search = useCallback(async (q: string) => {
-    if (q.length < 2) { setSuggestions([]); return; }
-    setLoading(true);
+    if (q.length < 2) { setSuggestions([]); setOpen(false); setSearchErr(''); return; }
+    setLoading(true); setSearchErr('');
     try {
       const res = await geocodeCities(q);
       setSuggestions(res);
       setOpen(true);
+      if (res.length === 0) setSearchErr('Город не найден — уточните запрос');
     } catch {
       setSuggestions([]);
+      setSearchErr('Ошибка поиска — попробуйте ещё раз');
     } finally {
       setLoading(false);
     }
@@ -110,8 +113,10 @@ function CitySearch({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     setQuery(v);
+    setSearchErr('');
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => search(v), 400);
+    if (v.length < 2) { setSuggestions([]); setOpen(false); return; }
+    timerRef.current = setTimeout(() => search(v), 350);
   };
 
   const pick = (s: { name: string; display_name: string; lat: number; lon: number }) => {
@@ -121,6 +126,7 @@ function CitySearch({
     setQuery('');
     setSuggestions([]);
     setOpen(false);
+    setSearchErr('');
   };
 
   // Close on outside click
@@ -136,29 +142,38 @@ function CitySearch({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-1.5">
+      <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 ${
+        isDark ? 'bg-slate-800/60 border-slate-600' : 'bg-white border-slate-300'
+      } focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500`}>
         <Search className="h-3.5 w-3.5 opacity-40 shrink-0" />
         <input
           type="text" value={query} onChange={handleChange}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
           placeholder={placeholder}
-          className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs ${theme.card}`}
+          className="flex-1 bg-transparent text-xs outline-none"
         />
-        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin opacity-40" />}
+        {loading
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin opacity-50 shrink-0" />
+          : query && <button onClick={() => { setQuery(''); setSuggestions([]); setOpen(false); setSearchErr(''); }}
+              className="opacity-40 hover:opacity-70 shrink-0"><X className="h-3 w-3" /></button>
+        }
       </div>
+      {searchErr && !open && (
+        <p className="text-[11px] text-red-400 mt-1">{searchErr}</p>
+      )}
       {open && suggestions.length > 0 && (
         <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-lg max-h-52 overflow-y-auto ${
           isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
         }`}>
           {suggestions.map((s, i) => (
             <button key={i} onClick={() => pick(s)}
-              className={`w-full text-left px-3 py-2 text-xs hover:${
-                isDark ? 'bg-slate-700' : 'bg-slate-50'
-              } flex items-center gap-2`}
+              className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 ${
+                isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-50'
+              }`}
             >
               <MapPin className="h-3 w-3 opacity-40 shrink-0" />
-              <span>{s.display_name}</span>
-              <span className="ml-auto opacity-40 text-[10px]">{s.lat.toFixed(2)}°, {s.lon.toFixed(2)}°</span>
+              <span className="flex-1 truncate">{s.display_name}</span>
+              <span className="opacity-40 text-[10px] shrink-0">{s.lat.toFixed(2)}°, {s.lon.toFixed(2)}°</span>
             </button>
           ))}
         </div>

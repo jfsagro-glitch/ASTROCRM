@@ -5271,8 +5271,7 @@ def geocode_cities(q: str = Query(..., min_length=2, max_length=100)):
         "q": q.strip(),
         "format": "json",
         "addressdetails": 1,
-        "limit": 7,
-        "featuretype": "city",
+        "limit": 10,
     })
     url = f"https://nominatim.openstreetmap.org/search?{params}"
     try:
@@ -5282,6 +5281,15 @@ def geocode_cities(q: str = Query(..., min_length=2, max_length=100)):
         results = []
         for item in data:
             addr = item.get("address", {})
+            # Accept cities, towns, villages, suburbs, municipalities
+            place_type = item.get("type", "")
+            place_class = item.get("class", "")
+            if place_class not in ("place", "boundary", "landuse"):
+                continue
+            if place_type not in ("city", "town", "village", "municipality",
+                                  "administrative", "suburb", "quarter",
+                                  "hamlet", "district"):
+                continue
             city_name = (
                 addr.get("city") or addr.get("town") or addr.get("village")
                 or addr.get("municipality") or addr.get("county")
