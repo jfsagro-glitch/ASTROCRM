@@ -117,6 +117,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── WebPush router (optional; safe if pywebpush missing) ────────────────────
+try:
+    from push_notifications import router as _push_router  # type: ignore
+    app.include_router(_push_router)
+except Exception as _push_err:  # pragma: no cover
+    print(f"[astro_api_v2] push_notifications disabled: {_push_err}")
+
 
 def _feature_unavailable(name: str, reason: str = "") -> HTTPException:
     detail = f"{name} engine not available"

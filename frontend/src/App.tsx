@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import ClientPortal from './components/ClientPortal';
 import CRM from './components/CRM';
 import AuthPage from './components/AuthPage';
+import PwaInstallBanner from './components/PwaInstallBanner';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -107,6 +108,7 @@ export default function App() {
               <AnimatedRoutes />
             </RuntimeErrorBoundary>
           </AuthGate>
+          <PwaInstallBanner />
         </div>
       </Router>
       </AuthProvider>

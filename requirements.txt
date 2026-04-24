@@ -4,3 +4,4 @@ pydantic>=2.9,<3
 pytz>=2024.1
 timezonefinder>=6.5,<7
 pyswisseph>=2.10.3.2
+pywebpush>=1.14.0
