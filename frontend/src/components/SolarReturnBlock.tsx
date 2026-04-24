@@ -115,7 +115,9 @@ function CitySearch({
   };
 
   const pick = (s: { name: string; display_name: string; lat: number; lon: number }) => {
-    onSelect({ name: s.display_name, lat: s.lat, lon: s.lon });
+    // Use short name (first segment before comma)
+    const shortName = s.name || s.display_name.split(',')[0].trim();
+    onSelect({ name: shortName, lat: s.lat, lon: s.lon });
     setQuery('');
     setSuggestions([]);
     setOpen(false);
@@ -207,7 +209,8 @@ function YearCard({ card, isDark }: { card: any; isDark: boolean }) {
       <div className="flex items-center gap-2 mb-3">
         <Sun className="h-5 w-5 text-amber-400" />
         <span className={`font-bold text-base ${isDark ? 'text-amber-200' : 'text-amber-700'}`}>
-          Соляр {card.sr_year} — {card.sr_date_utc ?? ''}
+          Соляр {card.sr_year}
+          {card.sr_date_utc && <span className="font-normal opacity-60 text-sm ml-1">· {card.sr_date_utc.slice(0, 10)}</span>}
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -574,11 +577,10 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
 
   // ── actions ─────────────────────────────────────────────────────────────────
   const runDeep = async () => {
+    if (!obsCity) { setDeepError('Укажите город встречи дня рождения'); return; }
     setDeepLoading(true); setDeepError(''); setDeepResult(null);
     try {
-      const lat = obsCity?.lat;
-      const lon = obsCity?.lon;
-      const r = await getSolarReturnDeep(birth, srYear, lat, lon, includeLunars);
+      const r = await getSolarReturnDeep(birth, srYear, obsCity.lat, obsCity.lon, includeLunars);
       setDeepResult(r);
     } catch (e: unknown) {
       setDeepError(e instanceof Error ? e.message : String(e));
@@ -610,7 +612,7 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
   const card = `${theme.card} border`;
-  const yearBtns = [thisYear, thisYear + 1, thisYear + 2, thisYear + 3];
+  const yearBtns = [thisYear - 1, thisYear, thisYear + 1, thisYear + 2, thisYear + 3];
 
   return (
     <div className="space-y-4">
@@ -652,29 +654,35 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
                   className={`px-3 py-1.5 rounded-lg border text-xs w-20 ${theme.card}`} />
               </div>
             </div>
-            {/* Observation city */}
+            {/* Observation city — REQUIRED */}
             <div>
-              <label className={`text-xs ${theme.text} mb-1 block`}>Город встречи дня рождения <span className="opacity-50">(необязательно)</span></label>
+              <label className={`text-xs font-semibold mb-1 flex items-center gap-1 ${obsCity ? 'text-green-400' : 'text-amber-400'}`}>
+                <MapPin className="h-3 w-3" />
+                Город встречи дня рождения
+                <span className="text-red-400 ml-0.5">*</span>
+              </label>
               {obsCity ? (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${theme.card}`}>
-                  <MapPin className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                  <span className="flex-1">{obsCity.name}</span>
-                  <span className="opacity-40 text-[10px]">{obsCity.lat.toFixed(2)}°, {obsCity.lon.toFixed(2)}°</span>
-                  <button onClick={() => setObsCity(null)} className="opacity-40 hover:opacity-80">
+                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-xs ${isDark ? 'border-green-600/60 bg-green-900/20' : 'border-green-300 bg-green-50'}`}>
+                  <MapPin className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                  <span className="flex-1 font-semibold">{obsCity.name}</span>
+                  <span className="opacity-50 text-[10px]">{obsCity.lat.toFixed(2)}°, {obsCity.lon.toFixed(2)}°</span>
+                  <button onClick={() => setObsCity(null)} className="opacity-40 hover:opacity-80 ml-1">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
-                <CitySearch
-                  onSelect={setObsCity}
-                  placeholder="Введите название города..."
-                  theme={theme}
-                  isDark={isDark}
-                />
+                <>
+                  <CitySearch
+                    onSelect={setObsCity}
+                    placeholder="Начните вводить название города..."
+                    theme={theme}
+                    isDark={isDark}
+                  />
+                  <p className={`text-[10px] mt-1 text-amber-400 opacity-80`}>
+                    Укажите город, где вы будете встречать день рождения — это обязательно для расчёта.
+                  </p>
+                </>
               )}
-              <p className={`text-[10px] ${theme.text} opacity-40 mt-1`}>
-                Пусто = место рождения ({birth.lat?.toFixed(2)}°, {birth.lon?.toFixed(2)}°).
-              </p>
             </div>
             {/* Lunars toggle */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -683,17 +691,36 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
               <span className={`text-xs ${theme.text}`}>Включить лунный календарь + «горячие месяцы»</span>
             </label>
 
-            <button onClick={runDeep} disabled={deepLoading}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${theme.btn}`}
+            <button onClick={runDeep} disabled={deepLoading || !obsCity}
+              title={!obsCity ? 'Сначала выберите город встречи дня рождения' : ''}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                !obsCity ? 'opacity-40 cursor-not-allowed ' + theme.btn : theme.btn
+              }`}
             >
               {deepLoading ? <><Spin />Вычисляю...</> : <><Star className="h-4 w-4" />Рассчитать соляр</>}
             </button>
+            {!obsCity && (
+              <p className="text-[11px] text-amber-400">⬆ Выберите город выше, чтобы продолжить</p>
+            )}
           </div>
 
           {deepError && <ErrBox msg={deepError} />}
 
           {deepResult && (
             <div className="space-y-4">
+              {/* Result header banner */}
+              <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
+                <Sun className={`h-5 w-5 shrink-0 ${isDark ? 'text-amber-300' : 'text-amber-500'}`} />
+                <div>
+                  <div className={`font-bold text-base ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
+                    Соляр {srYear} · {obsCity?.name}
+                  </div>
+                  {deepResult.year_card?.sr_date_utc && (
+                    <div className="text-xs opacity-60">Момент возврата: {deepResult.year_card.sr_date_utc.slice(0, 16).replace('T', ' ')} UTC</div>
+                  )}
+                </div>
+              </div>
+
               {/* Year card */}
               <YearCard card={deepResult.year_card} isDark={isDark} />
 
