@@ -23,6 +23,8 @@ import DashboardView from './DashboardView';
 import OnboardingFlow from './OnboardingFlow';
 import DailyJournalCard from './DailyJournalCard';
 import ReturnsTimeline from './ReturnsTimeline';
+import PaywallModal from './PaywallModal';
+import { useEntitlement } from '../hooks/useEntitlement';
 import DateSegmentInput from './DateSegmentInput';
 import DailyPersonalBlock from './DailyPersonalBlock';
 import { ChartAnalysisSection } from './ChartAnalysisSection';
@@ -2280,6 +2282,10 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
     utc:   parseFloat(initialParams?.get('utc') || '0'),
   }));
 
+  // ─── Entitlement + paywall state ───────────────────────────────────────────
+  const { isPro } = useEntitlement(user?.uid);
+  const [showPaywall, setShowPaywall] = useState(false);
+
   // ─── Onboarding: show on first visit when no birth data yet ────────────────
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     try {
@@ -2493,6 +2499,11 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
           onSkip={() => setShowOnboarding(false)}
         />
       )}
+      <PaywallModal
+        open={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        userId={user?.uid}
+      />
       {/* Navbar */}
       <nav className={`sticky top-0 z-10 border-b backdrop-blur-md ${theme.container}`}
         style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
@@ -2517,6 +2528,21 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             </div>
             {/* Language toggle */}
             <LangToggle theme={theme} />
+            {!isPro ? (
+              <button
+                onClick={() => setShowPaywall(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/15 border border-amber-300/30 text-amber-200 text-xs font-semibold hover:bg-amber-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                title="Открыть HOLO Pro"
+              >
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                Pro
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-400/15 border border-emerald-300/30 text-emerald-200 text-xs font-semibold">
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                Pro
+              </span>
+            )}
             <Link to="/crm" className={`text-sm ${theme.accent} hover:underline`}>
               {tr.crmLink}
             </Link>

@@ -153,6 +153,13 @@ try:
 except Exception as _journal_err:  # pragma: no cover
     print(f"[astro_api_v2] day_entries disabled: {_journal_err}")
 
+# ─── Billing/entitlement router ──────────────────────────────────────────────
+try:
+    from billing import router as _billing_router  # type: ignore
+    app.include_router(_billing_router)
+except Exception as _billing_err:  # pragma: no cover
+    print(f"[astro_api_v2] billing disabled: {_billing_err}")
+
 
 def _feature_unavailable(name: str, reason: str = "") -> HTTPException:
     detail = f"{name} engine not available"
