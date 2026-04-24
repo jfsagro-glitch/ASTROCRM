@@ -261,53 +261,128 @@ function YearCard({ card, isDark }: { card: any; isDark: boolean }) {
 function InterpBlock({ interp, isDark }: { interp: any; isDark: boolean }) {
   if (!interp) return null;
 
-  // Backend returns a plain string — just render it verbatim
-  if (typeof interp === 'string') {
+  // ── Object form (legacy / future) ──────────────────────────────────────
+  if (typeof interp !== 'string') {
+    const PMETA: Record<string, { icon: string; color: string }> = {
+      priority_1: { icon: '🏠', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50' },
+      priority_2: { icon: '⚡', color: isDark ? 'border-orange-600/40 bg-orange-900/20' : 'border-orange-200 bg-orange-50' },
+      priority_3: { icon: '💼', color: isDark ? 'border-blue-600/40 bg-blue-900/20' : 'border-blue-200 bg-blue-50' },
+      priority_4: { icon: '☀️', color: isDark ? 'border-yellow-600/40 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50' },
+      priority_5: { icon: '🌙', color: isDark ? 'border-indigo-600/40 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50' },
+      priority_6: { icon: '🔑', color: isDark ? 'border-purple-600/40 bg-purple-900/20' : 'border-purple-200 bg-purple-50' },
+      priority_7: { icon: '🔗', color: isDark ? 'border-green-600/40 bg-green-900/20' : 'border-green-200 bg-green-50' },
+      priority_8: { icon: '🧲', color: isDark ? 'border-slate-600/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50' },
+      year_card:  { icon: '📋', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50' },
+      action_plan:{ icon: '✅', color: isDark ? 'border-green-600/40 bg-green-900/20' : 'border-green-200 bg-green-50' },
+    };
     return (
-      <div className={`rounded-xl border p-4 ${isDark ? 'border-slate-600/30 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
-        <p className="text-sm leading-relaxed whitespace-pre-line font-mono">{interp}</p>
+      <div className="space-y-3">
+        {Object.entries(interp as Record<string, string>).map(([key, text]) => {
+          if (!text || key === 'type') return null;
+          const m = PMETA[key] ?? { icon: '•', color: isDark ? 'border-slate-600/30 bg-slate-800/30' : 'border-slate-200 bg-white' };
+          const label = key.replace('priority_', 'Приоритет ').replace('year_card', 'Год в словах').replace('action_plan', 'План действий').replace('_', ' ');
+          return (
+            <div key={key} className={`rounded-xl border ${m.color} p-4`}>
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-tight mt-0.5">{m.icon}</span>
+                <div><div className="text-xs font-semibold opacity-60 uppercase tracking-wide mb-1">{label}</div>
+                <p className="text-sm leading-relaxed whitespace-pre-line">{text}</p></div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  const PRIORITY_META: Record<string, { icon: string; color: string }> = {
-    priority_1: { icon: '🏠', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50' },
-    priority_2: { icon: '⚡', color: isDark ? 'border-orange-600/40 bg-orange-900/20' : 'border-orange-200 bg-orange-50' },
-    priority_3: { icon: '💼', color: isDark ? 'border-blue-600/40 bg-blue-900/20' : 'border-blue-200 bg-blue-50' },
-    priority_4: { icon: '☀️', color: isDark ? 'border-yellow-600/40 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50' },
-    priority_5: { icon: '🌙', color: isDark ? 'border-indigo-600/40 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50' },
-    priority_6: { icon: '🔑', color: isDark ? 'border-purple-600/40 bg-purple-900/20' : 'border-purple-200 bg-purple-50' },
-    priority_7: { icon: '🔗', color: isDark ? 'border-green-600/40 bg-green-900/20' : 'border-green-200 bg-green-50' },
-    priority_8: { icon: '🧲', color: isDark ? 'border-slate-600/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50' },
-    year_card:   { icon: '📋', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50' },
-    action_plan: { icon: '✅', color: isDark ? 'border-green-600/40 bg-green-900/20' : 'border-green-200 bg-green-50' },
+  // ── Plain string form from backend ─────────────────────────────────────
+  const PICONS: Record<number, string> = {1:'🏠',2:'⚡',3:'💼',4:'☀️',5:'🌙',6:'🔑',7:'🔗',8:'🧲'};
+  const PCOLORS: Record<number, string> = {
+    1: isDark ? 'border-amber-600/40 bg-amber-900/20'  : 'border-amber-200 bg-amber-50',
+    2: isDark ? 'border-orange-600/40 bg-orange-900/20': 'border-orange-200 bg-orange-50',
+    3: isDark ? 'border-blue-600/40 bg-blue-900/20'   : 'border-blue-200 bg-blue-50',
+    4: isDark ? 'border-yellow-600/40 bg-yellow-900/20': 'border-yellow-200 bg-yellow-50',
+    5: isDark ? 'border-indigo-600/40 bg-indigo-900/20': 'border-indigo-200 bg-indigo-50',
+    6: isDark ? 'border-purple-600/40 bg-purple-900/20': 'border-purple-200 bg-purple-50',
+    7: isDark ? 'border-green-600/40 bg-green-900/20'  : 'border-green-200 bg-green-50',
+    8: isDark ? 'border-slate-600/40 bg-slate-800/40'  : 'border-slate-200 bg-slate-50',
   };
+  const DEF_COLOR = isDark ? 'border-slate-600/30 bg-slate-800/30' : 'border-slate-200 bg-white';
 
-  const entries = Object.entries(interp as Record<string, string>);
+  interface Blk { icon: string; color: string; title: string; body: string }
+  const blocks: Blk[] = [];
+  let cur: Blk | null = null;
+  const flush = () => { if (cur) { blocks.push(cur); cur = null; } };
+
+  for (const raw of interp.split('\n')) {
+    const line = raw.trim();
+    if (!line || /^[═─]{4,}$/.test(line)) continue;
+
+    // [ПРИОРИТЕТ N]
+    const pm = line.match(/^\[ПРИОРИТЕТ\s+(\d+)\]\s*(.*)/);
+    if (pm) {
+      flush();
+      const n = parseInt(pm[1]);
+      cur = { icon: PICONS[n] ?? '•', color: PCOLORS[n] ?? DEF_COLOR, title: pm[2], body: '' };
+      continue;
+    }
+    // Star alerts
+    if (line.startsWith('★')) {
+      flush();
+      const stars = (line.match(/^★+/) ?? [''])[0].length;
+      cur = {
+        icon: stars >= 3 ? '⭐' : '✨',
+        color: isDark ? 'border-yellow-600/40 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50',
+        title: line.replace(/^★+\s*/, ''),
+        body: '',
+      };
+      continue;
+    }
+    // Year card
+    if (line.startsWith('ГОД В НЕСКОЛЬКИХ СЛОВАХ')) {
+      flush();
+      cur = { icon: '📋', color: isDark ? 'border-amber-600/40 bg-amber-900/20' : 'border-amber-200 bg-amber-50',
+        title: 'Год в нескольких словах', body: line.replace(/^ГОД В НЕСКОЛЬКИХ СЛОВАХ:\s*/, '') };
+      continue;
+    }
+    // Action plan
+    if (line.startsWith('ПЛАН ДЕЙСТВИЙ')) {
+      flush();
+      cur = { icon: '✅', color: isDark ? 'border-green-600/40 bg-green-900/20' : 'border-green-200 bg-green-50',
+        title: 'План действий', body: line.replace(/^ПЛАН ДЕЙСТВИЙ:\s*/, '') };
+      continue;
+    }
+    // Element/modality banner (before first priority)
+    if (!cur && line.startsWith('Стихия')) {
+      cur = { icon: '🔥', color: isDark ? 'border-rose-600/30 bg-rose-900/15' : 'border-rose-200 bg-rose-50',
+        title: '', body: line };
+      flush();
+      continue;
+    }
+    // Skip giant header
+    if (line.includes('АНАЛИЗ ПО СИСТЕМЕ АНДРЕЕВА')) continue;
+
+    if (!cur) {
+      cur = { icon: '•', color: DEF_COLOR, title: '', body: line };
+    } else {
+      cur.body += (cur.body ? '\n' : '') + line;
+    }
+  }
+  flush();
 
   return (
-    <div className="space-y-3">
-      {entries.map(([key, text]) => {
-        if (!text || key === 'type') return null;
-        const meta = PRIORITY_META[key] ?? { icon: '•', color: isDark ? 'border-slate-600/30 bg-slate-800/30' : 'border-slate-200 bg-white' };
-        // Render as plain label / body
-        const label = key
-          .replace('priority_', 'Приоритет ')
-          .replace('year_card', 'Год в словах')
-          .replace('action_plan', 'План действий')
-          .replace('_', ' ');
-        return (
-          <div key={key} className={`rounded-xl border ${meta.color} p-4`}>
-            <div className="flex items-start gap-2">
-              <span className="text-lg leading-tight mt-0.5">{meta.icon}</span>
-              <div>
-                <div className="text-xs font-semibold opacity-60 uppercase tracking-wide mb-1">{label}</div>
-                <p className="text-sm leading-relaxed whitespace-pre-line">{text}</p>
-              </div>
+    <div className="space-y-2">
+      {blocks.map((b, i) => (
+        <div key={i} className={`rounded-xl border ${b.color} p-3`}>
+          <div className="flex items-start gap-2">
+            <span className="text-lg leading-tight mt-0.5 shrink-0">{b.icon}</span>
+            <div className="min-w-0">
+              {b.title && <div className="text-xs font-semibold opacity-70 uppercase tracking-wide mb-1">{b.title}</div>}
+              {b.body  && <p className="text-sm leading-relaxed whitespace-pre-line">{b.body}</p>}
             </div>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -676,10 +751,11 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
               {deepResult.hot_months && deepResult.hot_months.length > 0 && (
                 <Section title="🔥 Горячие месяцы года" className={theme.card + ' border'}>
                   <div className="space-y-1.5">
-                    {(deepResult.hot_months as { lr_date: string; activated_natal_house: number; asc_sign: string }[]).map((m, i) => (
+                    {(deepResult.hot_months as { month_in_sr: number; date: string; lr_asc_natal_house: number; sphere: string; note: string }[]).map((m, i) => (
                       <div key={i} className={`rounded-lg p-2 text-sm ${isDark ? 'bg-orange-900/20' : 'bg-orange-50'}`}>
-                        <span className="font-mono text-xs opacity-60">{m.lr_date?.slice(0, 10)}</span>
-                        <span className="ml-2">Лунный возврат → Дом {m.activated_natal_house} · АСЦ {m.asc_sign}</span>
+                        <span className="font-mono text-xs opacity-60">{m.date?.slice(0, 10)}</span>
+                        {m.month_in_sr != null && <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${isDark ? 'bg-orange-800/40' : 'bg-orange-200'}`}>Месяц {m.month_in_sr}</span>}
+                        <span className="ml-2">{m.note ?? `Лунный возврат → Дом ${m.lr_asc_natal_house}${m.sphere ? ' · ' + m.sphere : ''}`}</span>
                       </div>
                     ))}
                   </div>
