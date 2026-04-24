@@ -4893,8 +4893,289 @@ def ingress_calendar(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# ECLIPSE-PERSONAL — upcoming eclipses mapped to natal houses
+# ═════════════════════════════════════════════════════════════════════════════
+
+_HOUSE_THEMES_ECL = {
+    1: "идентичность, тело, начинания",
+    2: "деньги, ценности, ресурсы",
+    3: "коммуникации, братья/сёстры, короткие поездки",
+    4: "дом, семья, корни",
+    5: "творчество, дети, удовольствие, риск",
+    6: "работа, здоровье, рутина",
+    7: "партнёрство, договоры, открытые враги",
+    8: "трансформация, наследство, совместные ресурсы",
+    9: "философия, путешествия, высшее образование",
+    10: "карьера, публичность, статус",
+    11: "друзья, сообщество, цели",
+    12: "тайны, изоляция, кармические уроки",
+}
+
+
+class EclipsePersonalRequest(BaseModel):
+    date:        str
+    time:        str = "12:00"
+    lat:         float
+    lon:         float
+    utc:         float = 0.0
+    timezone_name: Optional[str] = None
+    start_date:  Optional[str] = None
+    count:       int = 6
+    houses:      str = "placidus"
+    include_compensatory: bool = True
+
+
+@app.post("/predictive/eclipse-personal")
+def eclipse_personal(req: EclipsePersonalRequest):
+    """
+    Find upcoming eclipses and map each to the native's natal house.
+    Solar eclipse → new-cycle trigger; lunar → culmination/completion.
+    """
+    try:
+        from astro_engine import planet_in_house as _pih
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        start = req.start_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        eclipses = find_eclipses(start, count=req.count)
+
+        yr, mo, dy = _parse_date(req.date)
+        h, mi, sc  = _parse_time(req.time)
+        natal = calc_chart(yr, mo, dy, h, mi, sc, req.lat, req.lon, effective_utc,
+                           houses_system=req.houses,
+                           include_aspects=False, include_dignities=False,
+                           include_arabic=False)
+        houses_dict = natal.get("houses", {})
+
+        enriched = []
+        for ecl in eclipses:
+            ecl_lon = ecl.get("sun_lon" if ecl["type"] == "solar" else "moon_lon", 0)
+            natal_house = _pih(ecl_lon, houses_dict)
+            theme = _HOUSE_THEMES_ECL.get(natal_house, "")
+            entry = dict(ecl)
+            entry["natal_house"]     = natal_house
+            entry["activated_theme"] = theme
+            entry["sign"]            = sign_name(ecl_lon)
+
+            if req.include_compensatory and _COMPENSATORY_OK and build_compensatory_report is not None:
+                try:
+                    synth_aspect = {
+                        "transit_planet": "sun" if ecl["type"] == "solar" else "moon",
+                        "natal_planet":   f"house_{natal_house}",
+                        "aspect":         "conjunction",
+                        "orb":            0.0,
+                        "applying":       True,
+                    }
+                    _ecl_date = (ecl.get("date_utc") or start)[:10]
+                    _eyr, _emo, _edy = _parse_date(_ecl_date)
+                    _ecl_tr_chart = calc_chart(
+                        _eyr, _emo, _edy, 12, 0, 0, 0.0, 0.0, 0.0,
+                        include_aspects=False, include_patterns=False,
+                        include_dignities=False, include_arabic=False,
+                        include_sect=False, include_dispositors=False,
+                    )
+                    comp = build_compensatory_report(
+                        natal_chart=natal,
+                        transit_chart=_ecl_tr_chart,
+                        transit_aspects=[synth_aspect],
+                        target_date=_ecl_date,
+                        intensity="light",
+                    )
+                    _at_list = comp.get("active_transits", [])
+                    entry["compensatory"] = [
+                        _at.get("practices", [{}])[0] for _at in _at_list[:2]
+                        if _at.get("practices")
+                    ]
+                except Exception:
+                    entry["compensatory"] = []
+
+            enriched.append(entry)
+
+        return _present({
+            "natal_date":  req.date,
+            "scan_from":   start,
+            "eclipses":    enriched,
+            "count":       len(enriched),
+            "interpretation": (
+                f"Найдено {len(enriched)} затмений. "
+                "Затмения активируют натальные дома, интенсифицируя их темы на 6–18 месяцев. "
+                "Солнечное затмение (новолуние) запускает новый цикл в доме; "
+                "лунное (полнолуние) — завершает или кульминирует тему."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# INGRESS-PERSONAL — solar ingresses mapped to natal houses
+# ═════════════════════════════════════════════════════════════════════════════
+
+_ALL_SIGNS_12 = [
+    "aries","taurus","gemini","cancer","leo","virgo",
+    "libra","scorpio","sagittarius","capricorn","aquarius","pisces",
+]
+
+_SIGN_RU_MAP = {
+    "aries": "Овен", "taurus": "Телец", "gemini": "Близнецы",
+    "cancer": "Рак", "leo": "Лев", "virgo": "Дева",
+    "libra": "Весы", "scorpio": "Скорпион", "sagittarius": "Стрелец",
+    "capricorn": "Козерог", "aquarius": "Водолей", "pisces": "Рыбы",
+}
+
+_HOUSE_THEMES_ING = {
+    1: "идентичность, тело, начинания",
+    2: "деньги, ценности, ресурсы",
+    3: "коммуникации, короткие поездки",
+    4: "дом, семья, корни",
+    5: "творчество, дети, удовольствие",
+    6: "работа, здоровье, рутина",
+    7: "партнёрство, договоры",
+    8: "трансформация, совместные ресурсы",
+    9: "философия, путешествия, учёба",
+    10: "карьера, публичность",
+    11: "друзья, сообщество, цели",
+    12: "тайны, изоляция, духовность",
+}
+
+
+class IngressPersonalRequest(BaseModel):
+    date:   str
+    time:   str = "12:00"
+    lat:    float
+    lon:    float
+    utc:    float = 0.0
+    timezone_name: Optional[str] = None
+    year:   Optional[int] = None
+    houses: str = "placidus"
+
+
+@app.post("/predictive/ingress-personal")
+def ingress_personal(req: IngressPersonalRequest):
+    """
+    Compute all 12 solar ingresses for the year and map each to the native's natal house.
+    Identifies which life area each solar month (~30 days) emphasises.
+    """
+    try:
+        from astro_engine import planet_in_house as _pih
+        effective_utc = _utc_for_tz(req.timezone_name, req.date, req.utc)
+        year = req.year or datetime.now(timezone.utc).year
+
+        yr, mo, dy = _parse_date(req.date)
+        h, mi, sc  = _parse_time(req.time)
+        natal = calc_chart(yr, mo, dy, h, mi, sc, req.lat, req.lon, effective_utc,
+                           houses_system=req.houses,
+                           include_aspects=False, include_dignities=False,
+                           include_arabic=False)
+        houses_dict = natal.get("houses", {})
+
+        results = []
+        for sign in _ALL_SIGNS_12:
+            chart = None
+            for try_year in [year, year + 1]:
+                try:
+                    chart = ingress_chart(try_year, sign, req.lat, req.lon,
+                                         houses_system=req.houses)
+                    if chart:
+                        break
+                except Exception:
+                    continue
+
+            if not chart:
+                continue
+
+            meta = chart.get("ingress_metadata", {})
+            ingress_lon  = meta.get("target_lon", 0)
+            ingress_date = meta.get("ingress_date_utc", "") or meta.get("date", "")
+            natal_house  = _pih(ingress_lon, houses_dict)
+
+            results.append({
+                "sign":            sign,
+                "sign_ru":         _SIGN_RU_MAP.get(sign, sign),
+                "ingress_date":    ingress_date,
+                "ingress_lon":     round(ingress_lon, 2),
+                "natal_house":     natal_house,
+                "activated_theme": _HOUSE_THEMES_ING.get(natal_house, ""),
+            })
+
+        results.sort(key=lambda x: x.get("ingress_date", ""))
+
+        return _present({
+            "natal_date": req.date,
+            "year":       year,
+            "ingresses":  results,
+            "interpretation": (
+                f"12 солнечных ингрессий {year} года с привязкой к натальным домам. "
+                "Каждая ингрессия — смена фокуса на ~30 дней. "
+                "Дом, куда входит Солнце, активирует соответствующую жизненную тему."
+            ),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# GEOCODING — city name → lat/lon via Nominatim
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.get("/geocode/cities")
+def geocode_cities(q: str = Query(..., min_length=2, max_length=100)):
+    """
+    Search cities by name using Nominatim (OpenStreetMap).
+    Returns up to 7 results with name, lat, lon, display_name.
+    """
+    import urllib.request
+    import urllib.parse
+    if not q or not q.strip():
+        raise HTTPException(400, "Query parameter 'q' is required")
+    params = urllib.parse.urlencode({
+        "q": q.strip(),
+        "format": "json",
+        "addressdetails": 1,
+        "limit": 7,
+        "featuretype": "city",
+    })
+    url = f"https://nominatim.openstreetmap.org/search?{params}"
+    try:
+        req_obj = urllib.request.Request(url, headers={"User-Agent": "AstroCRM/1.0"})
+        with urllib.request.urlopen(req_obj, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        results = []
+        for item in data:
+            addr = item.get("address", {})
+            city_name = (
+                addr.get("city") or addr.get("town") or addr.get("village")
+                or addr.get("municipality") or addr.get("county")
+                or item.get("name", "")
+            )
+            country = addr.get("country", "")
+            results.append({
+                "name":         city_name,
+                "country":      country,
+                "display_name": f"{city_name}, {country}" if country else city_name,
+                "lat":          round(float(item["lat"]), 5),
+                "lon":          round(float(item["lon"]), 5),
+            })
+        # De-duplicate by (lat, lon)
+        seen: set = set()
+        unique = []
+        for r in results:
+            key = (round(r["lat"], 2), round(r["lon"], 2))
+            if key not in seen:
+                seen.add(key)
+                unique.append(r)
+        return {"results": unique[:7]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Geocoding failed: {e}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("astro_api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("astro_api_v2:app", host="0.0.0.0", port=8000, reload=True)

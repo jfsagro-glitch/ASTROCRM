@@ -1,7 +1,7 @@
 // ─── SolarReturnBlock — полный сервис Соляр по системе Андреева ─────────────
-import React, { useState } from 'react';
-import { Loader2, AlertCircle, MapPin, Star, Sun, Moon, Search } from 'lucide-react';
-import { getSolarReturnDeep, getSolarReturnCities, getSolarReturnSphereSearch } from '../services/astrologyService';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Loader2, AlertCircle, MapPin, Star, Sun, Moon, Search, X, Plus } from 'lucide-react';
+import { getSolarReturnDeep, getSolarReturnCities, getSolarReturnSphereSearch, geocodeCities } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -73,6 +73,129 @@ function Badge({ children, color = 'slate' }: { children: React.ReactNode; color
     ? 'bg-blue-500/10 text-blue-300 border-blue-500/20'
     : 'bg-slate-500/10 text-slate-300 border-slate-500/20';
   return <span className={`inline-block px-2 py-0.5 rounded-full border text-[11px] font-medium ${cls}`}>{children}</span>;
+}
+
+// ── City Search ──────────────────────────────────────────────────────────────
+interface CityItem { name: string; lat: number; lon: number; }
+
+function CitySearch({
+  onSelect, placeholder = 'Поиск города...', theme, isDark,
+}: {
+  onSelect: (city: CityItem) => void;
+  placeholder?: string;
+  theme: Theme;
+  isDark: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<{ name: string; display_name: string; lat: number; lon: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const search = useCallback(async (q: string) => {
+    if (q.length < 2) { setSuggestions([]); return; }
+    setLoading(true);
+    try {
+      const res = await geocodeCities(q);
+      setSuggestions(res);
+      setOpen(true);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setQuery(v);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => search(v), 400);
+  };
+
+  const pick = (s: { name: string; display_name: string; lat: number; lon: number }) => {
+    onSelect({ name: s.display_name, lat: s.lat, lon: s.lon });
+    setQuery('');
+    setSuggestions([]);
+    setOpen(false);
+  };
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-1.5">
+        <Search className="h-3.5 w-3.5 opacity-40 shrink-0" />
+        <input
+          type="text" value={query} onChange={handleChange}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder={placeholder}
+          className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs ${theme.card}`}
+        />
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin opacity-40" />}
+      </div>
+      {open && suggestions.length > 0 && (
+        <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-lg max-h-52 overflow-y-auto ${
+          isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+        }`}>
+          {suggestions.map((s, i) => (
+            <button key={i} onClick={() => pick(s)}
+              className={`w-full text-left px-3 py-2 text-xs hover:${
+                isDark ? 'bg-slate-700' : 'bg-slate-50'
+              } flex items-center gap-2`}
+            >
+              <MapPin className="h-3 w-3 opacity-40 shrink-0" />
+              <span>{s.display_name}</span>
+              <span className="ml-auto opacity-40 text-[10px]">{s.lat.toFixed(2)}°, {s.lon.toFixed(2)}°</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Editable city list ────────────────────────────────────────────────────────
+function CityListEditor({
+  cities, onChange, theme, isDark,
+}: {
+  cities: CityItem[];
+  onChange: (cities: CityItem[]) => void;
+  theme: Theme;
+  isDark: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        {cities.map((c, i) => (
+          <div key={i} className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] ${
+            isDark ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <MapPin className="h-2.5 w-2.5 opacity-40" />
+            <span>{c.name.split(',')[0]}</span>
+            <button onClick={() => onChange(cities.filter((_, j) => j !== i))}
+              className="ml-0.5 opacity-40 hover:opacity-80"><X className="h-2.5 w-2.5" /></button>
+          </div>
+        ))}
+      </div>
+      <CitySearch
+        onSelect={(city) => { if (!cities.some(c => Math.abs(c.lat - city.lat) < 0.1)) onChange([...cities, city]); }}
+        placeholder="+ Добавить город"
+        theme={theme}
+        isDark={isDark}
+      />
+    </div>
+  );
 }
 
 // ── Year Card ─────────────────────────────────────────────────────────────────
@@ -340,8 +463,7 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
 
   // ── deep analysis state ─
   const [srYear, setSrYear] = useState(thisYear);
-  const [obsLat, setObsLat] = useState<string>('');
-  const [obsLon, setObsLon] = useState<string>('');
+  const [obsCity, setObsCity] = useState<CityItem | null>(null);   // city for birthday
   const [includeLunars, setIncludeLunars] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deepResult, setDeepResult] = useState<any>(null);
@@ -351,6 +473,7 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
   // ── city comparison state ─
   const [citySrYear, setCitySrYear] = useState(thisYear);
   const [cityTargetSphere, setCityTargetSphere] = useState('');
+  const [compareCities, setCompareCities] = useState<CityItem[]>(DEFAULT_CITIES);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [cityResult, setCityResult] = useState<any>(null);
   const [cityLoading, setCityLoading] = useState(false);
@@ -359,6 +482,7 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
   // ── sphere search state ─
   const [ssYear, setSsYear] = useState(thisYear);
   const [ssSphere, setSsSphere] = useState('');
+  const [searchCities, setSearchCities] = useState<CityItem[]>(DEFAULT_CITIES);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [ssResult, setSsResult] = useState<any>(null);
   const [ssLoading, setSsLoading] = useState(false);
@@ -368,8 +492,8 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
   const runDeep = async () => {
     setDeepLoading(true); setDeepError(''); setDeepResult(null);
     try {
-      const lat = obsLat !== '' ? parseFloat(obsLat) : undefined;
-      const lon = obsLon !== '' ? parseFloat(obsLon) : undefined;
+      const lat = obsCity?.lat;
+      const lon = obsCity?.lon;
       const r = await getSolarReturnDeep(birth, srYear, lat, lon, includeLunars);
       setDeepResult(r);
     } catch (e: unknown) {
@@ -378,9 +502,10 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
   };
 
   const runCities = async () => {
+    if (!compareCities.length) { setCityError('Добавьте хотя бы один город'); return; }
     setCityLoading(true); setCityError(''); setCityResult(null);
     try {
-      const r = await getSolarReturnCities(birth, citySrYear, DEFAULT_CITIES, undefined, cityTargetSphere || undefined);
+      const r = await getSolarReturnCities(birth, citySrYear, compareCities, undefined, cityTargetSphere || undefined);
       setCityResult(r);
     } catch (e: unknown) {
       setCityError(e instanceof Error ? e.message : String(e));
@@ -389,9 +514,10 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
 
   const runSphereSearch = async () => {
     if (!ssSphere) { setSsError('Выберите сферу жизни'); return; }
+    if (!searchCities.length) { setSsError('Добавьте хотя бы один город'); return; }
     setSsLoading(true); setSsError(''); setSsResult(null);
     try {
-      const r = await getSolarReturnSphereSearch(birth, ssYear, DEFAULT_CITIES, undefined, ssSphere);
+      const r = await getSolarReturnSphereSearch(birth, ssYear, searchCities, undefined, ssSphere);
       setSsResult(r);
     } catch (e: unknown) {
       setSsError(e instanceof Error ? e.message : String(e));
@@ -442,28 +568,28 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
                   className={`px-3 py-1.5 rounded-lg border text-xs w-20 ${theme.card}`} />
               </div>
             </div>
-            {/* Observation location */}
+            {/* Observation city */}
             <div>
-              <label className={`text-xs ${theme.text} mb-1 block`}>Город встречи дня рождения (необязательно)</label>
-              <div className="flex gap-2 flex-wrap">
-                <div>
-                  <label className={`text-[10px] ${theme.text} opacity-50 mb-0.5 block`}>Широта</label>
-                  <input type="number" step="0.01" placeholder={`${birth.lat}`} value={obsLat}
-                    onChange={e => setObsLat(e.target.value)}
-                    className={`px-2 py-1.5 rounded-lg border text-xs w-24 ${theme.card}`} />
+              <label className={`text-xs ${theme.text} mb-1 block`}>Город встречи дня рождения <span className="opacity-50">(необязательно)</span></label>
+              {obsCity ? (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${theme.card}`}>
+                  <MapPin className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span className="flex-1">{obsCity.name}</span>
+                  <span className="opacity-40 text-[10px]">{obsCity.lat.toFixed(2)}°, {obsCity.lon.toFixed(2)}°</span>
+                  <button onClick={() => setObsCity(null)} className="opacity-40 hover:opacity-80">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <div>
-                  <label className={`text-[10px] ${theme.text} opacity-50 mb-0.5 block`}>Долгота</label>
-                  <input type="number" step="0.01" placeholder={`${birth.lon}`} value={obsLon}
-                    onChange={e => setObsLon(e.target.value)}
-                    className={`px-2 py-1.5 rounded-lg border text-xs w-24 ${theme.card}`} />
-                </div>
-                <button onClick={() => { setObsLat(''); setObsLon(''); }}
-                  className={`self-end px-2 py-1.5 rounded-lg border text-[10px] ${theme.tabInactive}`}
-                  title="Сбросить (использовать натальный город)">↺ Сброс</button>
-              </div>
+              ) : (
+                <CitySearch
+                  onSelect={setObsCity}
+                  placeholder="Введите название города..."
+                  theme={theme}
+                  isDark={isDark}
+                />
+              )}
               <p className={`text-[10px] ${theme.text} opacity-40 mt-1`}>
-                Пусто = место рождения. Укажите город, где планируете встретить день рождения.
+                Пусто = место рождения ({birth.lat?.toFixed(2)}°, {birth.lon?.toFixed(2)}°).
               </p>
             </div>
             {/* Lunars toggle */}
@@ -551,7 +677,7 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
           <div className={`rounded-xl ${card} p-4 space-y-3`}>
             <h4 className={`text-sm font-semibold ${theme.header}`}>🗺️ Сравнение городов для Соляра</h4>
             <p className={`text-xs ${theme.text} opacity-60`}>
-              Сравниваем АСЦ соляра в {DEFAULT_CITIES.length} популярных городах. Необязательно укажите целевую сферу — и города будут отсортированы по соответствию.
+              Сравниваем АСЦ соляра по городам. Добавьте нужные города и выберите целевую сферу.
             </p>
 
             {/* Year */}
@@ -564,6 +690,12 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
                   >{y}</button>
                 ))}
               </div>
+            </div>
+
+            {/* Editable city list */}
+            <div>
+              <label className={`text-xs ${theme.text} mb-1.5 block`}>Города для сравнения ({compareCities.length})</label>
+              <CityListEditor cities={compareCities} onChange={setCompareCities} theme={theme} isDark={isDark} />
             </div>
 
             {/* Target sphere */}
@@ -612,6 +744,12 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
                   >{y}</button>
                 ))}
               </div>
+            </div>
+
+            {/* Editable city list */}
+            <div>
+              <label className={`text-xs ${theme.text} mb-1.5 block`}>Города для поиска ({searchCities.length})</label>
+              <CityListEditor cities={searchCities} onChange={setSearchCities} theme={theme} isDark={isDark} />
             </div>
 
             {/* Sphere selector */}

@@ -139,6 +139,13 @@ export async function getSolarReturn(b: BirthInput, year: number, obsLat?: numbe
   });
 }
 
+export async function geocodeCities(query: string): Promise<{ name: string; country: string; display_name: string; lat: number; lon: number }[]> {
+  const res = await fetch(`${API_URL}/geocode/cities?q=${encodeURIComponent(query)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.results ?? []) as { name: string; country: string; display_name: string; lat: number; lon: number }[];
+}
+
 export async function getSolarReturnDeep(
   b: BirthInput,
   srYear: number,
