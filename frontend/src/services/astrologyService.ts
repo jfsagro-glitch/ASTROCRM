@@ -613,11 +613,50 @@ export interface DashboardData {
   };
 }
 
+// Session-cache for dashboard: 5-min TTL, keyed by birth+target_date.
+// Wins: instant tab-return, near-zero stale risk (Moon moves slowly within 5 min).
+const DASHBOARD_TTL_MS = 5 * 60 * 1000;
+function dashboardCacheKey(b: BirthInput, targetDate: string): string {
+  return `dash::${b.date}|${b.time}|${b.lat}|${b.lon}|${b.utc}|${targetDate}`;
+}
+
 export async function getDashboard(b: BirthInput, targetDate?: string): Promise<DashboardData> {
-  return post('/dashboard', {
+  const td = targetDate ?? new Date().toISOString().slice(0, 10);
+  const key = dashboardCacheKey(b, td);
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw) {
+      const { ts, data } = JSON.parse(raw) as { ts: number; data: DashboardData };
+      if (Date.now() - ts < DASHBOARD_TTL_MS) return data;
+      sessionStorage.removeItem(key);
+    }
+  } catch {/* ignore quota / parse */}
+  const data = await post<DashboardData>('/dashboard', {
     date: b.date, time: b.time, lat: b.lat, lon: b.lon, utc: b.utc,
-    target_date: targetDate ?? new Date().toISOString().slice(0, 10),
+    target_date: td,
   });
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {/* quota */}
+  return data;
+}
+
+export function invalidateDashboardCache(b?: BirthInput) {
+  try {
+    if (!b) {
+      // wipe all dashboard cache entries
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('dash::')) sessionStorage.removeItem(k);
+      }
+      return;
+    }
+    const prefix = `dash::${b.date}|${b.time}|${b.lat}|${b.lon}|${b.utc}|`;
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith(prefix)) sessionStorage.removeItem(k);
+    }
+  } catch {/* ignore */}
 }
 
 // ── Asteroids & Lilith Extended ───────────────────────────────────────────────
