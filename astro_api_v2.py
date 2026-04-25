@@ -244,7 +244,18 @@ _INTERP_KEY_TOKENS = (
 
 
 def _to_plain_ru(text: str) -> str:
-    raw = re.sub(r"\s+", " ", text or "").strip()
+    raw_orig = text or ""
+    # Skip already-structured rich interpretations (Andreev 8 priorities, etc.):
+    # collapsing them would destroy newline-based section breaks.
+    if (
+        "[ПРИОРИТЕТ" in raw_orig
+        or "АНАЛИЗ ПО СИСТЕМЕ" in raw_orig
+        or "ГОД В НЕСКОЛЬКИХ СЛОВАХ" in raw_orig
+        or "ПЛАН ДЕЙСТВИЙ" in raw_orig
+        or raw_orig.count("\n") >= 4
+    ):
+        return raw_orig
+    raw = re.sub(r"\s+", " ", raw_orig).strip()
     if not raw:
         return raw
     if len(raw) < 120 or "Просто:" in raw:
