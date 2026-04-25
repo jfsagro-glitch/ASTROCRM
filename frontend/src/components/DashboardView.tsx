@@ -14,6 +14,7 @@ import {
 import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
+import SolarReturnDashCard from './SolarReturnDashCard';
 import { useAppMode } from '../hooks/useAppMode';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
@@ -2267,9 +2268,14 @@ export default function DashboardView({ birthData, theme }: Props) {
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 4 — Детали и периоды (смешанная сетка)
-          Периоды (2 cols) | Фортуна | [Позиции планет — Pro]
+          Соляр года | Периоды | Фортуна | [Позиции планет — Pro]
       ══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+        {/* Solar Return — compact dashboard summary */}
+        <div className="md:col-span-1 xl:col-span-1">
+          <SolarReturnDashCard birth={birthData} theme={theme} />
+        </div>
 
         {/* Periods — wider */}
         <div className="md:col-span-1 xl:col-span-1">
