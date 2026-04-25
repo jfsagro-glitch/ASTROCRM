@@ -905,7 +905,7 @@ function PersonalActionPlanCard({ data, theme }: { data: DashboardData; theme: T
   );
 }
 
-function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
+function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: BirthInput; theme: ThemeLike }) {
   const score = data.day_score ?? 50;
   const narrative = getDayNarrative(score);
   const spheres = data.sphere_scores;
@@ -917,6 +917,76 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
   const weekday = today.toLocaleDateString('ru-RU', { weekday: 'long' });
   const dateStr = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
   const greeting = getTimeGreeting();
+
+  // ── Solar year progress (day X of 365 since last birthday) ──────────────────
+  const solarYear = (() => {
+    if (!birthData.date) return null;
+    const [, mm, dd] = birthData.date.split('-').map(Number);
+    if (!mm || !dd) return null;
+    const y = today.getFullYear();
+    const thisBday = new Date(y, mm - 1, dd);
+    const lastBday = today >= thisBday ? thisBday : new Date(y - 1, mm - 1, dd);
+    const nextBday = today >= thisBday ? new Date(y + 1, mm - 1, dd) : thisBday;
+    const total = Math.round((nextBday.getTime() - lastBday.getTime()) / 86400000);
+    const passed = Math.round((today.getTime() - lastBday.getTime()) / 86400000);
+    const left = Math.max(0, total - passed);
+    return { passed, total, left, pct: Math.min(100, Math.max(0, (passed / total) * 100)) };
+  })();
+
+  // ── Firdaria main → sub period ──────────────────────────────────────────────
+  const firdaria = data.firdaria as Record<string, Record<string, string> | undefined>;
+  const firMain = firdaria?.main_period;
+  const firSub  = firdaria?.sub_period;
+  const firSubInterp = (firMain?.planet && firSub?.planet)
+    ? getFirdariaSubInterpretation(firMain.planet, firSub.planet)
+    : null;
+
+  // ── Profected year ──────────────────────────────────────────────────────────
+  const prof = data.profections as Record<string, unknown>;
+  const profHouse = Number(prof?.annual_house ?? prof?.profected_house ?? 0);
+  const profLord  = String(prof?.annual_lord ?? prof?.lord_of_year ?? '');
+
+  // ── Top transit highlight ───────────────────────────────────────────────────
+  const topT = (data.top_transits ?? [])[0] as Record<string, unknown> | undefined;
+  const topTNature = (topT?.nature as string) ?? 'mixed';
+  const topTColor = topTNature === 'benefic' ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
+                  : topTNature === 'malefic' ? 'text-rose-300 border-rose-500/30 bg-rose-500/10'
+                  : 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+
+  // ── Personal day tip ────────────────────────────────────────────────────────
+  const dayTip = (() => {
+    const sunSign = data.natal_essence?.sun?.sign;
+    const moonSign = data.natal_essence?.moon?.sign;
+    const lowest = spheres
+      ? (Object.entries(spheres) as Array<[keyof typeof spheres, number]>)
+          .reduce((a, b) => (b[1] < a[1] ? b : a))
+      : null;
+    const lowestLabel: Record<string, string> = {
+      love: 'отношения', work: 'дела', finance: 'деньги', health: 'тело', creative: 'творчество',
+    };
+    const parts: string[] = [];
+    if (data.moon.is_void) {
+      parts.push('Луна без курса — отложите старты, завершайте начатое.');
+    } else if (score >= 65) {
+      parts.push('День поддерживает — действуйте на полной мощности.');
+    } else if (score <= 40) {
+      parts.push('Не форсируйте — день для сохранения, не атаки.');
+    } else {
+      parts.push('Ровный день — двигайтесь по плану без рывков.');
+    }
+    if (lowest && lowest[1] < 45) {
+      parts.push(`Уязвимая зона — ${lowestLabel[lowest[0] as string] ?? lowest[0]}: бережно.`);
+    }
+    if (retros.length >= 2) {
+      parts.push('Много ретро — пересмотр и доработка важнее запусков.');
+    } else if (retros.some(r => r.planet === 'mercury')) {
+      parts.push('Меркурий ретро — перепроверяйте слова и документы.');
+    }
+    if (sunSign && moonSign) {
+      parts.push(`Опора дня — ваше Солнце в ${SIGN_RU[sunSign] ?? sunSign} и Луна в ${SIGN_RU[moonSign] ?? moonSign}.`);
+    }
+    return parts.join(' ');
+  })();
 
   const scoreColor = score >= 65 ? '#22c55e' : score <= 40 ? '#ef4444' : '#f59e0b';
   const scoreBg = score >= 65
@@ -982,6 +1052,77 @@ function HeroCard({ data, theme }: { data: DashboardData; theme: ThemeLike }) {
           )}
         </div>
       </div>
+
+      {/* Personal context strip — solar year + firdaria + profection + top transit */}
+      <div className="relative px-5 py-3 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-2">
+        {solarYear && (
+          <div className="rounded-lg bg-amber-500/8 border border-amber-500/20 px-3 py-2">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-amber-300/85 mb-1">
+              <span>Солнечный год</span>
+              <span className="text-white/60 normal-case tracking-normal">{solarYear.passed}/{solarYear.total}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/8 overflow-hidden mb-1">
+              <div className="h-full bg-gradient-to-r from-amber-400 to-rose-400" style={{ width: `${solarYear.pct}%` }} />
+            </div>
+            <div className={`text-[10px] ${theme.text} opacity-70`}>До соляра — {solarYear.left} дн.</div>
+          </div>
+        )}
+
+        {firMain?.planet && (
+          <div className="rounded-lg bg-violet-500/8 border border-violet-500/20 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-violet-300/85 mb-1">Период жизни</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-base leading-none">{PLANET_GL[firMain.planet] ?? '✦'}</span>
+              <span className={`text-xs font-bold ${theme.header}`}>{PLANET_RU[firMain.planet] ?? firMain.planet}</span>
+              {firSub?.planet && (
+                <>
+                  <span className="text-white/35 text-[10px]">→</span>
+                  <span className="text-[11px] text-violet-200/90">{PLANET_GL[firSub.planet] ?? ''} {PLANET_RU[firSub.planet] ?? firSub.planet}</span>
+                </>
+              )}
+            </div>
+            {firSubInterp?.tone && (
+              <div className={`text-[10px] ${theme.text} opacity-70 mt-0.5 leading-snug line-clamp-2`}>{firSubInterp.tone}</div>
+            )}
+          </div>
+        )}
+
+        {profHouse > 0 && (
+          <div className="rounded-lg bg-sky-500/8 border border-sky-500/20 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-sky-300/85 mb-1">Тема года</div>
+            <div className={`text-xs font-bold ${theme.header}`}>Дом {profHouse}</div>
+            <div className={`text-[10px] ${theme.text} opacity-70 leading-snug`}>{HOUSE_THEME[profHouse] ?? ''}</div>
+            {profLord && (
+              <div className="text-[10px] text-sky-200/80 mt-0.5">Управитель: {PLANET_RU[profLord] ?? profLord}</div>
+            )}
+          </div>
+        )}
+
+        {topT && (
+          <div className={`rounded-lg border px-3 py-2 ${topTColor}`}>
+            <div className="text-[10px] uppercase tracking-wider opacity-80 mb-1">Главный транзит</div>
+            <div className="text-xs font-bold leading-snug">
+              {PLANET_GL[String(topT.transit_planet)] ?? ''} {PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet} {String(topT.aspect) ?? ''} {PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet}
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              орб {Number(topT.orb).toFixed(1)}° {topT.applying ? '· сходящийся' : '· расходящийся'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Day tip — synthesized personal advice */}
+      {dayTip && (
+        <div className="relative px-5 pb-3 pt-1">
+          <div className="rounded-xl bg-gradient-to-r from-fuchsia-500/10 via-amber-500/8 to-emerald-500/10 border border-white/10 px-3 py-2.5 flex items-start gap-2">
+            <span className="text-base leading-none mt-0.5" aria-hidden="true">💡</span>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-white/60 mb-0.5">Подсказка дня</div>
+              <p className={`text-[11px] ${theme.text} opacity-90 leading-relaxed m-0`}>{dayTip}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Retrogrades strip */}
       {retros.length > 0 && (
@@ -2238,7 +2379,7 @@ export default function DashboardView({ birthData, theme }: Props) {
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
       ══════════════════════════════════════════════════════════════════ */}
-      <HeroCard data={data} theme={theme} />
+      <HeroCard data={data} birthData={birthData} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 2 — Личность клиента (натальная суть)
