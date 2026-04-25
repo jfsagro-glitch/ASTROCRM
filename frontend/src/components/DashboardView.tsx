@@ -17,6 +17,7 @@ import LunarCalendarCard from './LunarCalendarCard';
 import SolarReturnDashCard from './SolarReturnDashCard';
 import DashboardCharts from './DashboardCharts';
 import NowStrip from './NowStrip';
+import HourlyTimeline from './HourlyTimeline';
 import { useAppMode } from '../hooks/useAppMode';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
@@ -2383,6 +2384,8 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
           УРОВЕНЬ 0 — СЕЙЧАС: hour-grain панель (час, а не день)
       ══════════════════════════════════════════════════════════════════ */}
       <NowStrip data={data} theme={theme} userId={userId} />
+
+      <HourlyTimeline data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
