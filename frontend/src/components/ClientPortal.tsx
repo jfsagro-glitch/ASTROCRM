@@ -2673,9 +2673,9 @@ export default function ClientPortal({ initialParams }: ClientPortalProps) {
             <div id="pdf-section-dashboard" className="space-y-4">
               {birth.date && birth.time ? (
                 <>
-                  <DashboardView birthData={birth} theme={theme} />
+                  <DashboardView birthData={birth} theme={theme} userId={user?.uid} />
                   <ReturnsTimeline birth={birth} />
-                  <DailyJournalCard userId={user?.uid} />
+                  <div id="daily-journal" className="scroll-mt-20"><DailyJournalCard userId={user?.uid} /></div>
                 </>
               ) : (
                 <div className={`rounded-2xl border ${theme.card} p-14 text-center space-y-3`}>

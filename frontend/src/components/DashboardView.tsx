@@ -29,6 +29,7 @@ interface ThemeLike {
 interface Props {
   birthData: BirthInput;
   theme: ThemeLike;
+  userId?: string;
 }
 
 function _isDark(theme: ThemeLike): boolean {
@@ -2241,7 +2242,7 @@ function PlanetPositionsCard({ data, theme }: { data: DashboardData; theme: Them
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export default function DashboardView({ birthData, theme }: Props) {
+export default function DashboardView({ birthData, theme, userId }: Props) {
   const [data, setData]       = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -2381,7 +2382,7 @@ export default function DashboardView({ birthData, theme }: Props) {
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 0 — СЕЙЧАС: hour-grain панель (час, а не день)
       ══════════════════════════════════════════════════════════════════ */}
-      <NowStrip data={data} theme={theme} />
+      <NowStrip data={data} theme={theme} userId={userId} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)

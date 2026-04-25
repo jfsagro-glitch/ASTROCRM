@@ -2,15 +2,26 @@
 // Hour-grain hierarchy: what's happening right now, what's the next concrete
 // event with exact time, and what's the best window to act today.
 import { useEffect, useState } from 'react';
-import { Clock, Hourglass, Compass } from 'lucide-react';
+import { Clock, Hourglass, Compass, BookOpen, Flame, ArrowRight } from 'lucide-react';
 import type { DashboardData } from '../services/astrologyService';
+import { getEntry, getStats, type DayEntryStored, type JournalStats } from '../services/journalService';
 
 interface ThemeLike {
   card: string; header: string; accent: string; text: string;
   btn: string; tabActive: string; tabInactive: string; symbol: string;
 }
 
-interface Props { data: DashboardData; theme: ThemeLike; }
+interface Props { data: DashboardData; theme: ThemeLike; userId?: string; }
+
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function scrollToJournal() {
+  const el = document.getElementById('daily-journal');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 const SIGN_RU: Record<string, string> = {
   aries: 'Овен', taurus: 'Телец', gemini: 'Близнецы', cancer: 'Рак',
@@ -49,14 +60,34 @@ interface NowEvent {
   tone: 'calm' | 'warn' | 'good';
 }
 
-export default function NowStrip({ data, theme }: Props) {
+export default function NowStrip({ data, theme, userId }: Props) {
   const [now, setNow] = useState<Date>(() => new Date());
+  const [journalEntry, setJournalEntry] = useState<DayEntryStored | null>(null);
+  const [journalStats, setJournalStats] = useState<JournalStats | null>(null);
 
   // tick every minute so the "next event" countdowns stay fresh
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // load today's journal entry + stats for the nudge strip (best-effort)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [entry, stats] = await Promise.all([
+          getEntry(todayISO(), userId).catch(() => null),
+          getStats(userId, 30).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setJournalEntry(entry);
+          setJournalStats(stats);
+        }
+      } catch { /* journal API offline — silently hide nudge */ }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const h = now.getHours();
   const band = hourBand(h);
@@ -154,6 +185,23 @@ export default function NowStrip({ data, theme }: Props) {
   const moonSignRu = SIGN_RU[data.moon.sign] ?? data.moon.sign;
   const phaseRu    = PHASE_RU[data.moon.phase] ?? data.moon.phase;
 
+  // ── Journal nudge: contextual prompt based on hour-band & today's entry ─
+  const morningDone = !!journalEntry?.morning_note?.trim();
+  const eveningDone = !!journalEntry?.evening_note?.trim();
+  const streak = journalStats?.streak ?? 0;
+  const journalNudge: { kind: 'morning' | 'evening' | 'streak' | null; text: string; cta: string } = (() => {
+    if (h >= 6 && h < 12 && !morningDone) {
+      return { kind: 'morning', text: 'Утреннее намерение задаёт ритм всего дня. 1 строка — этого хватит.', cta: 'Записать утро' };
+    }
+    if (h >= 19 && h < 24 && !eveningDone) {
+      return { kind: 'evening', text: 'Вечерний итог закрывает день и проявляет паттерны со временем.', cta: 'Подвести итог' };
+    }
+    if (streak >= 3) {
+      return { kind: 'streak', text: `Вы ведёте журнал ${streak} ${streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'} подряд. Не теряйте ритм.`, cta: 'Открыть журнал' };
+    }
+    return { kind: null, text: '', cta: '' };
+  })();
+
   return (
     <section
       aria-label="Сейчас и впереди"
@@ -195,6 +243,48 @@ export default function NowStrip({ data, theme }: Props) {
           <p className={`text-[11px] ${theme.text} opacity-85 mt-1.5 leading-relaxed m-0`}>{window.detail}</p>
         </div>
       </div>
+
+      {/* Journal nudge — only when contextually meaningful */}
+      {journalNudge.kind && (
+        <div className="px-3 pb-3">
+          <button
+            type="button"
+            onClick={scrollToJournal}
+            className={`w-full rounded-xl border px-3 py-2.5 flex items-center gap-3 text-left transition-colors hover:border-white/30 ${
+              journalNudge.kind === 'morning' ? 'border-amber-500/30 bg-amber-500/8 hover:bg-amber-500/12'
+            : journalNudge.kind === 'evening' ? 'border-indigo-500/30 bg-indigo-500/8 hover:bg-indigo-500/12'
+            :                                     'border-orange-500/30 bg-orange-500/8 hover:bg-orange-500/12'
+            }`}
+            aria-label={journalNudge.cta}
+          >
+            <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+              journalNudge.kind === 'morning' ? 'bg-amber-500/15 text-amber-300'
+            : journalNudge.kind === 'evening' ? 'bg-indigo-500/15 text-indigo-300'
+            :                                     'bg-orange-500/15 text-orange-300'
+            }`}>
+              {journalNudge.kind === 'streak'
+                ? <Flame size={16} aria-hidden="true" />
+                : <BookOpen size={16} aria-hidden="true" />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-semibold ${theme.header} flex items-center gap-2 flex-wrap`}>
+                {journalNudge.kind === 'morning' ? 'Утреннее намерение'
+               : journalNudge.kind === 'evening' ? 'Итог дня'
+               :                                    `Серия — ${streak} дн.`}
+                {streak > 0 && journalNudge.kind !== 'streak' && (
+                  <span className="text-[10px] text-orange-300/85 inline-flex items-center gap-1">
+                    <Flame size={10} aria-hidden="true" /> {streak}
+                  </span>
+                )}
+              </div>
+              <p className={`text-[11px] ${theme.text} opacity-75 m-0 mt-0.5 leading-snug`}>{journalNudge.text}</p>
+            </div>
+            <span className="shrink-0 text-[11px] text-white/65 inline-flex items-center gap-1">
+              {journalNudge.cta} <ArrowRight size={12} aria-hidden="true" />
+            </span>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
