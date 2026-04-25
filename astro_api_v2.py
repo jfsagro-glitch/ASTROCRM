@@ -5273,27 +5273,116 @@ def geocode_cities(q: str = Query(..., min_length=2, max_length=100)):
         "addressdetails": 1,
         "limit": 10,
     })
-    url = f"https://nominatim.openstreetmap.org/search?{params}"
+    url = f"https://nominatim.openstreetmap.org/search?{params}&accept-language=ru,en"
+
+    # ── built-in fallback: well-known cities (works offline / on Nominatim downtime)
+    BUILTIN = [
+        ("москва", "Москва", "Russia", 55.75, 37.62),
+        ("санкт-петербург", "Санкт-Петербург", "Russia", 59.93, 30.32),
+        ("питер", "Санкт-Петербург", "Russia", 59.93, 30.32),
+        ("спб", "Санкт-Петербург", "Russia", 59.93, 30.32),
+        ("новосибирск", "Новосибирск", "Russia", 55.03, 82.92),
+        ("екатеринбург", "Екатеринбург", "Russia", 56.84, 60.61),
+        ("казань", "Казань", "Russia", 55.78, 49.12),
+        ("сочи", "Сочи", "Russia", 43.60, 39.73),
+        ("краснодар", "Краснодар", "Russia", 45.04, 38.98),
+        ("калининград", "Калининград", "Russia", 54.71, 20.51),
+        ("владивосток", "Владивосток", "Russia", 43.12, 131.89),
+        ("берлин", "Берлин", "Germany", 52.52, 13.40),
+        ("мюнхен", "Мюнхен", "Germany", 48.14, 11.58),
+        ("прага", "Прага", "Czechia", 50.08, 14.44),
+        ("вена", "Вена", "Austria", 48.21, 16.37),
+        ("париж", "Париж", "France", 48.86, 2.35),
+        ("лондон", "Лондон", "UK", 51.51, -0.13),
+        ("рим", "Рим", "Italy", 41.90, 12.50),
+        ("милан", "Милан", "Italy", 45.46, 9.19),
+        ("барселона", "Барселона", "Spain", 41.39, 2.15),
+        ("мадрид", "Мадрид", "Spain", 40.42, -3.70),
+        ("стамбул", "Стамбул", "Türkiye", 41.01, 28.97),
+        ("анталья", "Анталья", "Türkiye", 36.90, 30.71),
+        ("тбилиси", "Тбилиси", "Georgia", 41.69, 44.83),
+        ("батуми", "Батуми", "Georgia", 41.65, 41.64),
+        ("ереван", "Ереван", "Armenia", 40.18, 44.51),
+        ("баку", "Баку", "Azerbaijan", 40.41, 49.87),
+        ("минск", "Минск", "Belarus", 53.90, 27.57),
+        ("киев", "Киев", "Ukraine", 50.45, 30.52),
+        ("алматы", "Алматы", "Kazakhstan", 43.24, 76.95),
+        ("астана", "Астана", "Kazakhstan", 51.17, 71.43),
+        ("ташкент", "Ташкент", "Uzbekistan", 41.30, 69.24),
+        ("бишкек", "Бишкек", "Kyrgyzstan", 42.87, 74.59),
+        ("дубай", "Дубай", "UAE", 25.20, 55.27),
+        ("тель-авив", "Тель-Авив", "Israel", 32.08, 34.78),
+        ("лимасол", "Лимасол", "Cyprus", 34.68, 33.04),
+        ("белград", "Белград", "Serbia", 44.79, 20.46),
+        ("будапешт", "Будапешт", "Hungary", 47.50, 19.04),
+        ("варшава", "Варшава", "Poland", 52.23, 21.01),
+        ("амстердам", "Амстердам", "Netherlands", 52.37, 4.90),
+        ("брюссель", "Брюссель", "Belgium", 50.85, 4.35),
+        ("хельсинки", "Хельсинки", "Finland", 60.17, 24.94),
+        ("стокгольм", "Стокгольм", "Sweden", 59.33, 18.07),
+        ("осло", "Осло", "Norway", 59.91, 10.75),
+        ("копенгаген", "Копенгаген", "Denmark", 55.68, 12.57),
+        ("афины", "Афины", "Greece", 37.98, 23.73),
+        ("лиссабон", "Лиссабон", "Portugal", 38.72, -9.14),
+        ("бали", "Бали (Денпасар)", "Indonesia", -8.34, 115.09),
+        ("бангкок", "Бангкок", "Thailand", 13.76, 100.50),
+        ("пхукет", "Пхукет", "Thailand", 7.88, 98.39),
+        ("сингапур", "Сингапур", "Singapore", 1.35, 103.82),
+        ("гонконг", "Гонконг", "China", 22.32, 114.17),
+        ("токио", "Токио", "Japan", 35.68, 139.69),
+        ("сеул", "Сеул", "South Korea", 37.57, 126.98),
+        ("шанхай", "Шанхай", "China", 31.23, 121.47),
+        ("пекин", "Пекин", "China", 39.90, 116.40),
+        ("нью-йорк", "Нью-Йорк", "USA", 40.71, -74.01),
+        ("лос-анджелес", "Лос-Анджелес", "USA", 34.05, -118.24),
+        ("майами", "Майами", "USA", 25.76, -80.19),
+        ("сан-франциско", "Сан-Франциско", "USA", 37.77, -122.42),
+        ("чикаго", "Чикаго", "USA", 41.88, -87.63),
+        ("торонто", "Торонто", "Canada", 43.65, -79.38),
+        ("монреаль", "Монреаль", "Canada", 45.50, -73.57),
+        ("мехико", "Мехико", "Mexico", 19.43, -99.13),
+        ("буэнос-айрес", "Буэнос-Айрес", "Argentina", -34.60, -58.38),
+        ("сан-паулу", "Сан-Паулу", "Brazil", -23.55, -46.63),
+        ("рио", "Рио-де-Жанейро", "Brazil", -22.91, -43.17),
+    ]
+
+    def _builtin_match(query: str):
+        ql = query.strip().lower()
+        out = []
+        for key, name, country, lat, lon in BUILTIN:
+            if key.startswith(ql) or ql in key:
+                out.append({
+                    "name":         name,
+                    "country":      country,
+                    "display_name": f"{name}, {country}",
+                    "lat":          lat,
+                    "lon":          lon,
+                })
+        return out[:7]
+
     try:
-        req_obj = urllib.request.Request(url, headers={"User-Agent": "AstroCRM/1.0"})
-        with urllib.request.urlopen(req_obj, timeout=5) as resp:
+        req_obj = urllib.request.Request(url, headers={"User-Agent": "AstroCRM/1.0 (contact@astrocrm.app)"})
+        with urllib.request.urlopen(req_obj, timeout=8) as resp:
             data = json.loads(resp.read().decode())
         results = []
         for item in data:
             addr = item.get("address", {})
-            # Accept cities, towns, villages, suburbs, municipalities
             place_type = item.get("type", "")
             place_class = item.get("class", "")
-            if place_class not in ("place", "boundary", "landuse"):
+            # Relaxed filter: accept any place / boundary / administrative entity
+            if place_class not in ("place", "boundary", "landuse", "administrative"):
                 continue
-            if place_type not in ("city", "town", "village", "municipality",
-                                  "administrative", "suburb", "quarter",
-                                  "hamlet", "district"):
+            if place_type and place_type not in (
+                "city", "town", "village", "municipality",
+                "administrative", "suburb", "quarter",
+                "hamlet", "district", "neighbourhood",
+                "locality", "isolated_dwelling",
+            ):
                 continue
             city_name = (
                 addr.get("city") or addr.get("town") or addr.get("village")
                 or addr.get("municipality") or addr.get("county")
-                or item.get("name", "")
+                or addr.get("state") or item.get("name", "")
             )
             country = addr.get("country", "")
             results.append({
@@ -5311,10 +5400,17 @@ def geocode_cities(q: str = Query(..., min_length=2, max_length=100)):
             if key not in seen:
                 seen.add(key)
                 unique.append(r)
+        # Backfill from built-in list if Nominatim returned nothing
+        if not unique:
+            unique = _builtin_match(q)
         return {"results": unique[:7]}
     except HTTPException:
         raise
     except Exception as e:
+        # Network / timeout / parse — fall back to built-in dictionary so the UI keeps working
+        fallback = _builtin_match(q)
+        if fallback:
+            return {"results": fallback, "source": "builtin", "warning": str(e)[:120]}
         raise HTTPException(502, f"Geocoding failed: {e}")
 
 
