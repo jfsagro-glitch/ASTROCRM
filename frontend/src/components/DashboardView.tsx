@@ -18,6 +18,7 @@ import SolarReturnDashCard from './SolarReturnDashCard';
 import DashboardCharts from './DashboardCharts';
 import NowStrip from './NowStrip';
 import HourlyTimeline from './HourlyTimeline';
+import DayCardShare from './DayCardShare';
 import { useAppMode } from '../hooks/useAppMode';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
@@ -2480,6 +2481,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
               Профи <span aria-hidden="true">✦</span>
             </button>
           </div>
+          <DayCardShare data={data} theme={theme} />
           <button
             onClick={() => load(true)}
             aria-label="Обновить дашборд"
