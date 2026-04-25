@@ -8,7 +8,7 @@ import {
   Activity, Palette, MapPin, Clock,
 } from 'lucide-react';
 import {
-  getDashboard, getDailyGlobal, getCompensatoryForecast,
+  getDashboard, invalidateDashboardCache, getDailyGlobal, getCompensatoryForecast,
   DailyGlobalResult, CompensatoryForecastResult, ForecastWindow,
 } from '../services/astrologyService';
 import type { DashboardData } from '../services/astrologyService';
@@ -95,6 +95,25 @@ const NATURE_CONFIG = {
   malefic: { label:'Напряжённый',   color:'text-red-400',     bg:'bg-red-500/10 border-red-500/30',         dot:'bg-red-400',     icon:'▼' },
   mixed:   { label:'Смешанный',     color:'text-amber-400',   bg:'bg-amber-500/10 border-amber-500/30',     dot:'bg-amber-400',   icon:'~' },
 };
+// Per-planet color tone — used for retro badges, glyph accents, transit chips.
+const PLANET_TONE: Record<string, { text: string; bg: string; border: string; ring: string }> = {
+  sun:     { text: 'text-amber-300',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   ring: '#f59e0b' },
+  moon:    { text: 'text-slate-200',   bg: 'bg-slate-400/10',   border: 'border-slate-400/30',   ring: '#cbd5e1' },
+  mercury: { text: 'text-cyan-300',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30',    ring: '#06b6d4' },
+  venus:   { text: 'text-pink-300',    bg: 'bg-pink-500/10',    border: 'border-pink-500/30',    ring: '#ec4899' },
+  mars:    { text: 'text-red-300',     bg: 'bg-red-500/10',     border: 'border-red-500/30',     ring: '#ef4444' },
+  jupiter: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', ring: '#10b981' },
+  saturn:  { text: 'text-stone-300',   bg: 'bg-stone-500/10',   border: 'border-stone-500/30',   ring: '#a8a29e' },
+  uranus:  { text: 'text-sky-300',     bg: 'bg-sky-500/10',     border: 'border-sky-500/30',     ring: '#0ea5e9' },
+  neptune: { text: 'text-indigo-300',  bg: 'bg-indigo-500/10',  border: 'border-indigo-500/30',  ring: '#6366f1' },
+  pluto:   { text: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/30', ring: '#d946ef' },
+  chiron:  { text: 'text-orange-300',  bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  ring: '#f97316' },
+  lilith:  { text: 'text-purple-300',  bg: 'bg-purple-500/10',  border: 'border-purple-500/30',  ring: '#a855f7' },
+};
+function planetTone(p: string) {
+  return PLANET_TONE[p] ?? { text: 'text-violet-300', bg: 'bg-violet-500/10', border: 'border-violet-500/30', ring: '#8b5cf6' };
+}
+
 const RETRO_MEANING: Record<string, string> = {
   mercury: 'пересмотр планов, техника капризна',
   venus:   'прошлое в отношениях всплывает',
@@ -1068,11 +1087,18 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
                   ВоК{vocCountdown ? ` ещё ${vocCountdown}` : ' активен'}
                 </span>
               )}
-              {retros.slice(0, 3).map(r => (
-                <span key={r.planet} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 font-medium">
-                  ⟲ {PLANET_RU[r.planet] ?? r.planet}
-                </span>
-              ))}
+              {retros.slice(0, 3).map(r => {
+                const t = planetTone(r.planet);
+                return (
+                  <span
+                    key={r.planet}
+                    className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${t.bg} border ${t.border} ${t.text} font-medium`}
+                    title={`${PLANET_RU[r.planet] ?? r.planet} ретроградный — ${RETRO_MEANING[r.planet] ?? 'пересмотр темы планеты'}`}
+                  >
+                    ⟲ {PLANET_RU[r.planet] ?? r.planet}
+                  </span>
+                );
+              })}
             </div>
 
             <p className={`text-base ${theme.text} opacity-90 leading-relaxed max-w-md font-medium`}>{narrative}</p>
@@ -1119,12 +1145,12 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
           <div className="rounded-lg bg-violet-500/8 border border-violet-500/20 px-3 py-2">
             <div className="text-[10px] uppercase tracking-wider text-violet-300/85 mb-1">Период жизни</div>
             <div className="flex items-center gap-1.5">
-              <span className="text-base leading-none">{PLANET_GL[firMain.planet] ?? '✦'}</span>
+              <span className="text-base leading-none" title={PLANET_RU[firMain.planet] ?? firMain.planet}>{PLANET_GL[firMain.planet] ?? '✦'}</span>
               <span className={`text-xs font-bold ${theme.header}`}>{PLANET_RU[firMain.planet] ?? firMain.planet}</span>
               {firSub?.planet && (
                 <>
                   <span className="text-white/35 text-[10px]">→</span>
-                  <span className="text-[11px] text-violet-200/90">{PLANET_GL[firSub.planet] ?? ''} {PLANET_RU[firSub.planet] ?? firSub.planet}</span>
+                  <span className="text-[11px] text-violet-200/90" title={`Суб-период: ${PLANET_RU[firSub.planet] ?? firSub.planet}`}>{PLANET_GL[firSub.planet] ?? ''} {PLANET_RU[firSub.planet] ?? firSub.planet}</span>
                 </>
               )}
             </div>
@@ -1149,7 +1175,13 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
           <div className={`rounded-lg border px-3 py-2 ${topTColor}`}>
             <div className="text-[10px] uppercase tracking-wider opacity-80 mb-1">Главный транзит</div>
             <div className="text-xs font-bold leading-snug">
-              {PLANET_GL[String(topT.transit_planet)] ?? ''} {PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet} {ASPECT_SYM[String(topT.aspect)] ?? ''} {PLANET_GL[String(topT.natal_planet)] ?? ''} {PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet}
+              <span title={`${PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet} (транзит)`}>
+                {PLANET_GL[String(topT.transit_planet)] ?? ''} {PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet}
+              </span>{' '}
+              <span title={ASPECT_NAME[String(topT.aspect)] ?? String(topT.aspect)}>{ASPECT_SYM[String(topT.aspect)] ?? ''}</span>{' '}
+              <span title={`${PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet} (натальная)`}>
+                {PLANET_GL[String(topT.natal_planet)] ?? ''} {PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet}
+              </span>
             </div>
             <div className="text-[10px] opacity-80 mt-0.5 italic">{ASPECT_NAME[String(topT.aspect)] ?? String(topT.aspect)}</div>
             <div className="text-[10px] opacity-75 mt-0.5">
@@ -1177,18 +1209,21 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
         <div className="relative px-5 pb-4 pt-3 border-t border-white/10">
           <div className="text-[10px] uppercase tracking-wider text-white/55 mb-2">Ретроградные планеты</div>
           <div className="flex flex-wrap gap-2">
-            {retros.map(r => (
-              <div key={r.planet} className="flex items-center gap-1.5 rounded-lg bg-violet-500/8 border border-violet-500/20 px-2.5 py-1.5">
-                <span className="text-violet-400 font-bold text-xs">⟲</span>
-                <span className={`text-xs font-semibold ${theme.header}`}>
-                  {PLANET_GL[r.planet] ?? ''} {PLANET_RU[r.planet] ?? r.planet}
-                </span>
-                <span className={`text-[10px] ${theme.text} opacity-70`}>{SIGN_RU[r.sign] ?? r.sign} {r.degree}°</span>
-                {RETRO_MEANING[r.planet] && (
-                  <span className={`text-[10px] italic ${theme.text} opacity-65`}>— {RETRO_MEANING[r.planet]}</span>
-                )}
-              </div>
-            ))}
+            {retros.map(r => {
+              const tone = planetTone(r.planet);
+              return (
+                <div key={r.planet} className={`flex items-center gap-1.5 rounded-lg ${tone.bg} border ${tone.border} px-2.5 py-1.5`}>
+                  <span className={`${tone.text} font-bold text-xs`} title={`${PLANET_RU[r.planet] ?? r.planet} ретроградный`}>⟲</span>
+                  <span className={`text-xs font-semibold ${theme.header}`} title={PLANET_RU[r.planet] ?? r.planet}>
+                    {PLANET_GL[r.planet] ?? ''} {PLANET_RU[r.planet] ?? r.planet}
+                  </span>
+                  <span className={`text-[10px] ${theme.text} opacity-70`}>{SIGN_RU[r.sign] ?? r.sign} {r.degree}°</span>
+                  {RETRO_MEANING[r.planet] && (
+                    <span className={`text-[10px] italic ${theme.text} opacity-65`}>— {RETRO_MEANING[r.planet]}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -2293,10 +2328,11 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   const [error, setError]     = useState<string | null>(null);
   const { mode, toggle: toggleMode, isPro } = useAppMode();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true); setError(null);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      if (force) invalidateDashboardCache(birthData);
       setData(await getDashboard(birthData, today));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -2406,7 +2442,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       <AlertTriangle size={32} className="text-red-400 mx-auto mb-3" aria-hidden="true" />
       <p className="text-red-300 text-sm mb-4">{error}</p>
       <button
-        onClick={load}
+        onClick={() => load(true)}
         className={`text-xs px-5 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
       >
         Повторить
@@ -2445,7 +2481,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
             </button>
           </div>
           <button
-            onClick={load}
+            onClick={() => load(true)}
             aria-label="Обновить дашборд"
             className={`flex items-center gap-1.5 text-xs px-3 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
           >

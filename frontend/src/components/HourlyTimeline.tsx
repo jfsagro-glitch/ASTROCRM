@@ -14,6 +14,14 @@ const PLANET_GL: Record<string, string> = {
   jupiter: '♃', saturn: '♄', uranus: '♅', neptune: '♆', pluto: '♇',
   asc: 'ASC', mc: 'MC',
 };
+const PLANET_RU: Record<string, string> = {
+  sun: 'Солнце', moon: 'Луна', mercury: 'Меркурий', venus: 'Венера',
+  mars: 'Марс', jupiter: 'Юпитер', saturn: 'Сатурн', uranus: 'Уран',
+  neptune: 'Нептун', pluto: 'Плутон', asc: 'Асцендент', mc: 'MC',
+};
+const ANG_RU: Record<number, string> = {
+  0: 'соединение', 60: 'секстиль', 90: 'квадрат', 120: 'трин', 180: 'оппозиция',
+};
 
 function bandColor(score: number): string {
   if (score >= 75) return '#22c55e'; // green
@@ -96,9 +104,12 @@ export default function HourlyTimeline({ data, theme }: Props) {
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full cursor-crosshair"
+          className="w-full cursor-crosshair focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 rounded"
           style={{ minWidth: 320, height: H }}
           preserveAspectRatio="none"
+          tabIndex={0}
+          role="img"
+          aria-label={`Энергия дня по часам. Сейчас ${fmtHour(currentHour)}, балл ${currentPoint?.score ?? '—'}. Используйте стрелки для навигации.`}
           onMouseLeave={() => setHoverHour(null)}
           onMouseMove={(e) => {
             const svg = svgRef.current;
@@ -117,6 +128,18 @@ export default function HourlyTimeline({ data, theme }: Props) {
             const xVB = xRatio * W;
             const hr = Math.round((xVB - padX) / stepX);
             if (hr >= 0 && hr < 24) setHoverHour(hr);
+          }}
+          onKeyDown={(e) => {
+            const cur = hoverHour ?? currentHour;
+            let next = cur;
+            if (e.key === 'ArrowRight')      next = Math.min(23, cur + 1);
+            else if (e.key === 'ArrowLeft')  next = Math.max(0, cur - 1);
+            else if (e.key === 'Home')       next = 0;
+            else if (e.key === 'End')        next = 23;
+            else if (e.key === 'Escape')     { setHoverHour(null); return; }
+            else return;
+            e.preventDefault();
+            setHoverHour(next);
           }}>
           {/* grid */}
           {[25, 50, 75].map((g) => {
@@ -276,7 +299,16 @@ export default function HourlyTimeline({ data, theme }: Props) {
                 <>
                   <span className="opacity-50">·</span>
                   <span className={`${theme.text} opacity-75`}>
-                    Луна {hits.map((h) => PLANET_GL[h.planet] ?? h.planet).join(' ')}
+                    Луна{' '}
+                    {hits.map((h, i) => (
+                      <span
+                        key={i}
+                        title={`${ANG_RU[h.angle] ?? h.angle + '°'} к натальной ${PLANET_RU[h.planet] ?? h.planet}`}
+                      >
+                        {PLANET_GL[h.planet] ?? h.planet}
+                        {i < hits.length - 1 ? ' ' : ''}
+                      </span>
+                    ))}
                   </span>
                 </>
               ) : (
@@ -295,7 +327,11 @@ export default function HourlyTimeline({ data, theme }: Props) {
       {peakHits.length > 0 && (
         <div className={`text-xs ${theme.text} opacity-70 italic border-l-2 pl-2 ${theme.accent}`} style={{ borderColor: '#10b981' }}>
           В пике {fmtHour(peakHour)}: Луна задевает{' '}
-          {peakHits.map((h) => PLANET_GL[h.planet] ?? h.planet).join(', ')} — самые яркие 1–2 часа дня.
+          {peakHits.map((h, i) => (
+            <span key={i} title={`${ANG_RU[h.angle] ?? h.angle + '°'} к натальной ${PLANET_RU[h.planet] ?? h.planet}`}>
+              {PLANET_GL[h.planet] ?? h.planet}{i < peakHits.length - 1 ? ', ' : ''}
+            </span>
+          ))} — самые яркие 1–2 часа дня.
         </div>
       )}
     </div>
