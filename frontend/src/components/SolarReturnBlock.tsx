@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Loader2, AlertCircle, MapPin, Star, Sun, Moon, Search, X, Plus } from 'lucide-react';
 import { getSolarReturnDeep, getSolarReturnCities, getSolarReturnSphereSearch, geocodeCities } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
+import { loadObsCity, saveObsCity } from '../utils/solarCity';
 
 // ── types ─────────────────────────────────────────────────────────────────────
 type Theme = {
@@ -565,7 +566,19 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
 
   // ── deep analysis state ─
   const [srYear, setSrYear] = useState(thisYear);
-  const [obsCity, setObsCity] = useState<CityItem | null>(null);   // city for birthday
+  const [obsCity, setObsCityState] = useState<CityItem | null>(() => {
+    const saved = loadObsCity(birth);
+    return saved ? { name: saved.name, lat: saved.lat, lon: saved.lon } : null;
+  });
+  const setObsCity = useCallback((c: CityItem | null) => {
+    setObsCityState(c);
+    if (c) saveObsCity(birth, c);
+  }, [birth]);
+  // Re-load saved city when the natal subject changes (different birth identity)
+  useEffect(() => {
+    const saved = loadObsCity(birth);
+    setObsCityState(saved ? { name: saved.name, lat: saved.lat, lon: saved.lon } : null);
+  }, [birth.date, birth.time, birth.lat, birth.lon]);
   const [includeLunars, setIncludeLunars] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deepResult, setDeepResult] = useState<any>(null);
