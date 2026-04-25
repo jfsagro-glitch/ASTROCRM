@@ -599,6 +599,7 @@ export interface DashboardData {
   next_lunation?: { full_moon: string; new_moon: string; days_to_full: number; days_to_new: number };
   hourly_timeline?: Array<{ hour: number; score: number; hits: Array<{ planet: string; angle: number }> }>;
   best_window?: { start_hour: number; end_hour: number; peak_score: number; peak_hour: number } | null;
+  trend_3d?: { yesterday: number; today: number; tomorrow: number } | null;
   chart_analysis?: Record<string, unknown>;
   natal_essence?: {
     sun?:     { sign?: string; house?: number; deg_min?: string };

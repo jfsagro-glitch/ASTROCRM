@@ -1583,6 +1583,37 @@ def dashboard(req: DashboardRequest):
             hourly_timeline = []
             best_window = None
 
+        # ── 3-day trend (yesterday / today / tomorrow scores) ─────────────────
+        try:
+            def _day_score_for_offset(day_offset_hr: float) -> int:
+                m_lon = (moon_lon_at_target + moon_speed_per_hr * day_offset_hr) % 360
+                bonus = 0.0
+                for npl, nlon in natal_planet_lons.items():
+                    if npl in ("north_node", "south_node", "chiron", "lilith"):
+                        continue
+                    sep = abs(((m_lon - nlon + 180) % 360) - 180)
+                    for ang, orb_max in ASP_TARGETS:
+                        d = abs(sep - ang)
+                        if d <= orb_max:
+                            strength = (orb_max - d) / orb_max
+                            if npl in _BENEFIC_PL2:
+                                bonus += ASP_BENEFIC_DELTA[ang] * strength
+                            elif npl in _MALEFIC_PL2:
+                                bonus += ASP_MALEFIC_DELTA[ang] * strength
+                            else:
+                                bonus += ASP_BENEFIC_DELTA[ang] * 0.5 * strength
+                            break
+                slow_base = (benefic_pts - malefic_pts) * 4 + 50
+                return max(15, min(95, round(slow_base + bonus * 0.6)))
+
+            trend_3d = {
+                "yesterday": _day_score_for_offset(-24),
+                "today":     day_score,
+                "tomorrow":  _day_score_for_offset(+24),
+            }
+        except Exception:
+            trend_3d = None
+
         return _present({
             "target_date":        target_date,
             "moon":               moon_status,
@@ -1600,6 +1631,7 @@ def dashboard(req: DashboardRequest):
             "next_lunation":      next_lunation,
             "hourly_timeline":    hourly_timeline,
             "best_window":        best_window,
+            "trend_3d":           trend_3d,
         })
     except HTTPException:
         raise
