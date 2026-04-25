@@ -651,6 +651,35 @@ export default function SolarReturnBlock({ birth, theme }: Props) {
       {/* ═══════════════════════════ DEEP ANALYSIS ═══════════════════════════ */}
       {tab === 'deep' && (
         <div className="space-y-3">
+          {/* Methodology preface — 8 priorities */}
+          <div className={`rounded-xl border p-4 ${isDark ? 'border-amber-700/30 bg-gradient-to-br from-amber-900/10 to-orange-900/10' : 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50'}`}>
+            <h3 className={`text-sm font-bold mb-1 ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>🌞 Соляр года — система Андреева</h3>
+            <p className={`text-xs leading-relaxed ${theme.text} opacity-75`}>
+              Соляр (карта солнечного возвращения) — это карта на момент, когда Солнце возвращается в ту же точку зодиака, что и при рождении. Она задаёт тему ближайших ~365 дней. Метод 8&nbsp;приоритетов В.&nbsp;Андреева раскрывает год слой за слоем.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3 text-[11px]">
+              {[
+                { n: 1, icon: '🏠', t: 'Куспид АСЦ соляра', d: 'в каком натальном доме — главная сфера года' },
+                { n: 2, icon: '⚡', t: 'Планеты в углах соляра', d: 'I, IV, VII, X — где будет проявление' },
+                { n: 3, icon: '💼', t: 'МС соляра', d: 'карьерный/публичный вектор года' },
+                { n: 4, icon: '☀️', t: 'Солнце в соляре', d: 'дом года и его дом в натале' },
+                { n: 5, icon: '🌙', t: 'Луна в соляре', d: 'эмоциональный фон, бытовая сфера' },
+                { n: 6, icon: '🔑', t: 'Управитель АСЦ соляра', d: 'кто «ведёт» год — куда направляет внимание' },
+                { n: 7, icon: '🔗', t: 'Аспекты Солнце↔Луна, угловые', d: 'напряжения и поддержки месяца к месяцу' },
+                { n: 8, icon: '🧲', t: 'Двойные ретурны', d: 'планеты, возвращающиеся одновременно — узлы судьбы' },
+              ].map((p) => (
+                <div key={p.n} className={`flex items-start gap-1.5 px-2 py-1.5 rounded-lg ${isDark ? 'bg-slate-900/30' : 'bg-white/60'}`}>
+                  <span className="opacity-50 font-mono text-[10px] mt-0.5">{p.n}.</span>
+                  <span>{p.icon}</span>
+                  <span className="flex-1"><b className="opacity-90">{p.t}</b><span className="opacity-60"> — {p.d}</span></span>
+                </div>
+              ))}
+            </div>
+            <p className={`text-[11px] mt-3 opacity-60 leading-relaxed`}>
+              💡 <b>Совет:</b> для перенесённого соляра указывайте город, где вы реально встретите день рождения (не город рождения). Карта меняет конфигурацию домов и углов — а значит и сферу года.
+            </p>
+          </div>
+
           <div className={`rounded-xl ${card} p-4 space-y-3`}>
             <h4 className={`text-sm font-semibold ${theme.header}`}>🌞 Глубокий анализ Соляра · 8 приоритетов Андреева</h4>
             <p className={`text-xs ${theme.text} opacity-60 leading-relaxed`}>

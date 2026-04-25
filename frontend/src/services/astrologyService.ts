@@ -139,11 +139,74 @@ export async function getSolarReturn(b: BirthInput, year: number, obsLat?: numbe
   });
 }
 
+// Built-in city dictionary — used when backend geocode is unreachable or returns nothing.
+const BUILTIN_CITIES: { name: string; country: string; lat: number; lon: number; aliases: string[] }[] = [
+  { name: 'Москва', country: 'Russia', lat: 55.75, lon: 37.62, aliases: ['москва', 'moscow'] },
+  { name: 'Санкт-Петербург', country: 'Russia', lat: 59.93, lon: 30.32, aliases: ['санкт-петербург', 'спб', 'питер', 'st petersburg'] },
+  { name: 'Новосибирск', country: 'Russia', lat: 55.03, lon: 82.92, aliases: ['новосибирск'] },
+  { name: 'Екатеринбург', country: 'Russia', lat: 56.84, lon: 60.61, aliases: ['екатеринбург'] },
+  { name: 'Казань', country: 'Russia', lat: 55.78, lon: 49.12, aliases: ['казань'] },
+  { name: 'Сочи', country: 'Russia', lat: 43.60, lon: 39.73, aliases: ['сочи'] },
+  { name: 'Краснодар', country: 'Russia', lat: 45.04, lon: 38.98, aliases: ['краснодар'] },
+  { name: 'Калининград', country: 'Russia', lat: 54.71, lon: 20.51, aliases: ['калининград'] },
+  { name: 'Берлин', country: 'Germany', lat: 52.52, lon: 13.40, aliases: ['берлин', 'berlin'] },
+  { name: 'Прага', country: 'Czechia', lat: 50.08, lon: 14.44, aliases: ['прага', 'prague'] },
+  { name: 'Вена', country: 'Austria', lat: 48.21, lon: 16.37, aliases: ['вена', 'vienna'] },
+  { name: 'Париж', country: 'France', lat: 48.86, lon: 2.35, aliases: ['париж', 'paris'] },
+  { name: 'Лондон', country: 'UK', lat: 51.51, lon: -0.13, aliases: ['лондон', 'london'] },
+  { name: 'Барселона', country: 'Spain', lat: 41.39, lon: 2.15, aliases: ['барселона', 'barcelona'] },
+  { name: 'Мадрид', country: 'Spain', lat: 40.42, lon: -3.70, aliases: ['мадрид', 'madrid'] },
+  { name: 'Рим', country: 'Italy', lat: 41.90, lon: 12.50, aliases: ['рим', 'rome'] },
+  { name: 'Стамбул', country: 'Türkiye', lat: 41.01, lon: 28.97, aliases: ['стамбул', 'istanbul'] },
+  { name: 'Анталья', country: 'Türkiye', lat: 36.90, lon: 30.71, aliases: ['анталья', 'antalya'] },
+  { name: 'Тбилиси', country: 'Georgia', lat: 41.69, lon: 44.83, aliases: ['тбилиси', 'tbilisi'] },
+  { name: 'Батуми', country: 'Georgia', lat: 41.65, lon: 41.64, aliases: ['батуми', 'batumi'] },
+  { name: 'Ереван', country: 'Armenia', lat: 40.18, lon: 44.51, aliases: ['ереван', 'yerevan'] },
+  { name: 'Минск', country: 'Belarus', lat: 53.90, lon: 27.57, aliases: ['минск', 'minsk'] },
+  { name: 'Киев', country: 'Ukraine', lat: 50.45, lon: 30.52, aliases: ['киев', 'kyiv'] },
+  { name: 'Алматы', country: 'Kazakhstan', lat: 43.24, lon: 76.95, aliases: ['алматы', 'almaty'] },
+  { name: 'Астана', country: 'Kazakhstan', lat: 51.17, lon: 71.43, aliases: ['астана', 'astana'] },
+  { name: 'Ташкент', country: 'Uzbekistan', lat: 41.30, lon: 69.24, aliases: ['ташкент'] },
+  { name: 'Дубай', country: 'UAE', lat: 25.20, lon: 55.27, aliases: ['дубай', 'dubai'] },
+  { name: 'Тель-Авив', country: 'Israel', lat: 32.08, lon: 34.78, aliases: ['тель-авив', 'tel aviv'] },
+  { name: 'Лимасол', country: 'Cyprus', lat: 34.68, lon: 33.04, aliases: ['лимасол', 'limassol'] },
+  { name: 'Белград', country: 'Serbia', lat: 44.79, lon: 20.46, aliases: ['белград', 'belgrade'] },
+  { name: 'Будапешт', country: 'Hungary', lat: 47.50, lon: 19.04, aliases: ['будапешт', 'budapest'] },
+  { name: 'Варшава', country: 'Poland', lat: 52.23, lon: 21.01, aliases: ['варшава', 'warsaw'] },
+  { name: 'Амстердам', country: 'Netherlands', lat: 52.37, lon: 4.90, aliases: ['амстердам', 'amsterdam'] },
+  { name: 'Афины', country: 'Greece', lat: 37.98, lon: 23.73, aliases: ['афины', 'athens'] },
+  { name: 'Бали', country: 'Indonesia', lat: -8.34, lon: 115.09, aliases: ['бали', 'bali', 'денпасар'] },
+  { name: 'Бангкок', country: 'Thailand', lat: 13.76, lon: 100.50, aliases: ['бангкок', 'bangkok'] },
+  { name: 'Пхукет', country: 'Thailand', lat: 7.88, lon: 98.39, aliases: ['пхукет', 'phuket'] },
+  { name: 'Сингапур', country: 'Singapore', lat: 1.35, lon: 103.82, aliases: ['сингапур', 'singapore'] },
+  { name: 'Гонконг', country: 'China', lat: 22.32, lon: 114.17, aliases: ['гонконг', 'hong kong'] },
+  { name: 'Токио', country: 'Japan', lat: 35.68, lon: 139.69, aliases: ['токио', 'tokyo'] },
+  { name: 'Нью-Йорк', country: 'USA', lat: 40.71, lon: -74.01, aliases: ['нью-йорк', 'new york', 'нью йорк'] },
+  { name: 'Лос-Анджелес', country: 'USA', lat: 34.05, lon: -118.24, aliases: ['лос-анджелес', 'los angeles'] },
+  { name: 'Майами', country: 'USA', lat: 25.76, lon: -80.19, aliases: ['майами', 'miami'] },
+];
+
+function builtinCityMatch(query: string): { name: string; country: string; display_name: string; lat: number; lon: number }[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return BUILTIN_CITIES
+    .filter(c => c.aliases.some(a => a.startsWith(q) || a.includes(q)))
+    .slice(0, 7)
+    .map(c => ({ name: c.name, country: c.country, display_name: `${c.name}, ${c.country}`, lat: c.lat, lon: c.lon }));
+}
+
 export async function geocodeCities(query: string): Promise<{ name: string; country: string; display_name: string; lat: number; lon: number }[]> {
-  const res = await fetch(`${API_URL}/geocode/cities?q=${encodeURIComponent(query)}`);
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.results ?? []) as { name: string; country: string; display_name: string; lat: number; lon: number }[];
+  try {
+    const res = await fetch(`${API_URL}/geocode/cities?q=${encodeURIComponent(query)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const remote = (data.results ?? []) as { name: string; country: string; display_name: string; lat: number; lon: number }[];
+      if (remote.length) return remote;
+    }
+  } catch {
+    // network / CORS / timeout — fall through to built-in dictionary
+  }
+  return builtinCityMatch(query);
 }
 
 export async function getSolarReturnDeep(
