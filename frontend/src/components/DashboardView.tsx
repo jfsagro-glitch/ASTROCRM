@@ -292,6 +292,47 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+// ─── Trend3d ──────────────────────────────────────────────────────────────────
+function Trend3d({ trend }: { trend: { yesterday: number; today: number; tomorrow: number } }) {
+  const items: Array<[string, number]> = [
+    ['вчера',   trend.yesterday],
+    ['сегодня', trend.today],
+    ['завтра',  trend.tomorrow],
+  ];
+  const max = Math.max(...items.map(([, v]) => v));
+  const arrow = trend.tomorrow > trend.today + 5 ? '↗' : trend.tomorrow < trend.today - 5 ? '↘' : '→';
+  const arrowColor = trend.tomorrow > trend.today + 5 ? '#22c55e' : trend.tomorrow < trend.today - 5 ? '#ef4444' : '#94a3b8';
+  return (
+    <div className="mt-2 flex items-end gap-1.5" aria-label="Динамика 3 дня">
+      {items.map(([label, val], i) => {
+        const isToday = i === 1;
+        const c = val >= 65 ? '#22c55e' : val <= 40 ? '#ef4444' : '#f59e0b';
+        const h = 12 + (val / max) * 18;
+        return (
+          <div key={label} className="flex flex-col items-center gap-0.5">
+            <span className="text-[9px] tabular-nums font-semibold" style={{ color: isToday ? c : 'rgba(255,255,255,0.55)' }}>
+              {val}
+            </span>
+            <div
+              className="w-3 rounded-sm transition-all"
+              style={{
+                height: `${h}px`,
+                background: c,
+                opacity: isToday ? 1 : 0.55,
+                outline: isToday ? '1px solid rgba(255,255,255,0.4)' : 'none',
+              }}
+            />
+            <span className={`text-[8px] uppercase tracking-wider ${isToday ? 'text-white/80 font-semibold' : 'text-white/40'}`}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+      <span className="ml-1 text-base leading-none" style={{ color: arrowColor }} aria-hidden="true">{arrow}</span>
+    </div>
+  );
+}
+
 // ─── SphereBar ────────────────────────────────────────────────────────────────
 function SphereBar({ icon: Icon, label, score, color }: {
   icon: React.ElementType; label: string; score: number; color: string;
@@ -1037,10 +1078,13 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
             <p className={`text-base ${theme.text} opacity-90 leading-relaxed max-w-md font-medium`}>{narrative}</p>
           </div>
 
-          {/* Center: ring */}
+          {/* Center: ring + 3-day trend */}
           <div className="flex flex-col items-center gap-1 shrink-0">
             <ScoreRing score={score} />
             <span className="text-[10px] text-white/55 uppercase tracking-wider">энергия дня</span>
+            {data.trend_3d && (
+              <Trend3d trend={data.trend_3d} />
+            )}
           </div>
 
           {/* Right: sphere scores */}
@@ -2293,6 +2337,36 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+      {/* NowStrip skeleton */}
+      <div className={`rounded-2xl border ${theme.card} p-3`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-white/10 p-3 space-y-2">
+              <div className="h-2.5 w-16 rounded bg-white/10" />
+              <div className="h-4 w-32 rounded bg-white/12" />
+              <div className="h-2 w-full rounded bg-white/6" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Timeline skeleton */}
+      <div className={`rounded-2xl border ${theme.card} p-4`}>
+        <div className="flex justify-between mb-3">
+          <div className="h-3 w-40 rounded bg-white/10" />
+          <div className="h-3 w-32 rounded bg-white/8" />
+        </div>
+        <div className="h-[140px] rounded-xl skeleton-shimmer relative overflow-hidden">
+          <svg viewBox="0 0 720 140" className="w-full h-full" preserveAspectRatio="none">
+            <path
+              d="M 28 100 Q 120 60 200 80 T 360 50 T 540 90 T 692 70"
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.15}
+              strokeWidth="2"
+            />
+          </svg>
         </div>
       </div>
       {/* Command skeleton */}

@@ -1,5 +1,5 @@
 // ─── HourlyTimeline — 24-hour energy curve with current-hour marker ───────────
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock, TrendingUp } from 'lucide-react';
 import type { DashboardData } from '../services/astrologyService';
 
@@ -29,6 +29,8 @@ function fmtHour(h: number): string {
 
 export default function HourlyTimeline({ data, theme }: Props) {
   const [now, setNow] = useState(new Date());
+  const [hoverHour, setHoverHour] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(t);
@@ -91,7 +93,31 @@ export default function HourlyTimeline({ data, theme }: Props) {
       </div>
 
       <div className="overflow-x-auto -mx-1">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 320, height: H }} preserveAspectRatio="none">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full cursor-crosshair"
+          style={{ minWidth: 320, height: H }}
+          preserveAspectRatio="none"
+          onMouseLeave={() => setHoverHour(null)}
+          onMouseMove={(e) => {
+            const svg = svgRef.current;
+            if (!svg) return;
+            const rect = svg.getBoundingClientRect();
+            const xRatio = (e.clientX - rect.left) / rect.width;
+            const xVB = xRatio * W;
+            const hr = Math.round((xVB - padX) / stepX);
+            if (hr >= 0 && hr < 24) setHoverHour(hr);
+          }}
+          onTouchStart={(e) => {
+            const svg = svgRef.current;
+            if (!svg || e.touches.length === 0) return;
+            const rect = svg.getBoundingClientRect();
+            const xRatio = (e.touches[0].clientX - rect.left) / rect.width;
+            const xVB = xRatio * W;
+            const hr = Math.round((xVB - padX) / stepX);
+            if (hr >= 0 && hr < 24) setHoverHour(hr);
+          }}>
           {/* grid */}
           {[25, 50, 75].map((g) => {
             const y = padTop + innerH - ((g - minS) / (maxS - minS)) * innerH;
@@ -160,6 +186,30 @@ export default function HourlyTimeline({ data, theme }: Props) {
             <circle key={p.hour} cx={p.x} cy={p.y} r={p.hour === currentHour ? 4 : 2.2} fill={bandColor(p.score)} />
           ))}
 
+          {/* hover indicator */}
+          {hoverHour !== null && points[hoverHour] && (
+            <g>
+              <line
+                x1={points[hoverHour].x}
+                x2={points[hoverHour].x}
+                y1={padTop}
+                y2={padTop + innerH}
+                stroke="#a78bfa"
+                strokeWidth="1"
+                strokeDasharray="2 2"
+                opacity="0.7"
+              />
+              <circle
+                cx={points[hoverHour].x}
+                cy={points[hoverHour].y}
+                r="5"
+                fill="none"
+                stroke="#a78bfa"
+                strokeWidth="1.5"
+              />
+            </g>
+          )}
+
           {/* peak marker */}
           {peakPoint && (
             <g>
@@ -205,25 +255,42 @@ export default function HourlyTimeline({ data, theme }: Props) {
         </svg>
       </div>
 
-      {/* legend / context */}
-      <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-        <div className={`${theme.text} opacity-70`}>
-          Сейчас {fmtHour(currentHour)} —{' '}
-          <span className="font-semibold" style={{ color: bandColor(currentPoint?.score ?? 50) }}>
-            {currentPoint?.score ?? '—'}
-          </span>
-          {currentHits.length > 0 && (
-            <span className="ml-1 opacity-60">
-              ({currentHits.map((h) => `${PLANET_GL[h.planet] ?? h.planet}`).join(' ')})
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[10px] opacity-60">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />силa</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#eab308' }} />средне</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#ef4444' }} />тихо</span>
-        </div>
-      </div>
+      {/* hover/now detail */}
+      {(() => {
+        const focused = hoverHour !== null ? points[hoverHour] : currentPoint;
+        const isHover = hoverHour !== null;
+        if (!focused) return null;
+        const hits = focused.hits ?? [];
+        return (
+          <div className={`flex items-center justify-between flex-wrap gap-2 text-xs rounded-lg px-3 py-2 transition-colors ${isHover ? 'bg-violet-500/8 border border-violet-500/20' : 'bg-white/3 border border-white/8'}`}>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] uppercase tracking-wider ${isHover ? 'text-violet-300' : 'opacity-50'}`}>
+                {isHover ? 'наводка' : 'сейчас'}
+              </span>
+              <span className={`font-semibold tabular-nums ${theme.header}`}>{fmtHour(focused.hour)}</span>
+              <span className="opacity-50">·</span>
+              <span className="font-bold tabular-nums" style={{ color: bandColor(focused.score) }}>
+                {focused.score}
+              </span>
+              {hits.length > 0 ? (
+                <>
+                  <span className="opacity-50">·</span>
+                  <span className={`${theme.text} opacity-75`}>
+                    Луна {hits.map((h) => PLANET_GL[h.planet] ?? h.planet).join(' ')}
+                  </span>
+                </>
+              ) : (
+                <span className={`${theme.text} opacity-50`}>фон без острых аспектов</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[10px] opacity-60">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />сила</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#eab308' }} />средне</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: '#ef4444' }} />тихо</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {peakHits.length > 0 && (
         <div className={`text-xs ${theme.text} opacity-70 italic border-l-2 pl-2 ${theme.accent}`} style={{ borderColor: '#10b981' }}>
