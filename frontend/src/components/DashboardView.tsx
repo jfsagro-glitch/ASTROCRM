@@ -1102,8 +1102,9 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
           <div className={`rounded-lg border px-3 py-2 ${topTColor}`}>
             <div className="text-[10px] uppercase tracking-wider opacity-80 mb-1">Главный транзит</div>
             <div className="text-xs font-bold leading-snug">
-              {PLANET_GL[String(topT.transit_planet)] ?? ''} {PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet} {String(topT.aspect) ?? ''} {PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet}
+              {PLANET_GL[String(topT.transit_planet)] ?? ''} {PLANET_RU[String(topT.transit_planet)] ?? topT.transit_planet} {ASPECT_SYM[String(topT.aspect)] ?? ''} {PLANET_GL[String(topT.natal_planet)] ?? ''} {PLANET_RU[String(topT.natal_planet)] ?? topT.natal_planet}
             </div>
+            <div className="text-[10px] opacity-80 mt-0.5 italic">{ASPECT_NAME[String(topT.aspect)] ?? String(topT.aspect)}</div>
             <div className="text-[10px] opacity-75 mt-0.5">
               орб {Number(topT.orb).toFixed(1)}° {topT.applying ? '· сходящийся' : '· расходящийся'}
             </div>

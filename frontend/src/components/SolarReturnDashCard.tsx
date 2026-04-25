@@ -161,25 +161,27 @@ export default function SolarReturnDashCard({ birth, theme, onOpenFull }: Props)
               </div>
             )}
 
-            {/* Sun / Moon mini grid */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg px-3 py-2 bg-white/5 border border-white/10">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/45 mb-0.5">
-                  <Sun size={10} className="text-amber-300" aria-hidden="true" /> Солнце
+            {/* Sun / Moon mini grid — only when at least one is present */}
+            {(card?.sun_in_sr_house != null || card?.moon_in_sr_house != null) && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/45 mb-0.5">
+                    <Sun size={10} className="text-amber-300" aria-hidden="true" /> Солнце
+                  </div>
+                  <div className="text-sm text-white/85">
+                    {card?.sun_in_sr_house != null ? `Дом ${card.sun_in_sr_house}` : '—'}
+                  </div>
                 </div>
-                <div className="text-sm text-white/85">
-                  {card?.sun_in_sr_house != null ? `Дом ${card.sun_in_sr_house}` : '—'}
+                <div className="rounded-lg px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/45 mb-0.5">
+                    <Moon size={10} className="text-sky-300" aria-hidden="true" /> Луна
+                  </div>
+                  <div className="text-sm text-white/85">
+                    {card?.moon_in_sr_house != null ? `Дом ${card.moon_in_sr_house}` : '—'}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-lg px-3 py-2 bg-white/5 border border-white/10">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/45 mb-0.5">
-                  <Moon size={10} className="text-sky-300" aria-hidden="true" /> Луна
-                </div>
-                <div className="text-sm text-white/85">
-                  {card?.moon_in_sr_house != null ? `Дом ${card.moon_in_sr_house}` : '—'}
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Element / modality */}
             {(dq?.element_ru || card?.dominant_element) && (
