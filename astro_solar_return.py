@@ -782,8 +782,17 @@ def lunar_return_calendar(
         return d - 360 if d > 180 else d
 
     for i in range(count):
-        lo = seed_jd + i * LUNAR_PERIOD_DAYS
-        hi = lo + LUNAR_PERIOD_DAYS + 2.0
+        # Bug fix: previously `seed_jd + i*LUNAR_PERIOD_DAYS` cumulatively
+        # double-advanced (seed already moved last iter, then we added i*period
+        # on top), making the calendar drift years into the future.
+        # i=0: search the full first lunation window after sr_jd.
+        # i>0: bracket tightly around prev_lr + 27.32d.
+        if i == 0:
+            lo = seed_jd
+            hi = seed_jd + LUNAR_PERIOD_DAYS + 2.0
+        else:
+            lo = seed_jd + LUNAR_PERIOD_DAYS - 2.0
+            hi = lo + 4.0
 
         # Find bracket
         step = 1.0
