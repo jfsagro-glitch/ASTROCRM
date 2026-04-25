@@ -15,6 +15,13 @@ interface ThemeLike {
 
 interface Props { data: DashboardData; theme: ThemeLike; }
 
+const PHASE_RU: Record<string, string> = {
+  new_moon: 'Новолуние', waxing_crescent: 'Растущий серп',
+  first_quarter: 'Первая четверть', waxing_gibbous: 'Растущая луна',
+  full_moon: 'Полнолуние', waning_gibbous: 'Убывающая луна',
+  last_quarter: 'Последняя четверть', waning_crescent: 'Убывающий серп',
+};
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 function clamp(n: number, lo = 0, hi = 100): number {
   return Math.max(lo, Math.min(hi, n));
@@ -68,7 +75,7 @@ function DayScoreGauge({ score }: { score: number }) {
         <text x={cx} y={cy + 6} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.5)">из 100</text>
       </svg>
       <div className="text-[11px] text-white/60 text-center">
-        {s >= 75 ? 'Сильный день' : s >= 55 ? 'Хороший день' : s >= 35 ? 'Сложный день' : 'Затратный день'}
+        {s >= 75 ? 'Сильный день' : s >= 60 ? 'Хороший день' : s >= 45 ? 'Нейтральный день' : s >= 30 ? 'Сложный день' : 'Затратный день'}
       </div>
     </div>
   );
@@ -174,7 +181,7 @@ function MoonDisc({ moon, lunation }: { moon: DashboardData['moon']; lunation?: 
         )}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="0.7" />
       </svg>
-      <div className="text-[11px] text-white/75 text-center capitalize leading-tight">{moon.phase}</div>
+      <div className="text-[11px] text-white/75 text-center leading-tight">{PHASE_RU[moon.phase] ?? moon.phase}</div>
       <div className="text-[10px] text-white/45 text-center">
         {Math.round(illum * 100)}% света
       </div>
@@ -289,7 +296,10 @@ export default function DashboardCharts({ data, theme }: Props) {
           </div>
           {spheres
             ? <SphereRadar scores={spheres} />
-            : <p className="text-[11px] text-white/45 my-6">Нет данных</p>}
+            : <div className="flex flex-col items-center justify-center gap-1 my-6 text-center">
+                <span className="text-2xl opacity-40" aria-hidden="true">◌</span>
+                <p className="text-[11px] text-white/55 m-0">Сферы появятся,<br/>когда будут активные транзиты</p>
+              </div>}
         </div>
 
         {/* 3. Moon */}
