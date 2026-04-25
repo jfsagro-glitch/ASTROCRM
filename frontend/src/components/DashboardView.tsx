@@ -15,6 +15,7 @@ import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
 import SolarReturnDashCard from './SolarReturnDashCard';
+import DashboardCharts from './DashboardCharts';
 import { useAppMode } from '../hooks/useAppMode';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
@@ -2248,6 +2249,11 @@ export default function DashboardView({ birthData, theme }: Props) {
           УРОВЕНЬ 3 — Стратегический фокус (тема года × день × риск)
       ══════════════════════════════════════════════════════════════════ */}
       <StrategicFocusCard data={data} theme={theme} />
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ВИЗУАЛЬНАЯ ПАНЕЛЬ — графики/диаграммы текущей ситуации
+      ══════════════════════════════════════════════════════════════════ */}
+      <DashboardCharts data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 4 — Тактические рекомендации (FULL WIDTH, 3 колонки)
