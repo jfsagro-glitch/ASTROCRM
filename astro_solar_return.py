@@ -1549,21 +1549,30 @@ def solar_return_deep_analysis(
     # ── 16. Year card ─────────────────────────────────────────────────────
     p1_theme = HOUSE_THEMES_DEEP.get(sr_asc_in_natal_house, {})
     year_card = {
-        "year":           sr_year,
-        "sr_date":        sr_date_utc,
-        "primary_sphere": f"{sr_asc_in_natal_house}-й дом — {p1_theme.get('title', '')}",
-        "asc_sign":       f"АСЦ соляра: {_fmt_lon(sr_asc_lon)}",
-        "career_vector":  f"МС соляра → {sr_mc_in_natal_house}-й дом ({SPHERE_LABELS.get(sr_mc_in_natal_house, '')})",
-        "sun_theme":      f"Солнце в {sr_sun_in_sr_house}-м доме соляра",
-        "moon_backdrop":  f"Луна в {sr_moon_sign.capitalize()} в {sr_moon_in_sr_house}-м доме",
-        "resonance":      (
+        "year":              sr_year,
+        "sr_date":           sr_date_utc,
+        "primary_sphere":    f"{sr_asc_in_natal_house}-й дом — {p1_theme.get('title', '')}",
+        # Raw numeric/structured fields — for rich UI rendering
+        "main_sphere":       sr_asc_in_natal_house,
+        "main_sphere_label": p1_theme.get("title", ""),
+        "sr_asc":            _fmt_lon(sr_asc_lon),
+        "sr_mc_house":       sr_mc_in_natal_house,
+        "sun_in_sr_house":   sr_sun_in_sr_house,
+        "moon_in_sr_house":  sr_moon_in_sr_house,
+        "moon_sign":         sr_moon_sign.lower() if sr_moon_sign else None,
+        "asc_sign":          f"АСЦ соляра: {_fmt_lon(sr_asc_lon)}",
+        "career_vector":     f"МС соляра → {sr_mc_in_natal_house}-й дом ({SPHERE_LABELS.get(sr_mc_in_natal_house, '')})",
+        "sun_theme":         f"Солнце в {sr_sun_in_sr_house}-м доме соляра",
+        "moon_backdrop":     f"Луна в {sr_moon_sign.capitalize()} в {sr_moon_in_sr_house}-м доме",
+        "resonance":         (
             f"★★★ Резонантный год ({asc_resonance:.1f}°)" if asc_resonance < 5 else
             f"★★ Высокий резонанс ({asc_resonance:.1f}°)"  if asc_resonance < 10 else
             f"Стандартный соляр (АСЦ разница {asc_resonance:.1f}°)"
         ),
         "planetary_returns": [r["name_ru"] for r in planetary_returns],
-        "focus":          p1_theme.get("focus", ""),
-        "avoid":          p1_theme.get("avoid", ""),
+        "returns":           [r["name_ru"] for r in planetary_returns],
+        "focus":             p1_theme.get("focus", ""),
+        "avoid":             p1_theme.get("avoid", ""),
     }
 
     # ── 17. Optional: HOLOS α intersection ───────────────────────────────

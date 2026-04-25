@@ -1342,9 +1342,22 @@ def dashboard(req: DashboardRequest):
             transit_planets_dict = {}
             transit_result = {}
 
-        # Sort by orb, take top 5
+        # ── Annotate aspects with nature (benefic / malefic / mixed) ──────────
+        _HARD_ASP    = {"conjunction", "opposition", "square"}
+        _BENEFIC_PL  = {"jupiter", "venus"}
+        _MALEFIC_PL  = {"saturn", "mars", "pluto", "uranus", "neptune"}
+        _BENEFIC_ASP = {"trine", "sextile"}
+        def _transit_nature(tp: str, asp: str) -> str:
+            if tp in _BENEFIC_PL and asp in _BENEFIC_ASP: return "benefic"
+            if tp in _MALEFIC_PL and asp in _HARD_ASP:    return "malefic"
+            return "mixed"
+
+        # Sort by orb, take top 5; tag with nature
         raw_aspects.sort(key=lambda a: a.get("orb", 99))
-        top_transits = raw_aspects[:5]
+        top_transits = [
+            {**a, "nature": _transit_nature(a.get("transit_planet", ""), a.get("aspect", ""))}
+            for a in raw_aspects[:5]
+        ]
 
         # ── Moon status ───────────────────────────────────────────────────────
         jd_target = _to_jd(target_date, req.target_time, req.utc)
@@ -1377,7 +1390,22 @@ def dashboard(req: DashboardRequest):
         # ── Firdaria ─────────────────────────────────────────────────────────
         natal_jd = _to_jd(req.date, req.time, req.utc)
         try:
-            firdaria_data = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+            _fird_raw = firdaria(natal_jd, target_date, lat=req.lat, lon=req.lon)
+            _am = _fird_raw.get("active_major") or {}
+            _as = _fird_raw.get("active_sub")   or {}
+            firdaria_data = {
+                "main_period": ({
+                    "planet": _am.get("major_lord"),
+                    "start":  str(int(_am["start_year"])) if _am.get("start_year") else None,
+                    "end":    str(int(_am["end_year"]))   if _am.get("end_year")   else None,
+                } if _am else None),
+                "sub_period": ({
+                    "planet": _as.get("sub_lord"),
+                    "start":  str(int(_as["start_year"])) if _as.get("start_year") else None,
+                    "end":    str(int(_as["end_year"]))   if _as.get("end_year")   else None,
+                } if _as else None),
+                "sect": _fird_raw.get("sect", ""),
+            }
         except Exception:
             firdaria_data = {}
 
@@ -1414,17 +1442,74 @@ def dashboard(req: DashboardRequest):
         except Exception:
             comp_report = {}
 
+        # ── Retrograde transiting planets ─────────────────────────────────────
+        retrograde_planets = []
+        for pname, pdata in transit_result.get("transit_planets", {}).items():
+            if isinstance(pdata, dict) and pdata.get("retrograde", False):
+                retrograde_planets.append({
+                    "planet": pname,
+                    "sign":   pdata.get("sign", ""),
+                    "degree": round(float(pdata.get("lon", 0)) % 30, 1),
+                })
+
+        # ── Day score 0-100 ────────────────────────────────────────────────────
+        benefic_pts = sum(1   for t in top_transits if t.get("nature") == "benefic")
+        malefic_pts = sum(1   for t in top_transits if t.get("nature") == "malefic")
+        mixed_pts   = sum(0.3 for t in top_transits if t.get("nature") == "mixed")
+        raw_score = 50 + benefic_pts * 8 - malefic_pts * 8 + mixed_pts * 2
+        day_score = max(15, min(95, round(raw_score)))
+
+        # ── Sphere scores (love/work/finance/health/creative) ─────────────────
+        SPHERE_PLANET_WEIGHT = {
+            "love":     {"venus": 20, "mars": 10, "moon": 12, "jupiter": 8},
+            "work":     {"mercury": 18, "sun": 12, "saturn": 10, "mars": 8, "jupiter": 10},
+            "finance":  {"venus": 12, "jupiter": 20, "saturn": 8, "pluto": -8, "mercury": 8},
+            "health":   {"sun": 12, "moon": 10, "mars": 8, "saturn": -8},
+            "creative": {"venus": 15, "neptune": 15, "mercury": 10, "uranus": 10, "moon": 8},
+        }
+        ASPECT_MULT = {"trine": 1.0, "sextile": 0.7, "conjunction": 0.8,
+                       "square": -0.8, "opposition": -0.9, "quincunx": -0.3}
+        sphere_scores = {}
+        for sphere, weights in SPHERE_PLANET_WEIGHT.items():
+            base = 55.0
+            for t in top_transits:
+                tp = t.get("transit_planet", "")
+                asp = t.get("aspect", "")
+                if tp in weights:
+                    base += weights[tp] * ASPECT_MULT.get(asp, 0.2)
+            sphere_scores[sphere] = max(10, min(95, round(base)))
+
+        # ── Next lunation (full / new moon) ────────────────────────────────────
+        from datetime import date as _d, timedelta as _td
+        _pa = phase_angle
+        next_full_days = round((180 - _pa) % 360 / 12.19, 0) if _pa < 180 else round((360 + 180 - _pa) % 360 / 12.19, 0)
+        next_new_days  = round((360 - _pa) % 360 / 12.19, 0)
+        try:
+            _today_date = _d.fromisoformat(target_date)
+        except Exception:
+            _today_date = _d.today()
+        next_lunation = {
+            "full_moon":    str(_today_date + _td(days=int(next_full_days))),
+            "new_moon":     str(_today_date + _td(days=int(next_new_days))),
+            "days_to_full": int(next_full_days),
+            "days_to_new":  int(next_new_days),
+        }
+
         return _present({
-            "target_date":    target_date,
-            "moon":           moon_status,
-            "top_transits":   top_transits,
-            "compensatory":   comp_report,
-            "firdaria":       firdaria_data,
-            "profections":    prof_data,
-            "fortune_today":  fortune_lot,
-            "arabic_natal":   natal.get("arabic_parts", {}),
-            "chart_analysis": chart_analysis,
-            "natal_essence":  natal_essence,
+            "target_date":        target_date,
+            "moon":               moon_status,
+            "top_transits":       top_transits,
+            "compensatory":       comp_report,
+            "firdaria":           firdaria_data,
+            "profections":        prof_data,
+            "fortune_today":      fortune_lot,
+            "arabic_natal":       natal.get("arabic_parts", {}),
+            "chart_analysis":     chart_analysis,
+            "natal_essence":      natal_essence,
+            "retrograde_planets": retrograde_planets,
+            "day_score":          day_score,
+            "sphere_scores":      sphere_scores,
+            "next_lunation":      next_lunation,
         })
     except HTTPException:
         raise

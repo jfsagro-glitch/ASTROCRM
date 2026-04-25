@@ -16,6 +16,7 @@ import type { BirthInput } from '../types/astro';
 import LunarCalendarCard from './LunarCalendarCard';
 import SolarReturnDashCard from './SolarReturnDashCard';
 import DashboardCharts from './DashboardCharts';
+import NowStrip from './NowStrip';
 import { useAppMode } from '../hooks/useAppMode';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
@@ -2376,6 +2377,11 @@ export default function DashboardView({ birthData, theme }: Props) {
           </button>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          УРОВЕНЬ 0 — СЕЙЧАС: hour-grain панель (час, а не день)
+      ══════════════════════════════════════════════════════════════════ */}
+      <NowStrip data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
