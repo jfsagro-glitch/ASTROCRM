@@ -1495,6 +1495,94 @@ def dashboard(req: DashboardRequest):
             "days_to_new":  int(next_new_days),
         }
 
+        # ── Hourly timeline (24 points, Moon-aspect intensity + diurnal) ───────
+        # Moon ~13°/day → ~0.5417°/hr. We scan each hour 00..23 local-equivalent
+        # (relative to target_date 00:00 UTC), evaluate Moon orbs to natal planets,
+        # add diurnal curve and day-score baseline.
+        try:
+            natal_planet_lons = {}
+            for pkey, pdata in (natal.get("planets", {}) or {}).items():
+                if isinstance(pdata, dict):
+                    natal_planet_lons[pkey] = float(pdata.get("lon", 0.0))
+                else:
+                    natal_planet_lons[pkey] = float(pdata or 0.0)
+
+            _BENEFIC_PL2  = {"jupiter", "venus", "sun", "moon", "mercury"}
+            _MALEFIC_PL2  = {"saturn", "mars", "pluto"}
+            ASP_TARGETS = [(0, 8), (60, 5), (90, 6), (120, 7), (180, 8)]  # (angle, orb_max)
+            ASP_BENEFIC_DELTA = {0: 4, 60: 6, 90: -5, 120: 8, 180: -4}
+            ASP_MALEFIC_DELTA = {0: -3, 60: 1, 90: -8, 120: 2, 180: -7}
+
+            moon_speed_per_hr = 13.176 / 24.0  # ~0.549°/h
+            jd_day_start = _to_jd(target_date, "00:00", req.utc)
+            moon_lon_at_target = float(transit_planets_dict.get("moon", moon_lon))
+            # Estimate moon at hour 0 by extrapolating back from current target time
+            try:
+                tt_h, tt_m, _ = _parse_time(req.target_time or "12:00")
+                hours_offset_from_midnight = tt_h + tt_m / 60.0
+            except Exception:
+                hours_offset_from_midnight = 12.0
+            moon_lon_at_h0 = (moon_lon_at_target - moon_speed_per_hr * hours_offset_from_midnight) % 360
+
+            hourly_timeline = []
+            for h in range(24):
+                m_lon = (moon_lon_at_h0 + moon_speed_per_hr * h) % 360
+                bonus = 0.0
+                hits = []
+                for npl, nlon in natal_planet_lons.items():
+                    if npl in ("north_node", "south_node", "chiron", "lilith"):
+                        continue
+                    sep = abs(((m_lon - nlon + 180) % 360) - 180)
+                    for ang, orb_max in ASP_TARGETS:
+                        d = abs(sep - ang)
+                        if d <= orb_max:
+                            strength = (orb_max - d) / orb_max  # 0..1
+                            if npl in _BENEFIC_PL2:
+                                bonus += ASP_BENEFIC_DELTA[ang] * strength
+                            elif npl in _MALEFIC_PL2:
+                                bonus += ASP_MALEFIC_DELTA[ang] * strength
+                            else:
+                                bonus += ASP_BENEFIC_DELTA[ang] * 0.5 * strength
+                            if strength > 0.55:
+                                hits.append({"planet": npl, "angle": ang})
+                            break
+                # Diurnal curve: low at night, peak mid-morning + early evening
+                diurnal = -6 * math.cos((h - 10) * math.pi / 12) - 2 * math.cos((h - 19) * math.pi / 6)
+                score_h = day_score + bonus + diurnal
+                score_h = max(10, min(95, round(score_h)))
+                hourly_timeline.append({
+                    "hour":  h,
+                    "score": score_h,
+                    "hits":  hits[:2],
+                })
+            # Best-window (longest run of hours ≥ top-25%-threshold)
+            scores_only = [p["score"] for p in hourly_timeline]
+            sorted_scores = sorted(scores_only, reverse=True)
+            threshold = sorted_scores[max(0, len(sorted_scores) // 4)] if sorted_scores else 60
+            best_start = best_len = 0
+            cur_start = -1
+            cur_len = 0
+            for i, s in enumerate(scores_only):
+                if s >= threshold:
+                    if cur_start < 0:
+                        cur_start = i
+                    cur_len += 1
+                    if cur_len > best_len:
+                        best_len = cur_len
+                        best_start = cur_start
+                else:
+                    cur_start = -1
+                    cur_len = 0
+            best_window = {
+                "start_hour": best_start,
+                "end_hour":   best_start + max(1, best_len) - 1,
+                "peak_score": max(scores_only) if scores_only else day_score,
+                "peak_hour":  scores_only.index(max(scores_only)) if scores_only else 12,
+            } if best_len > 0 else None
+        except Exception:
+            hourly_timeline = []
+            best_window = None
+
         return _present({
             "target_date":        target_date,
             "moon":               moon_status,
@@ -1510,6 +1598,8 @@ def dashboard(req: DashboardRequest):
             "day_score":          day_score,
             "sphere_scores":      sphere_scores,
             "next_lunation":      next_lunation,
+            "hourly_timeline":    hourly_timeline,
+            "best_window":        best_window,
         })
     except HTTPException:
         raise

@@ -158,9 +158,24 @@ export default function NowStrip({ data, theme, userId }: Props) {
 
   const next = events[0];
 
-  // ── Best window heuristic ─────────────────────────────────────────────────
+  // ── Best window: real data from backend timeline, fallback to heuristic ──
   const score = data.day_score ?? 50;
+  const bw = data.best_window;
   const window = (() => {
+    if (bw) {
+      const fmt = (hr: number) => `${String(hr).padStart(2, '0')}:00`;
+      const ahead = bw.start_hour > h;
+      const inside = h >= bw.start_hour && h <= bw.end_hour;
+      const passed = h > bw.end_hour;
+      let detail = '';
+      if (inside)      detail = `Вы внутри окна — действуйте. Пик в ${fmt(bw.peak_hour)}.`;
+      else if (ahead)  detail = `Откроется через ${bw.start_hour - h} ${bw.start_hour - h === 1 ? 'час' : 'часа'}. Пик ${fmt(bw.peak_hour)}.`;
+      else if (passed) detail = 'Сегодняшнее окно прошло — переносите запуски на завтра.';
+      return {
+        label: `${fmt(bw.start_hour)}–${fmt(bw.end_hour + 1)}`,
+        detail: moon.is_void ? `${detail} Учтите — Луна без курса.` : detail,
+      };
+    }
     if (moon.is_void) {
       return { label: 'После ВоК', detail: 'Подождите окончания пустого хода Луны для серьёзных стартов.' };
     }
