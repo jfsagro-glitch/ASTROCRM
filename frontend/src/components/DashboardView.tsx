@@ -1,6 +1,6 @@
 // ─── DashboardView — Redesigned bento-grid daily dashboard ──────────────────
 // Rebuilt for better information hierarchy, visual clarity, and usability.
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   Moon, Star, Zap, TrendingUp, Sparkles, Shield,
   AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp,
@@ -13,13 +13,16 @@ import {
 } from '../services/astrologyService';
 import type { DashboardData } from '../services/astrologyService';
 import type { BirthInput } from '../types/astro';
-import LunarCalendarCard from './LunarCalendarCard';
-import SolarReturnDashCard from './SolarReturnDashCard';
-import DashboardCharts from './DashboardCharts';
 import NowStrip from './NowStrip';
 import HourlyTimeline from './HourlyTimeline';
-import DayCardShare from './DayCardShare';
+import LunationCard from './LunationCard';
+// Lazy-loaded — these aren't above the fold and add ~50KB+ to initial bundle.
+const LunarCalendarCard   = lazy(() => import('./LunarCalendarCard'));
+const SolarReturnDashCard = lazy(() => import('./SolarReturnDashCard'));
+const DashboardCharts     = lazy(() => import('./DashboardCharts'));
+const DayCardShare        = lazy(() => import('./DayCardShare'));
 import { useAppMode } from '../hooks/useAppMode';
+import { useVisitStreak } from '../hooks/useVisitStreak';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
 // ─── Theme type ───────────────────────────────────────────────────────────────
@@ -2328,6 +2331,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const { mode, toggle: toggleMode, isPro } = useAppMode();
+  const { streak, longest } = useVisitStreak();
 
   const load = useCallback(async (force = false) => {
     setLoading(true); setError(null);
@@ -2481,7 +2485,19 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
               Профи <span aria-hidden="true">✦</span>
             </button>
           </div>
-          <DayCardShare data={data} theme={theme} />
+          <Suspense fallback={null}>
+            <DayCardShare data={data} theme={theme} />
+          </Suspense>
+          {streak >= 2 && (
+            <span
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-2 min-h-[40px] rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 font-semibold tabular-nums"
+              title={`Подряд: ${streak} ${streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'}. Рекорд: ${longest}.`}
+              aria-label={`Серия посещений: ${streak} дней подряд`}
+            >
+              <span aria-hidden="true">🔥</span>
+              {streak}
+            </span>
+          )}
           <button
             onClick={() => load(true)}
             aria-label="Обновить дашборд"
@@ -2498,6 +2514,8 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       <NowStrip data={data} theme={theme} userId={userId} />
 
       <HourlyTimeline data={data} theme={theme} />
+
+      <LunationCard data={data} theme={theme} />
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
@@ -2517,7 +2535,9 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       {/* ══════════════════════════════════════════════════════════════════
           ВИЗУАЛЬНАЯ ПАНЕЛЬ — графики/диаграммы текущей ситуации
       ══════════════════════════════════════════════════════════════════ */}
-      <DashboardCharts data={data} theme={theme} />
+      <Suspense fallback={<div className={`rounded-2xl border ${theme.card} p-8 text-center text-xs ${theme.text} opacity-50`}>Загружаю графики…</div>}>
+        <DashboardCharts data={data} theme={theme} />
+      </Suspense>
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 4 — Тактические рекомендации (FULL WIDTH, 3 колонки)
@@ -2544,7 +2564,9 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
 
         {/* Solar Return — compact dashboard summary */}
         <div className="md:col-span-1 xl:col-span-1">
-          <SolarReturnDashCard birth={birthData} theme={theme} />
+          <Suspense fallback={<div className={`rounded-2xl border ${theme.card} p-6 text-xs ${theme.text} opacity-50`}>Соляр…</div>}>
+            <SolarReturnDashCard birth={birthData} theme={theme} />
+          </Suspense>
         </div>
 
         {/* Periods — wider */}
@@ -2564,13 +2586,15 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
 
         {/* Lunar mini-calendar — full row span */}
         <div className="md:col-span-2 xl:col-span-3">
-          <LunarCalendarCard
-            theme={theme}
-            utc={birthData.utc}
-            lat={birthData.lat}
-            lon={birthData.lon}
-            days={7}
-          />
+          <Suspense fallback={<div className={`rounded-2xl border ${theme.card} p-6 text-xs ${theme.text} opacity-50`}>Лунный календарь…</div>}>
+            <LunarCalendarCard
+              theme={theme}
+              utc={birthData.utc}
+              lat={birthData.lat}
+              lon={birthData.lon}
+              days={7}
+            />
+          </Suspense>
         </div>
 
       </div>

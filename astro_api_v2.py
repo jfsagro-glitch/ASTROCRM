@@ -1479,6 +1479,14 @@ def dashboard(req: DashboardRequest):
                     base += weights[tp] * ASPECT_MULT.get(asp, 0.2)
             sphere_scores[sphere] = max(10, min(95, round(base)))
 
+        # ── Pre-build natal planet longitudes (used by lunation + hourly) ──────
+        natal_planet_lons = {}
+        for pkey, pdata in (natal.get("planets", {}) or {}).items():
+            if isinstance(pdata, dict):
+                natal_planet_lons[pkey] = float(pdata.get("lon", 0.0))
+            else:
+                natal_planet_lons[pkey] = float(pdata or 0.0)
+
         # ── Next lunation (full / new moon) ────────────────────────────────────
         from datetime import date as _d, timedelta as _td
         _pa = phase_angle
@@ -1488,11 +1496,56 @@ def dashboard(req: DashboardRequest):
             _today_date = _d.fromisoformat(target_date)
         except Exception:
             _today_date = _d.today()
+        # Approximate position of next lunations (Sun moves ~0.985°/day)
+        sun_speed = 0.9856
+        new_moon_lon  = (sun_lon + next_new_days * sun_speed) % 360
+        full_moon_lon = (sun_lon + next_full_days * sun_speed + 180.0) % 360
+
+        def _lunation_house(lon_val: float) -> int:
+            try:
+                cusps = []
+                for i in range(1, 13):
+                    hv = natal.get("houses", {}).get(f"h{i}")
+                    if hv is None: return 0
+                    cusps.append(hv["lon"] if isinstance(hv, dict) else hv)
+                ln = lon_val % 360
+                for i in range(12):
+                    s = cusps[i] % 360
+                    e = cusps[(i + 1) % 12] % 360
+                    if s <= e:
+                        if s <= ln < e: return i + 1
+                    else:
+                        if ln >= s or ln < e: return i + 1
+            except Exception:
+                pass
+            return 0
+
+        def _lunation_hits(lon_val: float, orb: float = 8.0):
+            hits = []
+            for npl, nlon in natal_planet_lons.items():
+                if npl in ("north_node", "south_node", "chiron", "lilith"): continue
+                sep = abs(((lon_val - nlon + 180) % 360) - 180)
+                # Treat conjunction (0) and opposition (180) only — strongest activations
+                for ang in (0, 180):
+                    d = abs(sep - ang)
+                    if d <= orb:
+                        hits.append({"planet": npl, "angle": ang, "orb": round(d, 1)})
+                        break
+            return hits
+
         next_lunation = {
             "full_moon":    str(_today_date + _td(days=int(next_full_days))),
             "new_moon":     str(_today_date + _td(days=int(next_new_days))),
             "days_to_full": int(next_full_days),
             "days_to_new":  int(next_new_days),
+            "new_moon_lon":   round(new_moon_lon, 2),
+            "new_moon_sign":  sign_name(new_moon_lon),
+            "new_moon_house": _lunation_house(new_moon_lon),
+            "new_moon_hits":  _lunation_hits(new_moon_lon),
+            "full_moon_lon":   round(full_moon_lon, 2),
+            "full_moon_sign":  sign_name(full_moon_lon),
+            "full_moon_house": _lunation_house(full_moon_lon),
+            "full_moon_hits":  _lunation_hits(full_moon_lon),
         }
 
         # ── Hourly timeline (24 points, Moon-aspect intensity + diurnal) ───────
@@ -1500,13 +1553,6 @@ def dashboard(req: DashboardRequest):
         # (relative to target_date 00:00 UTC), evaluate Moon orbs to natal planets,
         # add diurnal curve and day-score baseline.
         try:
-            natal_planet_lons = {}
-            for pkey, pdata in (natal.get("planets", {}) or {}).items():
-                if isinstance(pdata, dict):
-                    natal_planet_lons[pkey] = float(pdata.get("lon", 0.0))
-                else:
-                    natal_planet_lons[pkey] = float(pdata or 0.0)
-
             _BENEFIC_PL2  = {"jupiter", "venus", "sun", "moon", "mercury"}
             _MALEFIC_PL2  = {"saturn", "mars", "pluto"}
             ASP_TARGETS = [(0, 8), (60, 5), (90, 6), (120, 7), (180, 8)]  # (angle, orb_max)
