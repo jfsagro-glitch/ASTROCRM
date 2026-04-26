@@ -596,7 +596,13 @@ export interface DashboardData {
   retrograde_planets?: Array<{ planet: string; sign: string; degree: number }>;
   day_score?: number;
   sphere_scores?: { love: number; work: number; finance: number; health: number; creative: number };
-  next_lunation?: { full_moon: string; new_moon: string; days_to_full: number; days_to_new: number };
+  next_lunation?: {
+    full_moon: string; new_moon: string; days_to_full: number; days_to_new: number;
+    new_moon_lon?:   number; new_moon_sign?:  string; new_moon_house?:  number;
+    new_moon_hits?:  Array<{ planet: string; angle: number; orb: number }>;
+    full_moon_lon?:  number; full_moon_sign?: string; full_moon_house?: number;
+    full_moon_hits?: Array<{ planet: string; angle: number; orb: number }>;
+  };
   hourly_timeline?: Array<{ hour: number; score: number; hits: Array<{ planet: string; angle: number }> }>;
   best_window?: { start_hour: number; end_hour: number; peak_score: number; peak_hour: number } | null;
   trend_3d?: { yesterday: number; today: number; tomorrow: number } | null;
