@@ -24,6 +24,7 @@ const DashboardCharts     = lazy(() => import('./DashboardCharts'));
 const DayCardShare        = lazy(() => import('./DayCardShare'));
 const NotificationTimeSettings = lazy(() => import('./NotificationTimeSettings'));
 const MoodPulse                 = lazy(() => import('./MoodPulse'));
+const WeeklyRibbon              = lazy(() => import('./WeeklyRibbon'));
 import { useAppMode } from '../hooks/useAppMode';
 import { useVisitStreak } from '../hooks/useVisitStreak';
 import { haptic } from '../hooks/useHaptic';
@@ -2611,6 +2612,10 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       <HourlyTimeline data={data} theme={theme} />
 
       <InsightStrip data={data} theme={theme} />
+
+      <Suspense fallback={null}>
+        <WeeklyRibbon birthData={birthData} theme={theme} />
+      </Suspense>
 
       <LunationCard data={data} theme={theme} />
 
