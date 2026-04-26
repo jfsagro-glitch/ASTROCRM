@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   Moon, Star, Zap, TrendingUp, Sparkles, Shield,
-  AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp,
+  AlertTriangle, CheckCircle, RefreshCw, Info, ChevronDown, ChevronUp, Copy,
   AlertCircle, Calendar, Globe, Heart, Briefcase, DollarSign,
   Activity, Palette, MapPin, Clock,
 } from 'lucide-react';
@@ -2388,6 +2388,38 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   }, [data, birthData]);
 
   const ptr = usePullToRefresh(() => load(true));
+  const [copyFlash, setCopyFlash] = useState<'ok' | 'err' | null>(null);
+
+  const copyTodaySummary = useCallback(async () => {
+    if (!data) return;
+    const sc = data.day_score ?? 50;
+    const tone = sc >= 65 ? 'благоприятный' : sc <= 40 ? 'осторожный' : 'нейтральный';
+    const top = data.top_transits?.[0];
+    const moonLine = data.moon ? `Луна в ${data.moon.sign}${data.moon.is_void ? ' (без курса)' : ''}` : '';
+    const topLine = top ? `${top.transit_planet} ${top.aspect} ${top.natal_planet}` : '';
+    const lun = data.next_lunation;
+    const lunLine = lun
+      ? (lun.days_to_new <= lun.days_to_full
+          ? `Новолуние через ${lun.days_to_new} дн.`
+          : `Полнолуние через ${lun.days_to_full} дн.`)
+      : '';
+    const lines = [
+      `✦ ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} — ${tone} день, балл ${sc}`,
+      moonLine,
+      topLine && `Главный транзит: ${topLine}`,
+      lunLine,
+    ].filter(Boolean);
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      haptic('success');
+      setCopyFlash('ok');
+    } catch {
+      haptic('error');
+      setCopyFlash('err');
+    }
+    window.setTimeout(() => setCopyFlash(null), 2000);
+  }, [data]);
 
   if (loading) return (
     <div role="status" aria-live="polite" aria-label="Загрузка дашборда" className="space-y-4">
@@ -2501,7 +2533,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   const { moon, top_transits, compensatory, fortune_today } = data;
 
   return (
-    <div className="space-y-4" style={{ transform: ptr.pull > 0 ? `translateY(${ptr.pull}px)` : undefined, transition: ptr.busy || ptr.pull === 0 ? 'transform 220ms ease-out' : undefined }}>
+    <main id="main" tabIndex={-1} className="space-y-4 focus:outline-none" style={{ transform: ptr.pull > 0 ? `translateY(${ptr.pull}px)` : undefined, transition: ptr.busy || ptr.pull === 0 ? 'transform 220ms ease-out' : undefined }}>
 
       {(ptr.pull > 0 || ptr.busy) && (
         <div
@@ -2542,6 +2574,15 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
           <Suspense fallback={null}>
             <DayCardShare data={data} theme={theme} />
           </Suspense>
+          <button
+            onClick={() => { haptic('tap'); copyTodaySummary(); }}
+            aria-label="Скопировать сводку дня"
+            title="Скопировать текстовую сводку"
+            className={`flex items-center gap-1.5 text-xs px-3 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
+          >
+            <Copy size={12} aria-hidden="true" />
+            {copyFlash === 'ok' ? 'скопировано' : copyFlash === 'err' ? 'не удалось' : 'Копировать'}
+          </button>
           {streak >= 2 && (
             <span
               className="inline-flex items-center gap-1 text-xs px-2.5 py-2 min-h-[40px] rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 font-semibold tabular-nums"
@@ -2682,6 +2723,6 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
         <GlobalAstroPanel theme={theme} />
       </div>
 
-    </div>
+    </main>
   );
 }
