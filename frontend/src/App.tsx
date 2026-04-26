@@ -101,6 +101,12 @@ export default function App() {
       <AuthProvider>
       <Router>
         <div className="midnight-app min-h-screen">
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[70] focus:bg-white focus:text-slate-900 focus:px-3 focus:py-1.5 focus:rounded-md focus:text-sm focus:font-semibold focus:shadow-lg"
+          >
+            К содержимому
+          </a>
           <div className="stars-layer stars-layer-a" aria-hidden="true" />
           <div className="stars-layer stars-layer-b" aria-hidden="true" />
           <div className="aurora-layer" aria-hidden="true" />

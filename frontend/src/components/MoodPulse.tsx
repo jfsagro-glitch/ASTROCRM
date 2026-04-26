@@ -1,7 +1,7 @@
 // ─── MoodPulse — inline daily mood logger (5 levels) ─────────────────────────
 // One-tap save to journal API. Loads today's entry on mount; preserves notes.
 import { useEffect, useState } from 'react';
-import { upsertEntry, getEntry, type DayEntryStored } from '../services/journalService';
+import { upsertEntry, getEntry, listEntries, type DayEntryStored } from '../services/journalService';
 import { haptic } from '../hooks/useHaptic';
 
 interface ThemeLike { card: string; header: string; accent: string; text: string; symbol: string; }
@@ -20,16 +20,37 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const MOOD_COLOR: Record<number, string> = {
+  1: '#ef4444', 2: '#f97316', 3: '#facc15', 4: '#84cc16', 5: '#22c55e',
+};
+
+function isoDateOffset(daysBack: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const HEATMAP_DAYS = 14;
+
 export default function MoodPulse({ theme, userId }: Props) {
   const [entry, setEntry] = useState<DayEntryStored | null>(null);
   const [pending, setPending] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancel = false;
     getEntry(todayISO(), userId)
       .then((e) => { if (!cancel) setEntry(e); })
       .catch(() => { /* silent — keep empty state */ });
+    listEntries({ userId, start: isoDateOffset(HEATMAP_DAYS - 1), end: todayISO(), limit: 60 })
+      .then((rows) => {
+        if (cancel) return;
+        const map: Record<string, number> = {};
+        for (const r of rows) if (typeof r.mood === 'number') map[r.date] = r.mood;
+        setHistory(map);
+      })
+      .catch(() => { /* silent */ });
     return () => { cancel = true; };
   }, [userId]);
 
@@ -47,6 +68,7 @@ export default function MoodPulse({ theme, userId }: Props) {
         tags:         entry?.tags ?? [],
       });
       setEntry(saved);
+      setHistory((h) => ({ ...h, [saved.date]: v }));
       haptic('success');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось сохранить');
@@ -100,6 +122,33 @@ export default function MoodPulse({ theme, userId }: Props) {
       {error && (
         <p className="text-[11px] text-red-300 mt-2 m-0" role="alert">{error}</p>
       )}
+
+      <div className="mt-3 pt-2.5 border-t border-white/8">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className={`text-[10px] uppercase tracking-wider ${theme.text} opacity-50`}>
+            Последние {HEATMAP_DAYS} дней
+          </span>
+        </div>
+        <div className="flex gap-[3px]" aria-label="Настроение за последние 14 дней">
+          {Array.from({ length: HEATMAP_DAYS }, (_, i) => {
+            const offset = HEATMAP_DAYS - 1 - i;
+            const date = isoDateOffset(offset);
+            const m = history[date];
+            const color = m ? MOOD_COLOR[m] : 'rgba(255,255,255,0.06)';
+            const d = new Date(date);
+            const dayLabel = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+            return (
+              <div
+                key={date}
+                className="flex-1 h-5 rounded-sm transition-all hover:scale-y-110 origin-bottom"
+                style={{ backgroundColor: color, border: m ? 'none' : '1px solid rgba(255,255,255,0.08)' }}
+                title={m ? `${dayLabel}: ${m}/5` : `${dayLabel}: нет записи`}
+                aria-label={m ? `${dayLabel}, ${m} из 5` : `${dayLabel}, нет записи`}
+              />
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
