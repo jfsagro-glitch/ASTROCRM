@@ -21,8 +21,12 @@ const LunarCalendarCard   = lazy(() => import('./LunarCalendarCard'));
 const SolarReturnDashCard = lazy(() => import('./SolarReturnDashCard'));
 const DashboardCharts     = lazy(() => import('./DashboardCharts'));
 const DayCardShare        = lazy(() => import('./DayCardShare'));
+const NotificationTimeSettings = lazy(() => import('./NotificationTimeSettings'));
 import { useAppMode } from '../hooks/useAppMode';
 import { useVisitStreak } from '../hooks/useVisitStreak';
+import { haptic } from '../hooks/useHaptic';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import AnimatedNumber from './AnimatedNumber';
 import { getFirdariaSubInterpretation } from '../data/firdariaSubPeriods';
 
 // ─── Theme type ───────────────────────────────────────────────────────────────
@@ -307,8 +311,8 @@ function ScoreRing({ score }: { score: number }) {
           )}
         </circle>
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
-        <span className="text-4xl font-bold leading-none tracking-tight" style={{ color }}>{score}</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true" style={{ color }}>
+        <AnimatedNumber value={score} className="text-4xl font-bold leading-none tracking-tight" />
         <span className="text-xs leading-none mt-1 font-semibold uppercase tracking-widest" style={{ color }}>{label}</span>
       </div>
     </div>
@@ -2348,6 +2352,8 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
+  const ptr = usePullToRefresh(() => load(true));
+
   if (loading) return (
     <div role="status" aria-live="polite" aria-label="Загрузка дашборда" className="space-y-4">
       {/* Hero skeleton */}
@@ -2460,7 +2466,20 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   const { moon, top_transits, compensatory, fortune_today } = data;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" style={{ transform: ptr.pull > 0 ? `translateY(${ptr.pull}px)` : undefined, transition: ptr.busy || ptr.pull === 0 ? 'transform 220ms ease-out' : undefined }}>
+
+      {(ptr.pull > 0 || ptr.busy) && (
+        <div
+          className="fixed left-0 right-0 top-0 flex justify-center pointer-events-none z-50"
+          style={{ transform: `translateY(${Math.max(8, ptr.pull - 32)}px)` }}
+          aria-hidden="true"
+        >
+          <div className="bg-white/10 backdrop-blur border border-white/15 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs text-white/85">
+            <RefreshCw size={12} className={ptr.busy ? 'animate-spin' : ''} style={{ transform: !ptr.busy ? `rotate(${ptr.progress * 360}deg)` : undefined, transition: 'transform 80ms linear' }} aria-hidden="true" />
+            {ptr.busy ? 'Обновляю…' : ptr.progress >= 1 ? 'Отпустите для обновления' : 'Тяните для обновления'}
+          </div>
+        </div>
+      )}
 
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2471,14 +2490,14 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
         <div className="flex items-center gap-2">
           <div role="group" aria-label="Режим отображения" className="flex rounded-xl overflow-hidden border border-white/10 text-xs">
             <button
-              onClick={() => mode !== 'simple' && toggleMode()}
+              onClick={() => { if (mode !== 'simple') { haptic('select'); toggleMode(); } }}
               aria-pressed={mode === 'simple'}
               className={`px-3 py-2 min-h-[40px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${mode === 'simple' ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white'}`}
             >
               Простой
             </button>
             <button
-              onClick={() => mode !== 'pro' && toggleMode()}
+              onClick={() => { if (mode !== 'pro') { haptic('select'); toggleMode(); } }}
               aria-pressed={mode === 'pro'}
               className={`px-3 py-2 min-h-[40px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset ${mode === 'pro' ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white'}`}
             >
@@ -2499,7 +2518,7 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
             </span>
           )}
           <button
-            onClick={() => load(true)}
+            onClick={() => { haptic('tap'); load(true); }}
             aria-label="Обновить дашборд"
             className={`flex items-center gap-1.5 text-xs px-3 py-2 min-h-[40px] rounded-xl ${theme.btn} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
           >
@@ -2516,6 +2535,10 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       <HourlyTimeline data={data} theme={theme} />
 
       <LunationCard data={data} theme={theme} />
+
+      <Suspense fallback={null}>
+        <NotificationTimeSettings theme={theme} userId={userId} />
+      </Suspense>
 
       {/* ══════════════════════════════════════════════════════════════════
           УРОВЕНЬ 1 — ГЛАВНЫЙ ЭКРАН: Score + сферы (above-the-fold якорь)
