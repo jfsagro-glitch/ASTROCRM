@@ -16,12 +16,14 @@ import type { BirthInput } from '../types/astro';
 import NowStrip from './NowStrip';
 import HourlyTimeline from './HourlyTimeline';
 import LunationCard from './LunationCard';
+import InsightStrip from './InsightStrip';
 // Lazy-loaded — these aren't above the fold and add ~50KB+ to initial bundle.
 const LunarCalendarCard   = lazy(() => import('./LunarCalendarCard'));
 const SolarReturnDashCard = lazy(() => import('./SolarReturnDashCard'));
 const DashboardCharts     = lazy(() => import('./DashboardCharts'));
 const DayCardShare        = lazy(() => import('./DayCardShare'));
 const NotificationTimeSettings = lazy(() => import('./NotificationTimeSettings'));
+const MoodPulse                 = lazy(() => import('./MoodPulse'));
 import { useAppMode } from '../hooks/useAppMode';
 import { useVisitStreak } from '../hooks/useVisitStreak';
 import { haptic } from '../hooks/useHaptic';
@@ -2534,7 +2536,13 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
 
       <HourlyTimeline data={data} theme={theme} />
 
+      <InsightStrip data={data} theme={theme} />
+
       <LunationCard data={data} theme={theme} />
+
+      <Suspense fallback={null}>
+        <MoodPulse theme={theme} userId={userId} />
+      </Suspense>
 
       <Suspense fallback={null}>
         <NotificationTimeSettings
