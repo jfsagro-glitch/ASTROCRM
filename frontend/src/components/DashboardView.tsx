@@ -1118,6 +1118,20 @@ function HeroCard({ data, birthData, theme }: { data: DashboardData; birthData: 
           <div className="flex flex-col items-center gap-1 shrink-0">
             <ScoreRing score={score} />
             <span className="text-[10px] text-white/55 uppercase tracking-wider">энергия дня</span>
+            {data.trend_3d && (() => {
+              const delta = (data.trend_3d.today ?? 0) - (data.trend_3d.yesterday ?? 0);
+              if (Math.abs(delta) < 1) return null;
+              const up = delta > 0;
+              return (
+                <span
+                  className={`text-[10px] tabular-nums font-semibold ${up ? 'text-emerald-300' : 'text-red-300'}`}
+                  title={`Изменение относительно вчера: ${up ? '+' : ''}${Math.round(delta)}`}
+                  aria-label={`По сравнению со вчера ${up ? 'выше' : 'ниже'} на ${Math.abs(Math.round(delta))} баллов`}
+                >
+                  {up ? '↑' : '↓'} {up ? '+' : ''}{Math.round(delta)} vs вчера
+                </span>
+              );
+            })()}
             {data.trend_3d && (
               <Trend3d trend={data.trend_3d} />
             )}
@@ -2353,6 +2367,25 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
   }, [birthData]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Idle-time prefetch tomorrow's dashboard so day-flip / trend feels instant
+  useEffect(() => {
+    if (!data) return;
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const iso = tomorrow.toISOString().slice(0, 10);
+    const run = () => { getDashboard(birthData, iso).catch(() => { /* silent */ }); };
+    if (typeof w.requestIdleCallback === 'function') {
+      const id = w.requestIdleCallback(run, { timeout: 4000 });
+      return () => { if (typeof w.cancelIdleCallback === 'function') w.cancelIdleCallback(id); };
+    }
+    const t = window.setTimeout(run, 2500);
+    return () => window.clearTimeout(t);
+  }, [data, birthData]);
 
   const ptr = usePullToRefresh(() => load(true));
 

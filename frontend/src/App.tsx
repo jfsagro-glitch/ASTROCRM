@@ -4,6 +4,7 @@ import ClientPortal from './components/ClientPortal';
 import CRM from './components/CRM';
 import AuthPage from './components/AuthPage';
 import PwaInstallBanner from './components/PwaInstallBanner';
+import OfflineBanner from './components/OfflineBanner';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -109,6 +110,7 @@ export default function App() {
             </RuntimeErrorBoundary>
           </AuthGate>
           <PwaInstallBanner />
+          <OfflineBanner />
         </div>
       </Router>
       </AuthProvider>
