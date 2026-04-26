@@ -2537,7 +2537,17 @@ export default function DashboardView({ birthData, theme, userId }: Props) {
       <LunationCard data={data} theme={theme} />
 
       <Suspense fallback={null}>
-        <NotificationTimeSettings theme={theme} userId={userId} />
+        <NotificationTimeSettings
+          theme={theme}
+          userId={userId}
+          bodyHint={(() => {
+            const sc = data.day_score ?? 50;
+            const tone = sc >= 65 ? 'благоприятный' : sc <= 40 ? 'осторожный' : 'нейтральный';
+            const top = data.top_transits?.[0];
+            const tail = top ? ` · ${top.transit_planet} ${top.aspect} ${top.natal_planet}` : '';
+            return `Сегодня ${tone} день · балл ${sc}${tail}`.slice(0, 140);
+          })()}
+        />
       </Suspense>
 
       {/* ══════════════════════════════════════════════════════════════════

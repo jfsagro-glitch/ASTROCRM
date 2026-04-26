@@ -124,5 +124,56 @@ export function usePushSubscription(userId?: string) {
     }
   }, []);
 
-  return { status, subscribed, loading, subscribe, unsubscribe, updatePrefs, supported: isSupported() };
+  const scheduleMorning = useCallback(async (
+    hour: number, minute: number, body: string,
+  ): Promise<boolean> => {
+    if (!isSupported()) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return false;
+      // compute next local hh:mm in UTC
+      const now = new Date();
+      const fire = new Date(now);
+      fire.setHours(hour, minute, 0, 0);
+      if (fire.getTime() <= now.getTime()) fire.setDate(fire.getDate() + 1);
+      const dedup = `morning:${fire.toISOString().slice(0, 10)}`;
+      const res = await fetch(`${API_URL}/api/push/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint:    sub.endpoint,
+          fire_at_utc: fire.toISOString(),
+          title:       '✦ Astro Daily',
+          body,
+          url:         '/',
+          dedup_key:   dedup,
+        }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[push] scheduleMorning failed', e);
+      return false;
+    }
+  }, []);
+
+  const testNow = useCallback(async (body = 'Тест: уведомления работают ✦'): Promise<boolean> => {
+    if (!isSupported()) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return false;
+      const res = await fetch(`${API_URL}/api/push/test-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint, title: '✦ Astro Daily', body, url: '/' }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[push] testNow failed', e);
+      return false;
+    }
+  }, []);
+
+  return { status, subscribed, loading, subscribe, unsubscribe, updatePrefs, scheduleMorning, testNow, supported: isSupported() };
 }
