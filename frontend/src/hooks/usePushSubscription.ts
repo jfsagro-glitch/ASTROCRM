@@ -60,7 +60,11 @@ export function usePushSubscription(userId?: string) {
       await fetch(`${API_URL}/api/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription: sub.toJSON(), user_id: userId ?? null }),
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          user_id: userId ?? null,
+          prefs: { tz_offset_min: new Date().getTimezoneOffset() },
+        }),
       });
       setSubscribed(true);
       return true;
@@ -96,5 +100,29 @@ export function usePushSubscription(userId?: string) {
     }
   }, [userId]);
 
-  return { status, subscribed, loading, subscribe, unsubscribe, supported: isSupported() };
+  const updatePrefs = useCallback(async (prefs: {
+    morning_hour?: number; morning_minute?: number; enabled?: boolean;
+  }): Promise<boolean> => {
+    if (!isSupported()) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return false;
+      const res = await fetch(`${API_URL}/api/push/prefs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: sub.endpoint,
+          tz_offset_min: new Date().getTimezoneOffset(),
+          ...prefs,
+        }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[push] updatePrefs failed', e);
+      return false;
+    }
+  }, []);
+
+  return { status, subscribed, loading, subscribe, unsubscribe, updatePrefs, supported: isSupported() };
 }

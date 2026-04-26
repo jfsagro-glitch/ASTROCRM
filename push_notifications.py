@@ -57,20 +57,43 @@ def _save_all(rows: list[dict[str, Any]]) -> None:
     tmp.replace(STORE_PATH)
 
 
-def upsert_subscription(sub: dict[str, Any], user_id: Optional[str]) -> None:
+def upsert_subscription(
+    sub: dict[str, Any],
+    user_id: Optional[str],
+    prefs: Optional[dict[str, Any]] = None,
+) -> None:
     with _lock:
         rows = _load_all()
         endpoint = sub.get("endpoint")
         if not endpoint:
             raise ValueError("subscription.endpoint missing")
-        # dedup by endpoint
+        # preserve existing prefs if not supplied
+        existing = next((r for r in rows if r.get("subscription", {}).get("endpoint") == endpoint), None)
+        merged_prefs = (existing or {}).get("prefs") if existing else None
+        if prefs is not None:
+            merged_prefs = {**(merged_prefs or {}), **prefs}
         rows = [r for r in rows if r.get("subscription", {}).get("endpoint") != endpoint]
         rows.append({
             "user_id":      user_id,
             "subscription": sub,
+            "prefs":        merged_prefs or {"morning_hour": 8, "morning_minute": 0, "tz_offset_min": 0, "enabled": True},
             "created_at":   datetime.now(timezone.utc).isoformat(),
         })
         _save_all(rows)
+
+
+def update_prefs(endpoint: str, prefs: dict[str, Any]) -> bool:
+    with _lock:
+        rows = _load_all()
+        found = False
+        for r in rows:
+            if r.get("subscription", {}).get("endpoint") == endpoint:
+                r["prefs"] = {**(r.get("prefs") or {}), **prefs}
+                found = True
+                break
+        if found:
+            _save_all(rows)
+        return found
 
 
 def remove_subscription(endpoint: str) -> int:
@@ -160,6 +183,15 @@ router = APIRouter(prefix="/api/push", tags=["push"])
 class SubscribeBody(BaseModel):
     subscription: dict[str, Any] = Field(..., description="PushSubscription.toJSON()")
     user_id: Optional[str] = None
+    prefs: Optional[dict[str, Any]] = None
+
+
+class PrefsBody(BaseModel):
+    endpoint: str
+    morning_hour: Optional[int] = None       # 0..23 local
+    morning_minute: Optional[int] = None     # 0..59
+    tz_offset_min: Optional[int] = None      # JS Date.getTimezoneOffset() (negative east)
+    enabled: Optional[bool] = None
 
 
 class UnsubscribeBody(BaseModel):
@@ -182,10 +214,25 @@ def get_vapid_public_key() -> dict[str, str]:
 @router.post("/subscribe")
 def subscribe(body: SubscribeBody) -> dict[str, Any]:
     try:
-        upsert_subscription(body.subscription, body.user_id)
+        upsert_subscription(body.subscription, body.user_id, body.prefs)
         return {"ok": True}
     except Exception as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/prefs")
+def set_prefs(body: PrefsBody) -> dict[str, Any]:
+    prefs: dict[str, Any] = {}
+    if body.morning_hour   is not None: prefs["morning_hour"]   = max(0, min(23, body.morning_hour))
+    if body.morning_minute is not None: prefs["morning_minute"] = max(0, min(59, body.morning_minute))
+    if body.tz_offset_min  is not None: prefs["tz_offset_min"]  = body.tz_offset_min
+    if body.enabled        is not None: prefs["enabled"]        = bool(body.enabled)
+    if not prefs:
+        raise HTTPException(400, "no prefs supplied")
+    found = update_prefs(body.endpoint, prefs)
+    if not found:
+        raise HTTPException(404, "subscription not found")
+    return {"ok": True, "prefs": prefs}
 
 
 @router.post("/unsubscribe")
