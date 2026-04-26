@@ -33,11 +33,14 @@ except Exception:
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 STORE_PATH = Path(os.environ.get("PUSH_STORE_PATH", "push_subscriptions.json"))
+SCHEDULE_PATH = Path(os.environ.get("PUSH_SCHEDULE_PATH", "push_schedule.json"))
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@astrocrm.local")
+PUSH_CRON_TOKEN = os.environ.get("PUSH_CRON_TOKEN", "")
 
 _lock = threading.Lock()
+_sched_lock = threading.Lock()
 
 # ─── Storage helpers ─────────────────────────────────────────────────────────
 def _load_all() -> list[dict[str, Any]]:
@@ -110,6 +113,110 @@ def list_subscriptions(user_id: Optional[str] = None) -> list[dict[str, Any]]:
     if user_id is not None:
         rows = [r for r in rows if r.get("user_id") == user_id]
     return rows
+
+
+# ─── Schedule store ──────────────────────────────────────────────────────────
+def _load_sched() -> list[dict[str, Any]]:
+    if not SCHEDULE_PATH.exists():
+        return []
+    try:
+        with SCHEDULE_PATH.open("r", encoding="utf-8") as f:
+            return json.load(f) or []
+    except Exception:
+        return []
+
+
+def _save_sched(rows: list[dict[str, Any]]) -> None:
+    tmp = SCHEDULE_PATH.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False, indent=2)
+    tmp.replace(SCHEDULE_PATH)
+
+
+def schedule_push(
+    endpoint: str,
+    fire_at_utc: str,
+    payload: dict[str, Any],
+    dedup_key: Optional[str] = None,
+) -> dict[str, Any]:
+    """Queue one push. dedup_key replaces an existing pending entry with the same key."""
+    with _sched_lock:
+        rows = _load_sched()
+        if dedup_key:
+            rows = [
+                r for r in rows
+                if not (r.get("endpoint") == endpoint and r.get("dedup_key") == dedup_key and r.get("status") == "pending")
+            ]
+        rows.append({
+            "endpoint":    endpoint,
+            "fire_at_utc": fire_at_utc,
+            "payload":     payload,
+            "dedup_key":   dedup_key,
+            "status":      "pending",
+            "created_at":  datetime.now(timezone.utc).isoformat(),
+        })
+        # cap history
+        if len(rows) > 5000:
+            rows = rows[-5000:]
+        _save_sched(rows)
+        return {"ok": True}
+
+
+def _find_sub_by_endpoint(endpoint: str) -> Optional[dict[str, Any]]:
+    for r in _load_all():
+        if r.get("subscription", {}).get("endpoint") == endpoint:
+            return r
+    return None
+
+
+def flush_due(now: Optional[datetime] = None, max_send: int = 200) -> dict[str, Any]:
+    """Send all pending entries with fire_at_utc <= now. Returns summary."""
+    now = now or datetime.now(timezone.utc)
+    sent = failed = skipped = 0
+    errors: list[str] = []
+    with _sched_lock:
+        rows = _load_sched()
+    changed = False
+    for row in rows:
+        if row.get("status") != "pending":
+            continue
+        try:
+            fire = datetime.fromisoformat(row["fire_at_utc"].replace("Z", "+00:00"))
+        except Exception:
+            row["status"] = "error"; row["error"] = "bad fire_at_utc"
+            changed = True; continue
+        if fire > now:
+            continue
+        if sent + failed >= max_send:
+            break
+        sub_row = _find_sub_by_endpoint(row.get("endpoint", ""))
+        if not sub_row:
+            row["status"] = "dropped"; row["error"] = "subscription not found"
+            changed = True; skipped += 1; continue
+        prefs = sub_row.get("prefs") or {}
+        if prefs.get("enabled") is False:
+            row["status"] = "skipped"; row["error"] = "disabled"
+            changed = True; skipped += 1; continue
+        p = row.get("payload") or {}
+        res = send_push(
+            sub_row["subscription"],
+            title=p.get("title", "✦ Astro Daily"),
+            body=p.get("body",  "Откройте дашборд"),
+            url=p.get("url",   "/"),
+            icon=p.get("icon"),
+        )
+        if res.get("ok"):
+            row["status"] = "sent"; row["sent_at"] = now.isoformat()
+            sent += 1
+        else:
+            row["status"] = "error"; row["error"] = res.get("error", "send failed")
+            failed += 1
+            if len(errors) < 5: errors.append(row["error"])
+        changed = True
+    if changed:
+        with _sched_lock:
+            _save_sched(rows)
+    return {"sent": sent, "failed": failed, "skipped": skipped, "errors": errors}
 
 
 # ─── Sender ──────────────────────────────────────────────────────────────────
@@ -206,6 +313,22 @@ class TestSendBody(BaseModel):
     url: str = "/"
 
 
+class ScheduleBody(BaseModel):
+    endpoint: str
+    fire_at_utc: str = Field(..., description="ISO-8601 UTC, e.g. 2026-04-27T05:00:00Z")
+    title: str = "✦ Astro Daily"
+    body: str = "Откройте дашборд"
+    url: str = "/"
+    dedup_key: Optional[str] = None  # replaces existing pending with same key
+
+
+class TestNowBody(BaseModel):
+    endpoint: str
+    title: str = "✦ Astro Daily"
+    body: str = "Тест: уведомления включены"
+    url: str = "/"
+
+
 @router.get("/vapid-public-key")
 def get_vapid_public_key() -> dict[str, str]:
     return {"public_key": VAPID_PUBLIC_KEY}
@@ -245,6 +368,36 @@ def unsubscribe(body: UnsubscribeBody) -> dict[str, Any]:
 def test_send(body: TestSendBody) -> dict[str, Any]:
     """DEV-only helper to fire a broadcast."""
     return broadcast(body.title, body.body, body.url, user_id=body.user_id)
+
+
+@router.post("/schedule")
+def schedule(body: ScheduleBody) -> dict[str, Any]:
+    sub_row = _find_sub_by_endpoint(body.endpoint)
+    if not sub_row:
+        raise HTTPException(404, "subscription not found")
+    return schedule_push(
+        endpoint=body.endpoint,
+        fire_at_utc=body.fire_at_utc,
+        payload={"title": body.title, "body": body.body, "url": body.url},
+        dedup_key=body.dedup_key,
+    )
+
+
+@router.post("/test-now")
+def test_now(body: TestNowBody) -> dict[str, Any]:
+    """Fire a single push immediately to one endpoint (used by 'send test' UI)."""
+    sub_row = _find_sub_by_endpoint(body.endpoint)
+    if not sub_row:
+        raise HTTPException(404, "subscription not found")
+    return send_push(sub_row["subscription"], title=body.title, body=body.body, url=body.url)
+
+
+@router.post("/cron-tick")
+def cron_tick(token: str = "") -> dict[str, Any]:
+    """Flush due scheduled pushes. Protect with PUSH_CRON_TOKEN env if set."""
+    if PUSH_CRON_TOKEN and token != PUSH_CRON_TOKEN:
+        raise HTTPException(401, "invalid token")
+    return flush_due()
 
 
 @router.get("/status")

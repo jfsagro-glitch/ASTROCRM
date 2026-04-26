@@ -1,11 +1,11 @@
 // ─── NotificationTimeSettings — pick morning push time, sync to backend ──────
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, BellOff, Clock } from 'lucide-react';
 import { usePushSubscription } from '../hooks/usePushSubscription';
 import { haptic } from '../hooks/useHaptic';
 
 interface ThemeLike { card: string; header: string; accent: string; text: string; btn: string; symbol: string; }
-interface Props { theme: ThemeLike; userId?: string; }
+interface Props { theme: ThemeLike; userId?: string; bodyHint?: string; }
 
 const TIMES: Array<{ h: number; m: number; label: string }> = [
   { h: 6, m: 30, label: '06:30' },
@@ -35,11 +35,21 @@ function read(): Stored {
   return { h: 8, m: 0, enabled: true };
 }
 
-export default function NotificationTimeSettings({ theme, userId }: Props) {
-  const { status, subscribed, loading, subscribe, unsubscribe, updatePrefs, supported } = usePushSubscription(userId);
+export default function NotificationTimeSettings({ theme, userId, bodyHint }: Props) {
+  const { status, subscribed, loading, subscribe, unsubscribe, updatePrefs, scheduleMorning, testNow, supported } = usePushSubscription(userId);
   const [s, setS] = useState<Stored>(read());
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [testFlash, setTestFlash] = useState<string | null>(null);
+
+  // schedule the next morning ping whenever subscribed/enabled/time/bodyHint changes
+  useEffect(() => {
+    if (!subscribed || !s.enabled) return;
+    const body = bodyHint && bodyHint.length > 0
+      ? bodyHint
+      : 'Откройте дашборд — сводка дня готова';
+    scheduleMorning(s.h, s.m, body).catch(() => { /* best-effort */ });
+  }, [subscribed, s.enabled, s.h, s.m, bodyHint, scheduleMorning]);
 
   if (!supported) return null;
 
@@ -134,9 +144,28 @@ export default function NotificationTimeSettings({ theme, userId }: Props) {
             : <><BellOff size={12} aria-hidden="true" /> Включить</>}
         </button>
         {subscribed && s.enabled && (
-          <span className={`flex items-center gap-1 text-[11px] ${theme.text} opacity-60`}>
-            <Clock size={10} aria-hidden="true" /> ежедневно
-          </span>
+          <>
+            <span className={`flex items-center gap-1 text-[11px] ${theme.text} opacity-60`}>
+              <Clock size={10} aria-hidden="true" /> ежедневно
+            </span>
+            <button
+              onClick={async () => {
+                haptic('tap');
+                const ok = await testNow('Тест: уведомления работают ✦');
+                setTestFlash(ok ? 'отправлено' : 'не удалось');
+                window.setTimeout(() => setTestFlash(null), 2500);
+              }}
+              className={`ml-auto text-[11px] px-2.5 py-1.5 min-h-[32px] rounded-lg bg-white/6 border border-white/10 ${theme.text} hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
+              aria-label="Отправить тестовое уведомление"
+            >
+              Тест
+            </button>
+            {testFlash && (
+              <span className={`text-[11px] ${testFlash === 'отправлено' ? 'text-emerald-300' : 'text-red-300'} opacity-90`}>
+                {testFlash}
+              </span>
+            )}
+          </>
         )}
       </div>
     </div>
